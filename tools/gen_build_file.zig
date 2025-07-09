@@ -32,10 +32,24 @@ pub fn main() !void {
 
     if (!skip_headers) try copyHeaderFiles(allocator);
 
-    try generateSourceLists(allocator,  "OCCT/src/FoundationClasses/TKernel");
-    try generateSourceLists(allocator,  "OCCT/src/FoundationClasses/TKMath");
+    try generateSourceLists(allocator, "OCCT/src/FoundationClasses/TKernel");
+    try generateSourceLists(allocator, "OCCT/src/FoundationClasses/TKMath");
+    try generateSourceLists(allocator, "OCCT/src/ModelingData/TKG2d");
+    try generateSourceLists(allocator, "OCCT/src/ModelingData/TKG3d");
+    try generateSourceLists(allocator, "OCCT/src/ModelingData/TKGeomBase");
+    try generateSourceLists(allocator, "OCCT/src/ModelingData/TKBRep");
+    try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKGeomAlgo");
+    try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKTopAlgo");
+    try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKPrim");
+    try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKFillet");
+    try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKOffset");
+    try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKFeat");
+    try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKBool");
+    try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKShHealing");
+    try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKBO");
+    try generateSourceLists(allocator, "OCCT/src/DataExchange/TKDESTEP");
+    try generateSourceLists(allocator, "OCCT/src/DataExchange/TKXSBase");
 }
-
 
 pub fn fatal(comptime format: []const u8, args: anytype) noreturn {
     std.log.err(format, args);
@@ -64,7 +78,7 @@ fn copyHeaderFiles(allocator: std.mem.Allocator) !void {
 
         // std.debug.print(" {s} {s}\n", .{source, dest_path});
         if (std.mem.indexOf(u8, source, "GTests") != null) continue;
-        if (!endsWith(u8, source, "hxx") and !endsWith(u8, source, "lxx") and !endsWith(u8, source, "gxx")) continue;
+        if (!endsWith(u8, source, ".h") and !endsWith(u8, source, ".hxx") and !endsWith(u8, source, ".lxx") and !endsWith(u8, source, ".gxx") and !endsWith(u8, source, ".pxx")) continue;
         try std.fs.cwd().copyFile(source, std.fs.cwd(), dest_path, .{});
     }
 }
@@ -80,7 +94,9 @@ fn generateSourceLists(allocator: std.mem.Allocator, dir_path: []const u8) !void
     }
 
     const module = std.fs.path.basename(dir_path);
-    const sources_file_name = try std.fmt.allocPrint(allocator, "{s}_generated-build-config.zig", .{ module,  });
+    const sources_file_name = try std.fmt.allocPrint(allocator, "{s}_generated-build-config.zig", .{
+        module,
+    });
     defer allocator.free(sources_file_name);
 
     std.debug.print("Collecting source files\n", .{});
@@ -97,7 +113,7 @@ fn generateSourceLists(allocator: std.mem.Allocator, dir_path: []const u8) !void
         if (endsWith(u8, source, "pxx")) continue;
         if (endsWith(u8, source, "lxx")) continue;
         if (endsWith(u8, source, "gxx")) continue;
-        if (!endsWith(u8, source, "xx")) continue;
+        if (!endsWith(u8, source, ".c") and !endsWith(u8, source, ".cxx")) continue;
         try file.writer().print("    \"{s}\",\n", .{source});
     }
     try file.writeAll("};\n");
