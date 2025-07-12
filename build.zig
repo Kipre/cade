@@ -32,6 +32,12 @@ fn addOCCTModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
 }
 
 pub fn build(b: *std.Build) void {
+    const only_gen_tool = b.option(
+        bool,
+        "only_tools",
+        "Only build the generator tool executable",
+    ) orelse false;
+
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -48,6 +54,8 @@ pub fn build(b: *std.Build) void {
     });
 
     b.installArtifact(gen_sources);
+
+    if (only_gen_tool) return;
 
     // main module
     const mod = b.createModule(.{
