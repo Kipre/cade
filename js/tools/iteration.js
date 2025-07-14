@@ -4,7 +4,7 @@
 /**
  * @template T
  * @param {T[]} array
- * @returns {Iterator<[T, T, number]>}
+ * @returns {Generator<[T, T, number]>}
  */
 export function* pairs(array, offset = 0, wrap = true) {
   const len = array.length;

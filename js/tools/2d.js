@@ -1,6 +1,8 @@
 // @ts-check
 /** @import * as types from './types' */
 
+const eps = 1e-5;
+
 import { pairs } from './iteration.js';
 
 /**
@@ -50,6 +52,7 @@ export function rotatePoint([x0, y0], [x1, y1], alpha) {
 
 
 export function mirrorPoint(p, l1, l2) {
+  if (norm(p, l1) < eps) return p;
   const mid = pointToLine(p, l1, l2);
   return rotatePoint(mid, p, Math.PI);
 }

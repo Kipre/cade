@@ -3,6 +3,7 @@ import { KindaDOMMatrix, KindaDOMPoint } from "../dom.js";
 import {
     computeVectorAngle,
   intersectLines,
+  mirrorPoint,
   norm,
   offsetPolyline,
   placeAlong,
@@ -186,4 +187,26 @@ bro.test("computes angle", () => {
   bro
     .expect(() => computeVectorAngle([ 0, 0 ]))
     .toThrow();
+});
+
+bro.test("mirrorPoint", () => {
+  bro
+    .expect(mirrorPoint([0, -1], [0, 0], [1, 0]))
+    .toRoughlyEqual([0, 1], 1e-5);
+
+  bro
+    .expect(mirrorPoint([0, 0.5], [0, 0], [1, 0]))
+    .toRoughlyEqual([0, -0.5], 1e-5);
+
+  bro
+    .expect(mirrorPoint([1, 0], [0, 0], [1, 0]))
+    .toRoughlyEqual([1, 0], 1e-5);
+
+  bro
+    .expect(mirrorPoint([0, 0], [0, 0], [1, 0]))
+    .toRoughlyEqual([0, 0], 1e-5);
+
+  bro
+    .expect(mirrorPoint([1, -0.8], [0, 0], [1, 0]))
+    .toRoughlyEqual([1, 0.8], 1e-5);
 });
