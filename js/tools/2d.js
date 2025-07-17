@@ -3,7 +3,7 @@
 
 const eps = 1e-5;
 
-import { pairs } from './iteration.js';
+import { pairs } from "./iteration.js";
 
 /**
  * @param {types.Point} p1
@@ -39,6 +39,8 @@ export function areOnSameLine(p1, p2, p3) {
 }
 
 /**
+ * Rotates p2 around p1 by alpha radian
+ *
  * @param {types.Point} p1
  * @param {types.Point} p2
  * @param {number} alpha
@@ -49,7 +51,6 @@ export function rotatePoint([x0, y0], [x1, y1], alpha) {
   const [sinA, cosA] = [Math.sin(alpha), Math.cos(alpha)];
   return [u * cosA - v * sinA + x0, u * sinA + v * cosA + y0];
 }
-
 
 export function mirrorPoint(p, l1, l2) {
   if (norm(p, l1) < eps) return p;
@@ -62,8 +63,6 @@ export function norm(p1, p2) {
   const [u, v] = minus(p2, p1);
   return Math.sqrt(u ** 2 + v ** 2);
 }
-
-
 
 export function degs(angle) {
   return (180 * angle) / Math.PI;
@@ -149,12 +148,12 @@ export function computeVectorAngle(v) {
  * @param {types.Point} p1
  * @param {types.Point} l0
  * @param {types.Point} l1
- * @returns {types.Point}
+ * @returns {types.Point | null}
  */
 export function intersectLines(p0, p1, l0, l1) {
   let [u, v] = [p1[0] - p0[0], p1[1] - p0[1]];
   let [m, n] = [l1[0] - l0[0], l1[1] - l0[1]];
-  if (u === 0 && m === 0) throw new Error("no intersection");
+  if (u === 0 && m === 0) return null;
   if (m === 0) [u, v, m, n, p0, p1, l0, l1] = [m, n, u, v, l0, l1, p0, p1];
 
   const penteL = n / m;
@@ -165,7 +164,7 @@ export function intersectLines(p0, p1, l0, l1) {
   }
 
   const penteP = v / u;
-  if (penteP === penteL) throw new Error("no intersection");
+  if (penteP === penteL) return null;
 
   const biasP = p0[1] - penteP * p0[0];
   const x = (biasL - biasP) / (penteP - penteL);
@@ -173,35 +172,43 @@ export function intersectLines(p0, p1, l0, l1) {
   return [x, y];
 }
 
+/**
+ * Checks if a point is within a bbox defined by two points.
+ * Useful for determining if an intersection in in the relevant.
+ *
+ * @param {types.Point} p
+ * @param {types.Point} l1
+ * @param {types.Point} l2
+ * @returns {boolean}
+ */
+export function pointInsideLineBbox(p, l1, l2) {
+  const [minX1, maxX1, minY1, maxY1] = [
+    Math.min(l1[0], l2[0]),
+    Math.max(l1[0], l2[0]),
+    Math.min(l1[1], l2[1]),
+    Math.max(l1[1], l2[1]),
+  ];
+  return (
+    minX1 <= p[0] + eps &&
+    p[0] - eps <= maxX1 &&
+    minY1 <= p[1] + eps &&
+    p[1] - eps <= maxY1
+  );
+}
+
+/**
+ * @param {types.Point[]} poly1
+ * @param {types.Point[]} poly2
+ * @param {boolean} wrap
+ * @returns {types.Point?}
+ */
 export function intersect(poly1, poly2, wrap = false) {
   for (const [a, b] of pairs(poly1, 0, wrap && poly1.length > 2)) {
     for (const [c, d] of pairs(poly2, 0, wrap && poly2.length > 2)) {
-      try {
-        //const [a, b, c, d] = [poly1[i], poly1[i + 1], poly2[j], poly2[j + 1]];
-        const int = intersectLines(a, b, c, d);
-        const [minX1, minX2, maxX1, maxX2, minY1, minY2, maxY1, maxY2] = [
-          Math.min(a[0], b[0]),
-          Math.min(c[0], d[0]),
-          Math.max(a[0], b[0]),
-          Math.max(c[0], d[0]),
-          Math.min(a[1], b[1]),
-          Math.min(c[1], d[1]),
-          Math.max(a[1], b[1]),
-          Math.max(c[1], d[1]),
-        ];
-        const eps = 1e-5;
-        if (
-          minX1 <= int[0] + eps &&
-          int[0] - eps <= maxX1 &&
-          minY1 <= int[1] + eps &&
-          int[1] - eps <= maxY1 &&
-          minX2 <= int[0] + eps &&
-          int[0] - eps <= maxX2 &&
-          minY2 <= int[1] + eps &&
-          int[1] - eps <= maxY2
-        )
-          return int;
-      } catch (e) { }
+      const int = intersectLines(a, b, c, d);
+      if (int == null) continue;
+      if (pointInsideLineBbox(int, a, b) && pointInsideLineBbox(int, c, d))
+        return int;
     }
   }
   console.error(poly1, poly2);

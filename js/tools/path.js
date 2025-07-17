@@ -1,8 +1,24 @@
 // @ts-check
 /** @import * as types from './types' */
 
-import { areOnSameLine, computeAngleBetween, minus, mirrorPoint, norm, offsetPolyline, placeAlong, pointToLine } from './2d.js';
-import { pairs } from './iteration.js';
+import {
+  areOnSameLine,
+  computeAngleBetween,
+  computeVectorAngle,
+  intersectLines,
+  minus,
+  mirrorPoint,
+  mult,
+  norm,
+  offsetPolyline,
+  placeAlong,
+  plus,
+  pointInsideLineBbox,
+  pointToLine,
+  rotatePoint,
+} from "./2d.js";
+import { getCircleCenter } from "./circle.js";
+import { pairs } from "./iteration.js";
 
 const eps = 1e-5;
 
@@ -111,7 +127,6 @@ export class Path {
     for (const i of toRemove) {
       this.controls.splice(i, 1);
     }
-    
   }
 
   mirror() {
@@ -128,11 +143,11 @@ export class Path {
       const mirrored = mirrorPoint(p, firstPoint, lastPoint);
 
       switch (type) {
-        case ("lineTo"):
+        case "lineTo":
           this.lineTo(mirrored);
           break;
 
-        case ("arc"):
+        case "arc":
           this.arc(mirrored, maybeRadius, maybeSweepFlag);
           break;
 
@@ -143,6 +158,93 @@ export class Path {
 
     this.close();
     this.simplify();
+  }
+
+  /**
+   * @param {types.Point} p1
+   * @param {types.Point} p2
+   * @param {boolean} checkBounds
+   * @returns {types.Point[]}
+   */
+  intersect(p1, p2, checkBounds = true) {
+    const result = [];
+    let firstPoint;
+    let lastPoint;
+
+    for (let [type, p, ...rest] of this.controls) {
+      switch (type) {
+        case "moveTo":
+          firstPoint = p;
+          break;
+        case "close": {
+          if (Math.abs(norm(lastPoint, firstPoint)) < eps) break;
+          p = firstPoint
+        }
+        case "lineTo": {
+          if (lastPoint == null) throw new Error();
+          const int = intersectLines(lastPoint, p, p1, p2);
+          if (int == null) break;
+          if (
+            pointInsideLineBbox(int, lastPoint, p) &&
+            (!checkBounds || pointInsideLineBbox(int, p1, p2))
+          )
+            result.push(int);
+          break;
+        }
+        case "arc": {
+          const [radius, sweep] = rest;
+          const center = getCircleCenter(lastPoint, p, radius, sweep);
+          const [cx, cy] = center;
+          if (pointToLine([cx, cy], p1, p2) > radius) break;
+          const slope = (p2[1] - p1[1]) / (p2[0] - p1[0]);
+          const bias = p1[1] - p1[0] * slope;
+          // Math.sqrt((cx - ix)**2 + (cy - iy) ** 2) = radius
+          // (cx - ix)**2 + (cy - iy) ** 2 = radius ** 2
+          // cx**2 - 2*cx*ix  + ix**2 + cy**2 - 2*cy*iy  + iy**2 = radius ** 2
+          // ix * slope + bias = iy
+          //
+          // cx**2 - 2*cx*ix  + ix**2 + cy**2 - 2*cy*(ix*slope + bias) + (ix*slope + bias)**2 = radius ** 2
+          // cx**2 - 2*cx*ix  + ix**2 + cy**2 - 2*cy*ix*slope + 2*cy*bias + ix**2*slope**2 + 2*ix*slope*bias + bias**2 = radius ** 2
+          // cx**2 - 2*cx*ix  + ix**2 + cy**2 - 2*cy*ix*slope + 2*cy*bias + ix**2*slope**2 + 2*ix*slope*bias + bias**2 = radius ** 2
+          //ix**2 - 2*cy*ix*slope + ix**2*slope**2 + 2*ix*slope*bias - 2*cx*ix + cy**2 + 2*cy*bias  + bias**2 + cx**2 - radius ** 2 = 0
+          //ix**2(1 + slope**2)  + ix * (- 2*cy*slope + 2*slope*bias - 2*cx) + cy**2 + 2*cy*bias + bias**2 + cx**2 - radius ** 2 = 0
+          const a = 1 + slope ** 2;
+          const b = -2 * cy * slope + 2 * slope * bias - 2 * cx;
+          const c = cy ** 2 + 2 * cy * bias + bias ** 2 + cx ** 2 - radius ** 2;
+          const delta = b ** 2 - 4 * a * c;
+          if (delta < 0) break;
+
+          const roots = [];
+          if (Math.abs(delta) < eps) {
+            const ix = -b / (2 * a);
+            roots.push([ix, ix * slope + bias]);
+          } else
+            for (const d of [-1, +1]) {
+              const ix = -b + (d * Math.sqrt(delta)) / (2 * a);
+              roots.push([ix, ix * slope + bias]);
+            }
+
+          for (const root of roots) {
+            const baseAngle = computeVectorAngle(minus(center, lastPoint));
+            const rootAngle = computeVectorAngle(minus(center, root));
+            const angleInBetween =
+              0 < rootAngle - baseAngle &&
+              rootAngle - baseAngle <
+              computeVectorAngle(minus(center, p)) - baseAngle;
+            if (
+              angleInBetween &&
+              (!checkBounds || pointInsideLineBbox(root, p1, p2))
+            )
+              result.push(root);
+          }
+          break;
+        }
+        default:
+          throw new Error();
+      }
+      lastPoint = p;
+    }
+    return result;
   }
 
   toString() {
