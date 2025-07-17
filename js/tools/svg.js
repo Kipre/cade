@@ -1,7 +1,7 @@
 // @ts-check
 /** @import * as types from '../types' */
 
-import { pathRound } from "d3-path";
+import { Path } from "./path.js";
 
 export const w3svg = "http://www.w3.org/2000/svg";
 
@@ -93,16 +93,16 @@ export function logVector(x0, y0, x1, y1, color) {
 export function debugPolyline(poly, color = "red", strokeWidth = null) {
   const g = document.createElementNS(w3svg, "g");
   const p = document.createElementNS(w3svg, "path");
-  const d = pathRound(1);
+  const d = new Path();
   const [p0, ...rest] = poly;
-  d.moveTo(...p0);
+  d.moveTo(p0);
 
   for (const pn of rest) {
-    d.lineTo(...pn);
+    d.lineTo(pn);
     const point = document.createElementNS(w3svg, "circle");
     point.setAttribute("cx", pn[0]);
     point.setAttribute("cy", pn[1]);
-    point.setAttribute("r", 0.5 * (strokeWidth ?? 1));
+    point.setAttribute("r", "1em");
     g.appendChild(point);
   }
 
@@ -116,9 +116,9 @@ export function debugPolyline(poly, color = "red", strokeWidth = null) {
 }
 
 /**
- * @param {types.Point[][]} pointArrays
+ * @param {types.Point[][] | string[]} shapes
  */
-export function debugGeometry(...pointArrays) {
+export function debugGeometry(...shapes) {
   if (typeof document === "undefined") return;
 
   const id = "debug-drawing";
@@ -131,11 +131,27 @@ export function debugGeometry(...pointArrays) {
   const bbox = BBox.fromViewBox(svg.getAttribute("viewBox"));
   const colors = ["red", "green", "blue", "purple", "brown"];
 
-  for (let i = 0; i < pointArrays.length; i++) {
-    const points = pointArrays[i];
-    const path = debugPolyline(points, colors[i % pointArrays.length]);
+  for (let i = 0; i < shapes.length; i++) {
+    const shape = shapes[i];
+    const color = colors[i % shapes.length];
+
+    let path;
+    if (Array.isArray(shape)) {
+      path = debugPolyline(shape, color);
+      for (const p of shape) bbox.include(p);
+    } else {
+      path = document.createElementNS(w3svg, "path");
+      path.setAttribute("d", shape);
+      path.setAttribute("stroke", color);
+      path.setAttribute("fill", "none");
+
+      const totalLength = path.getTotalLength();
+      for (let i = 0; i < 1; i += 0.01) {
+        const p = path.getPointAtLength(totalLength * i);
+        bbox.include([p.x, p.y]);
+      }
+    }
     svg.appendChild(path);
-    for (const p of points) bbox.include(p);
   }
 
   svg.setAttribute("viewBox", bbox.toViewBox());

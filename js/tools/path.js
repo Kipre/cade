@@ -8,17 +8,15 @@ import {
   intersectLines,
   minus,
   mirrorPoint,
-  mult,
   norm,
   offsetPolyline,
   placeAlong,
   plus,
   pointInsideLineBbox,
   pointToLine,
-  rotatePoint,
 } from "./2d.js";
 import { getCircleCenter } from "./circle.js";
-import { pairs } from "./iteration.js";
+import { debugGeometry } from "./svg.js";
 
 const eps = 1e-5;
 
@@ -178,7 +176,7 @@ export class Path {
           break;
         case "close": {
           if (Math.abs(norm(lastPoint, firstPoint)) < eps) break;
-          p = firstPoint
+          p = firstPoint;
         }
         case "lineTo": {
           if (lastPoint == null) throw new Error();
@@ -196,41 +194,33 @@ export class Path {
           const center = getCircleCenter(lastPoint, p, radius, sweep);
           const [cx, cy] = center;
           if (pointToLine([cx, cy], p1, p2) > radius) break;
-          const slope = (p2[1] - p1[1]) / (p2[0] - p1[0]);
-          const bias = p1[1] - p1[0] * slope;
-          // Math.sqrt((cx - ix)**2 + (cy - iy) ** 2) = radius
-          // (cx - ix)**2 + (cy - iy) ** 2 = radius ** 2
-          // cx**2 - 2*cx*ix  + ix**2 + cy**2 - 2*cy*iy  + iy**2 = radius ** 2
-          // ix * slope + bias = iy
-          //
-          // cx**2 - 2*cx*ix  + ix**2 + cy**2 - 2*cy*(ix*slope + bias) + (ix*slope + bias)**2 = radius ** 2
-          // cx**2 - 2*cx*ix  + ix**2 + cy**2 - 2*cy*ix*slope + 2*cy*bias + ix**2*slope**2 + 2*ix*slope*bias + bias**2 = radius ** 2
-          // cx**2 - 2*cx*ix  + ix**2 + cy**2 - 2*cy*ix*slope + 2*cy*bias + ix**2*slope**2 + 2*ix*slope*bias + bias**2 = radius ** 2
-          //ix**2 - 2*cy*ix*slope + ix**2*slope**2 + 2*ix*slope*bias - 2*cx*ix + cy**2 + 2*cy*bias  + bias**2 + cx**2 - radius ** 2 = 0
-          //ix**2(1 + slope**2)  + ix * (- 2*cy*slope + 2*slope*bias - 2*cx) + cy**2 + 2*cy*bias + bias**2 + cx**2 - radius ** 2 = 0
-          const a = 1 + slope ** 2;
-          const b = -2 * cy * slope + 2 * slope * bias - 2 * cx;
-          const c = cy ** 2 + 2 * cy * bias + bias ** 2 + cx ** 2 - radius ** 2;
-          const delta = b ** 2 - 4 * a * c;
-          if (delta < 0) break;
 
+          const l1 = minus(p1, center);
+          const l2 = minus(p2, center);
+          const [dx, dy] = minus(l2, l1);
+          const dr = norm([dx, dy]);
+          const D = l1[0] * l2[1] - l2[0] * l1[1];
+
+          const delta = radius ** 2 * dr ** 2 - D ** 2;
+
+          const sgn = dy > 0 ? 1 : -1;
           const roots = [];
-          if (Math.abs(delta) < eps) {
-            const ix = -b / (2 * a);
-            roots.push([ix, ix * slope + bias]);
-          } else
-            for (const d of [-1, +1]) {
-              const ix = -b + (d * Math.sqrt(delta)) / (2 * a);
-              roots.push([ix, ix * slope + bias]);
-            }
+          if (Math.abs(delta) < eps || delta > 0) {
+            const ix = (D * dy + sgn * dx * Math.sqrt(delta)) / dr ** 2;
+            const iy = (-D * dx + Math.abs(dy) * Math.sqrt(delta)) / dr ** 2;
+            roots.push(plus([ix, iy], center));
+          }
+          if (delta > 0) {
+            const ix = (D * dy - sgn * dx * Math.sqrt(delta)) / dr ** 2;
+            const iy = (-D * dx - Math.abs(dy) * Math.sqrt(delta)) / dr ** 2;
+            roots.push(plus([ix, iy], center));
+          }
 
           for (const root of roots) {
-            const baseAngle = computeVectorAngle(minus(center, lastPoint));
-            const rootAngle = computeVectorAngle(minus(center, root));
-            const angleInBetween =
-              0 < rootAngle - baseAngle &&
-              rootAngle - baseAngle <
-              computeVectorAngle(minus(center, p)) - baseAngle;
+            const u = computeVectorAngle(minus(p, lastPoint));
+            const v = computeVectorAngle(minus(root, lastPoint));
+            const angleInBetween = sweep && (v - u) < 0;
+
             if (
               angleInBetween &&
               (!checkBounds || pointInsideLineBbox(root, p1, p2))

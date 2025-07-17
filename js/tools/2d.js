@@ -220,6 +220,7 @@ export function moveLine(p, l1, l2) {
 }
 
 export function pointToLine(p, l1, l2) {
+  if (norm(p, l1) < eps || norm(p, l1) < eps) return p;
   const angle = computeAngleBetween(minus(l1, l2), minus(l1, p));
   const fraction = (norm(l1, p) * Math.cos(angle)) / norm(l1, l2);
   return placeAlong(l1, l2, { fraction });
