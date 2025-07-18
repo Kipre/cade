@@ -3,6 +3,7 @@ import { KindaDOMMatrix, KindaDOMPoint } from "../dom.js";
 import {
     computeVectorAngle,
   intersectLines,
+  isToTheLeft,
   mirrorPoint,
   norm,
   offsetPolyline,
@@ -209,4 +210,13 @@ bro.test("mirrorPoint", () => {
   bro
     .expect(mirrorPoint([1, -0.8], [0, 0], [1, 0]))
     .toRoughlyEqual([1, 0.8], 1e-5);
+});
+
+bro.test("is to the left", () => {
+  bro
+    .expect(isToTheLeft([1, 1], [0, 0], [2, 0]))
+    .toBe(true);
+  bro
+    .expect(isToTheLeft([1, -1], [0, 0], [2, 0]))
+    .toBe(false);
 });

@@ -314,3 +314,15 @@ export function offsetPolyline(polyline, offset, wraps = false) {
 export function inflatePolyline(poly, offset) {
   return [...poly, ...offsetPolyline(poly, offset).toReversed()];
 }
+
+/**
+ * @param {types.Point} p
+ * @param {types.Point} l1
+ * @param {types.Point} l2
+ * @returns {boolean}
+ */
+export function isToTheLeft(p, l1, l2) {
+  return (
+    (l2[0] - l1[0]) * (p[1] - l1[0]) - (l2[1] - l1[1]) * (p[0] - l1[0]) > 0
+  );
+}

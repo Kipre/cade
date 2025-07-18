@@ -6,6 +6,7 @@ import {
   computeAngleBetween,
   computeVectorAngle,
   intersectLines,
+  isToTheLeft,
   minus,
   mirrorPoint,
   norm,
@@ -14,9 +15,9 @@ import {
   plus,
   pointInsideLineBbox,
   pointToLine,
+  rotatePoint,
 } from "./2d.js";
-import { getCircleCenter } from "./circle.js";
-import { debugGeometry } from "./svg.js";
+import { getCircleCenter, intersectLineAndCircle, intersectTwoCircles, isInPieSlice } from "./circle.js";
 
 const eps = 1e-5;
 
@@ -159,12 +160,68 @@ export class Path {
   }
 
   /**
+   * @param {types.Point} start
+   * @param {types.Point} end
+   * @param {number} radius
+   * @param {number} sweep
+   * @returns {types.Point[]}
+   */
+  intersectArc(start, end, radius, sweep) {
+    const result = [];
+    let lastPoint;
+
+    const center = getCircleCenter(start, end, radius, sweep);
+
+    for (let [type, p, ...rest] of this.controls) {
+      switch (type) {
+        case "moveTo":
+          break;
+        case "close": {
+          p = this.controls[0][1];
+          if (Math.abs(norm(lastPoint, p)) < eps) break;
+        }
+        case "lineTo": {
+          if (pointToLine(center, lastPoint, p) > radius) break;
+
+          const roots = intersectLineAndCircle(lastPoint, p, center, radius);
+
+          for (const root of roots) {
+            const rootOnArc = isInPieSlice(root, start, end, center, sweep);
+
+            if (rootOnArc && pointInsideLineBbox(root, lastPoint, p))
+              result.push(root);
+          }
+          break;
+        }
+        case "arc": {
+          const [radius2, sweep2] = rest;
+          const center2 = getCircleCenter(lastPoint, p, radius2, sweep2);
+          if (norm(center, center2) > radius + radius2) break;
+
+          const roots = intersectTwoCircles(center, radius, center2, radius2);
+
+          for (const root of roots) {
+            const rootOnArc = isInPieSlice(root, start, end, center, sweep);
+            const rootOnArc2 = isInPieSlice(root, lastPoint, p, center2, sweep2);
+            if (rootOnArc && rootOnArc2) result.push(root);
+          }
+          break;
+        }
+        default:
+          throw new Error();
+      }
+      lastPoint = p;
+    }
+    return result;
+  }
+
+  /**
    * @param {types.Point} p1
    * @param {types.Point} p2
    * @param {boolean} checkBounds
    * @returns {types.Point[]}
    */
-  intersect(p1, p2, checkBounds = true) {
+  intersectLine(p1, p2, checkBounds = true) {
     const result = [];
     let firstPoint;
     let lastPoint;
@@ -192,34 +249,12 @@ export class Path {
         case "arc": {
           const [radius, sweep] = rest;
           const center = getCircleCenter(lastPoint, p, radius, sweep);
-          const [cx, cy] = center;
-          if (pointToLine([cx, cy], p1, p2) > radius) break;
+          if (pointToLine(center, p1, p2) > radius) break;
 
-          const l1 = minus(p1, center);
-          const l2 = minus(p2, center);
-          const [dx, dy] = minus(l2, l1);
-          const dr = norm([dx, dy]);
-          const D = l1[0] * l2[1] - l2[0] * l1[1];
-
-          const delta = radius ** 2 * dr ** 2 - D ** 2;
-
-          const sgn = dy > 0 ? 1 : -1;
-          const roots = [];
-          if (Math.abs(delta) < eps || delta > 0) {
-            const ix = (D * dy + sgn * dx * Math.sqrt(delta)) / dr ** 2;
-            const iy = (-D * dx + Math.abs(dy) * Math.sqrt(delta)) / dr ** 2;
-            roots.push(plus([ix, iy], center));
-          }
-          if (delta > 0) {
-            const ix = (D * dy - sgn * dx * Math.sqrt(delta)) / dr ** 2;
-            const iy = (-D * dx - Math.abs(dy) * Math.sqrt(delta)) / dr ** 2;
-            roots.push(plus([ix, iy], center));
-          }
+          const roots = intersectLineAndCircle(p1, p2, center, radius);
 
           for (const root of roots) {
-            const u = computeVectorAngle(minus(p, lastPoint));
-            const v = computeVectorAngle(minus(root, lastPoint));
-            const angleInBetween = sweep && (v - u) < 0;
+            const angleInBetween = sweep && !isToTheLeft(root, lastPoint, p);
 
             if (
               angleInBetween &&
@@ -235,6 +270,47 @@ export class Path {
       lastPoint = p;
     }
     return result;
+  }
+
+  /**
+   * @param {Path} other
+   */
+  booleanIntersection(other) {
+    if (
+      this.controls.at(-1)[0] !== "close" ||
+      other.controls.at(-1)[0] !== "close"
+    )
+      throw new Error("boolean intersections require closed shapes");
+
+    const intersections = [];
+    let lastPoint = null;
+    for (const [type, p, maybeRadius, maybeFlag] of this.controls) {
+      switch (type) {
+        case "moveTo":
+          lastPoint = p;
+          break;
+
+        case "lineTo":
+          intersections.push(other.intersectLine(lastPoint, p));
+          break;
+
+        case "arc":
+          intersections.push(
+            other.intersectArc(lastPoint, p, maybeRadius, maybeFlag),
+          );
+          break;
+
+        case "close": {
+          const firstPoint = this.controls[0][1];
+          intersections.push(other.intersectLine(lastPoint, firstPoint));
+          break;
+        }
+        default:
+          throw new Error("failed");
+      }
+    }
+
+    return new Path();
   }
 
   toString() {

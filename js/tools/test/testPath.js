@@ -1,5 +1,5 @@
 // @ts-check
-import { pointToLine, rotatePoint } from "../2d.js";
+import { plus, pointToLine, rotatePoint } from "../2d.js";
 import { Path } from "../path.js";
 import { debugGeometry } from "../svg.js";
 import bro from "./brotest/brotest.js";
@@ -42,38 +42,81 @@ bro.test("mirror", () => {
     );
 });
 
+const half = 500;
+const radius = 100;
+const interCenter = 1000;
+const [bl, tl, tr, br] = [
+  [0, 1000],
+  [0, 0],
+  [2000, 0],
+  [1900, 1000],
+];
+
+const leftInnerEnd = pointToLine([half, 0], bl, br);
+const loop = new Path();
+loop.moveTo([half, half + radius]);
+loop.arc([half, half - radius], radius, 1);
+loop.lineTo([half + interCenter, half - radius]);
+loop.arc([half + interCenter, half + radius], radius, 1);
+loop.lineTo(pointToLine([half + interCenter, 0], bl, br));
+loop.lineTo(br);
+loop.lineTo(tr);
+loop.lineTo(tl);
+loop.lineTo(bl);
+loop.lineTo(leftInnerEnd);
+loop.close();
+
 bro.test("intersect", () => {
-  const half = 500;
-  const radius = 100;
-  const interCenter = 1000;
-  const [bl, tl, tr, br] = [
-    [0, 1000],
-    [0, 0],
-    [2000, 0],
-    [1900, 1000],
-  ];
-
-  const loop = new Path();
-  loop.moveTo([half, half + radius]);
-  loop.arc([half, half - radius], radius, 1);
-  loop.lineTo([half + interCenter, half - radius]);
-  loop.arc([half + interCenter, half + radius], radius, 1);
-  loop.lineTo(pointToLine([half + interCenter, 0], bl, br));
-  loop.lineTo(br);
-  loop.lineTo(tr);
-  loop.lineTo(tl);
-  loop.lineTo(bl);
-  loop.lineTo(pointToLine([half, 0], bl, br));
-  loop.close();
-
   const center = [half + interCenter, half];
   const end = rotatePoint(center, [0, 1500], -Math.PI / 2);
 
-  const intersections = loop.intersect(center, end);
+  const intersections = loop.intersectLine(center, end);
   // debugGeometry(loop.toString(), [center, end], [[0, 0], ...intersections]);
 
   bro.expect(intersections).toEqual([
     [1555.4700196225228, 583.2050294337844],
     [1833.3333333333333, 1000],
   ]);
+});
+
+bro.test("intersect arc", () => {
+  const center = leftInnerEnd;
+  const radius = 450;
+  const start = plus(center, [50, -radius]);
+  const end = plus(center, [50, radius]);
+  const sweep = 0;
+
+  const s = new Path();
+  s.moveTo(start);
+  s.arc(end, radius, sweep);
+  s.close();
+
+  const intersections = loop.intersectArc(start, end, radius, sweep);
+
+  bro.expect(intersections).toEqual([
+    [426.11625991783626, 567.3883740082163],
+    [100, 1000],
+  ]);
+});
+
+bro.test("boolean intersection", () => {
+  const center = [half + interCenter, half];
+  const end = plus(center, rotatePoint([0, 0], [1000, 0], Math.PI / 3));
+  const end2 = plus(center, [1000, 0]);
+
+  const s = new Path();
+  s.moveTo(center);
+  s.lineTo(end);
+  s.lineTo(end2);
+  s.close();
+
+  debugGeometry(loop.toString(), s.toString());
+  const intersection = loop.booleanIntersection(s);
+  console.log(intersection);
+  // debugGeometry(loop.toString(), s.toString(), intersection.toString());
+
+  // bro.expect(intersection).toEqual([
+  //   [1555.4700196225228, 583.2050294337844],
+  //   [1833.3333333333333, 1000],
+  // ]);
 });
