@@ -13,13 +13,25 @@ import {
   offsetPolyline,
   placeAlong,
   plus,
+  pointCoordinateOnLine,
   pointInsideLineBbox,
   pointToLine,
   rotatePoint,
 } from "./2d.js";
-import { getCircleCenter, intersectLineAndCircle, intersectTwoCircles, isInPieSlice } from "./circle.js";
+import {
+  getCircleCenter,
+  intersectLineAndCircle,
+  intersectTwoCircles,
+  isInPieSlice,
+  pointCoordinateOnArc,
+} from "./circle.js";
 
 const eps = 1e-5;
+
+/**
+ * @typedef {{segment: number; x: number}} IntersectionLocation
+ * @typedef {{point: types.Point; host: IntersectionLocation}} SimpleIntersection
+ */
 
 export class Path {
   constructor() {
@@ -164,7 +176,7 @@ export class Path {
    * @param {types.Point} end
    * @param {number} radius
    * @param {number} sweep
-   * @returns {types.Point[]}
+   * @returns {SimpleIntersection[]}
    */
   intersectArc(start, end, radius, sweep) {
     const result = [];
@@ -172,7 +184,9 @@ export class Path {
 
     const center = getCircleCenter(start, end, radius, sweep);
 
-    for (let [type, p, ...rest] of this.controls) {
+    const nbControls = this.controls.length;
+    for (let i = 0; i < nbControls; i++) {
+      let [type, p, ...rest] = this.controls[i];
       switch (type) {
         case "moveTo":
           break;
@@ -186,10 +200,13 @@ export class Path {
           const roots = intersectLineAndCircle(lastPoint, p, center, radius);
 
           for (const root of roots) {
-            const rootOnArc = isInPieSlice(root, start, end, center, sweep);
+            const rootOnArc = isInPieSlice(root, start, end, radius, sweep);
+            const x = pointCoordinateOnLine(root, lastPoint, p);
 
-            if (rootOnArc && pointInsideLineBbox(root, lastPoint, p))
-              result.push(root);
+            if (rootOnArc && 0 < x && x < 1) {
+              const host = { segment: i, x };
+              result.push({ point: root, host: host });
+            }
           }
           break;
         }
@@ -201,9 +218,13 @@ export class Path {
           const roots = intersectTwoCircles(center, radius, center2, radius2);
 
           for (const root of roots) {
-            const rootOnArc = isInPieSlice(root, start, end, center, sweep);
-            const rootOnArc2 = isInPieSlice(root, lastPoint, p, center2, sweep2);
-            if (rootOnArc && rootOnArc2) result.push(root);
+            const x = pointCoordinateOnArc(root, lastPoint, p, radius, sweep);
+            const rootOnArc = isInPieSlice(root, start, end, radius, sweep);
+
+            if (rootOnArc && 0 < x && x < 1) {
+              const host = { segment: i, x };
+              result.push({ host, point: root });
+            }
           }
           break;
         }
@@ -219,14 +240,16 @@ export class Path {
    * @param {types.Point} p1
    * @param {types.Point} p2
    * @param {boolean} checkBounds
-   * @returns {types.Point[]}
+   * @returns {SimpleIntersection[]}
    */
   intersectLine(p1, p2, checkBounds = true) {
     const result = [];
     let firstPoint;
     let lastPoint;
 
-    for (let [type, p, ...rest] of this.controls) {
+    const nbControls = this.controls.length;
+    for (let i = 0; i < nbControls; i++) {
+      let [type, p, ...rest] = this.controls[i];
       switch (type) {
         case "moveTo":
           firstPoint = p;
@@ -242,25 +265,32 @@ export class Path {
           if (
             pointInsideLineBbox(int, lastPoint, p) &&
             (!checkBounds || pointInsideLineBbox(int, p1, p2))
-          )
-            result.push(int);
+          ) {
+            const host = {
+              segment: i,
+              x: pointCoordinateOnLine(int, lastPoint, p),
+            };
+            result.push({ point: int, host: host });
+          }
           break;
         }
         case "arc": {
           const [radius, sweep] = rest;
           const center = getCircleCenter(lastPoint, p, radius, sweep);
-          if (pointToLine(center, p1, p2) > radius) break;
+          if (norm(center, pointToLine(center, p1, p2)) > radius) break;
 
           const roots = intersectLineAndCircle(p1, p2, center, radius);
 
           for (const root of roots) {
-            const angleInBetween = sweep && !isToTheLeft(root, lastPoint, p);
+            const x = pointCoordinateOnArc(root, lastPoint, p, radius, sweep);
 
-            if (
-              angleInBetween &&
-              (!checkBounds || pointInsideLineBbox(root, p1, p2))
-            )
-              result.push(root);
+            const pointOnLine =
+              !checkBounds || pointInsideLineBbox(root, p1, p2);
+
+            if (0 < x && x < 1 && pointOnLine) {
+              const host = { segment: i, x };
+              result.push({ host, point: root });
+            }
           }
           break;
         }
@@ -287,28 +317,29 @@ export class Path {
     for (const [type, p, maybeRadius, maybeFlag] of this.controls) {
       switch (type) {
         case "moveTo":
-          lastPoint = p;
           break;
 
         case "lineTo":
-          intersections.push(other.intersectLine(lastPoint, p));
+          intersections.push(...other.intersectLine(lastPoint, p));
           break;
 
         case "arc":
           intersections.push(
-            other.intersectArc(lastPoint, p, maybeRadius, maybeFlag),
+            ...other.intersectArc(lastPoint, p, maybeRadius, maybeFlag),
           );
           break;
 
         case "close": {
           const firstPoint = this.controls[0][1];
-          intersections.push(other.intersectLine(lastPoint, firstPoint));
+          intersections.push(...other.intersectLine(lastPoint, firstPoint));
           break;
         }
         default:
           throw new Error("failed");
       }
+      lastPoint = p;
     }
+    return intersections;
 
     return new Path();
   }

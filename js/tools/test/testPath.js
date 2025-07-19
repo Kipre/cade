@@ -74,8 +74,20 @@ bro.test("intersect", () => {
   // debugGeometry(loop.toString(), [center, end], [[0, 0], ...intersections]);
 
   bro.expect(intersections).toEqual([
-    [1555.4700196225228, 583.2050294337844],
-    [1833.3333333333333, 1000],
+    {
+      host: {
+        segment: 3,
+        x: 0.8128329581890014,
+      },
+      point: [1555.4700196225228, 583.2050294337844],
+    },
+    {
+      point: [1833.3333333333333, 1000],
+      host: {
+        segment: 5,
+        x: 0.833333333333333,
+      },
+    },
   ]);
 });
 
@@ -94,8 +106,20 @@ bro.test("intersect arc", () => {
   const intersections = loop.intersectArc(start, end, radius, sweep);
 
   bro.expect(intersections).toEqual([
-    [426.11625991783626, 567.3883740082163],
-    [100, 1000],
+    {
+      host: {
+        segment: 1,
+        x: 0.09249943128803638,
+      },
+      point: [426.11625991783626, 567.3883740082163],
+    },
+    {
+      point: [100, 1000],
+      host: {
+        segment: 9,
+        x: 0.19999999999999998,
+      },
+    },
   ]);
 });
 

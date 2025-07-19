@@ -326,3 +326,18 @@ export function isToTheLeft(p, l1, l2) {
     (l2[0] - l1[0]) * (p[1] - l1[0]) - (l2[1] - l1[1]) * (p[0] - l1[0]) > 0
   );
 }
+
+/**
+ * @param {types.Point} p
+ * @param {types.Point} l1
+ * @param {types.Point} l2
+ * @returns {number}
+ */
+export function pointCoordinateOnLine(p, l1, l2) {
+  const length = norm(l1, l2);
+  const fromStart = norm(l1, p);
+  const fromEnd = norm(l2, p);
+
+  const direction = fromStart < fromEnd && fromEnd > length ? -1 : 1;
+  return (direction * fromStart) / length;
+}

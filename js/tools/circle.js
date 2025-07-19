@@ -11,8 +11,6 @@ import {
   plus,
   rotatePoint,
 } from "./2d.js";
-import { Path } from "./path.js";
-import { debugGeometry } from "./svg.js";
 
 const eps = 1e-5;
 
@@ -98,24 +96,41 @@ export function intersectTwoCircles(center, radius, center2, radius2) {
  * @param {types.Point} p
  * @param {types.Point} start
  * @param {types.Point} end
- * @param {types.Point} center
+ * @param {number} radius
  * @param {number} sweep
  * @returns {boolean}
  */
-export function isInPieSlice(p, start, end, center, sweep) {
-  const startAngle = computeVectorAngle(minus(start, center)) % Math.PI;
-  const endAngle = computeVectorAngle(minus(end, center)) % Math.PI;
+export function isInPieSlice(p, start, end, radius, sweep) {
+  const x = pointCoordinateOnArc(p, start, end, radius, sweep);
+  return 0 < x && x < 1;
+}
 
-  if (Math.abs((endAngle - startAngle) % Math.PI) < eps) {
-    const isLeft = isToTheLeft(p, start, end);
-    return !!sweep === !isLeft;
+/**
+ * @param {types.Point} p
+ * @param {types.Point} start
+ * @param {types.Point} end
+ * @param {number} radius
+ * @param {number} sweep
+ * @returns {number}
+ */
+export function pointCoordinateOnArc(p, start, end, radius, sweep) {
+  const modulo = (a, m) => ((a % m) + m) % m;
+  const normalize = (a) => modulo(a + Math.PI, 2 * Math.PI) - Math.PI;
+
+  const center = getCircleCenter(start, end, radius, sweep);
+
+  const startAngle = Math.atan2(...minus(start, center));
+
+  let angle = normalize(Math.atan2(...minus(p, center)) - startAngle);
+  let endAngle = normalize(Math.atan2(...minus(end, center)) - startAngle);
+
+  // will need some adjustment when long arcs will be possible
+  if (Math.abs(endAngle + Math.PI) < eps && sweep === 0) endAngle = Math.PI;
+
+  if (endAngle < 0) {
+    endAngle *= -1;
+    angle *= -1;
   }
 
-  const angle = computeVectorAngle(minus(p, center)) % Math.PI;
-
-  const result =
-    (startAngle <= angle && angle <= endAngle) ||
-    (startAngle >= angle && angle >= endAngle);
-
-  return result;
+  return angle / endAngle;
 }
