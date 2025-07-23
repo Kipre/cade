@@ -69,14 +69,18 @@ export function degs(angle) {
   return (180 * angle) / Math.PI;
 }
 
-export function polygonArea(poly) {
+export function signedArea(poly) {
   let result = 0;
   const nbPoints = poly.length;
   for (let i = 0; i < nbPoints; i++) {
     const [p, n] = [i, (i + 1) % nbPoints];
     result += poly[p][0] * poly[n][1] - poly[p][1] * poly[n][0];
   }
-  return Math.abs(result) / 2;
+  return result;
+}
+
+export function polygonArea(poly) {
+  return Math.abs(signedArea(poly)) / 2;
 }
 
 export function polylinePerimeter(poly, closed = false) {

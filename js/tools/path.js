@@ -17,6 +17,7 @@ import {
   pointInsideLineBbox,
   pointToLine,
   rotatePoint,
+  signedArea,
 } from "./2d.js";
 import {
   arcTangentAt,
@@ -40,6 +41,50 @@ const eps = 1e-5;
 export class Path {
   constructor() {
     this.controls = [];
+  }
+
+  static fromD(path) {
+    const result = new Path();
+    const tokens = path.split(" ");
+    let i = 0;
+
+    while (i < tokens.length) {
+      switch (tokens[i++]) {
+        case "":
+          break;
+        case "M":
+          result.moveTo([
+            Number.parseFloat(tokens[i++]),
+            Number.parseFloat(tokens[i++]),
+          ]);
+          break;
+        case "L":
+          result.lineTo([
+            Number.parseFloat(tokens[i++]),
+            Number.parseFloat(tokens[i++]),
+          ]);
+          break;
+        case "A": {
+          const rx = Number.parseFloat(tokens[i++]);
+          const ry = Number.parseFloat(tokens[i++]);
+          const angle = Number.parseFloat(tokens[i++]);
+          const bigArc = Number.parseInt(tokens[i++]);
+          const sweep = Number.parseInt(tokens[i++]);
+          const x = Number.parseFloat(tokens[i++]);
+          const y = Number.parseFloat(tokens[i++]);
+          if (rx !== ry) throw new Error("unsupported command");
+          result.arc([x, y], rx, sweep);
+          break;
+        }
+        case "Z":
+        case "z":
+          result.close();
+          break;
+        default:
+          throw new Error("unsupported command");
+      }
+    }
+    return result;
   }
 
   isEmpty() {
@@ -407,6 +452,11 @@ export class Path {
     const exploredPaths = {};
     let intersectionLoop = null;
 
+    const rotation = {
+      other: other.rotatesClockwise(),
+      self: this.rotatesClockwise(),
+    };
+
     for (let idx = 0; idx < length; idx++) {
       for (let side of ["self", "other"]) {
         const loop = [];
@@ -430,19 +480,22 @@ export class Path {
           const info = intersections[i][side];
           i = crossesFromTheRight ? info.after : info.before;
 
+          const rot = rotation[side];
           side = side === "self" ? "other" : "self";
-          crossesFromTheRight = info.crossesFromTheRight;
+          crossesFromTheRight = rot === info.crossesFromTheRight;
           counter++;
         } while (i !== idx && counter < 10);
         if (counter === 10) throw new Error("failed to find loop");
 
         if (intersectionLoop) break;
-        loops.push(loop);
+        if (loop.length) loops.push(loop);
       }
       if (intersectionLoop) break;
     }
 
     const loop = intersectionLoop;
+    const result = [];
+    // for (const loop of loops) {
     if (loop == null) throw new Error();
     const path = new Path();
 
@@ -462,8 +515,26 @@ export class Path {
       );
       path.merge(sub);
     }
+    //   result.push(path);
+    // }
 
+    // console.log(intersections);
+    // console.log(loops);
+    // debugGeometry(
+    //   this,
+    //   other,
+    //   ...result.slice(0, 1),
+    //   intersections.map((int) => int.point),
+    // );
     return path;
+  }
+
+  rotatesClockwise() {
+    if (this.controls.at(-1)[0] !== "close")
+      throw new Error("cannot determine rotation direction of an open path");
+
+    const points = this.controls.slice(0, -1).map((c) => c[1]);
+    return signedArea(points) < 0;
   }
 
   /**
@@ -573,6 +644,53 @@ export class Path {
     }
     const end = this.evaluate(endSegment, endX);
     result.controls.at(-1)[1] = end;
+    return result;
+  }
+
+  /**
+   * @param {types.Point} p
+   * @returns {Path}
+   */
+  translate(p) {
+    const result = new Path();
+    result.controls = this.controls.map((control) => {
+      const result = [...control];
+      if (!result[1]) return result;
+      result[1] = plus(result[1], p);
+      return result;
+    });
+    return result;
+  }
+
+  /**
+   * @param {number} x
+   * @param {number} y
+   * @returns {Path}
+   */
+  scale(x, y) {
+    const result = new Path();
+    result.controls = this.controls.map((control) => {
+      const result = [...control];
+      if (!result[1]) return result;
+      result[1] = [result[1][0] * x, result[1][1] * y];
+      return result;
+    });
+    return result;
+  }
+
+  /**
+   * @param {number} angle
+   * @param {types.Point} center
+   * @returns {Path}
+   */
+  rotate(angle, center = [0, 0]) {
+    const result = new Path();
+    result.controls = this.controls.map((control) => {
+      const result = [...control];
+      if (!result[1]) return result;
+      result[1] = rotatePoint(center, control[1], angle);
+      return result;
+    });
     return result;
   }
 

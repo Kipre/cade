@@ -171,6 +171,20 @@ bro.test("merge", () => {
     );
 });
 
+bro.test("from d", () => {
+  const d =
+    "M 1788.4 1000 L 1500.0000000000002 1000 L 1500 600 A 100 100 0 0 0 1550.0970458984375 586.5651245117188 A 100 100 0 0 0 1500 400 L 500 400 A 100 100 0 0 0 500 600 L 500.00000000000006 1000 L 0 1000 L 0 0 L 2000 0 L 1900 1000 L 1788.4 1000 Z";
+  const path = Path.fromD(d);
+
+  bro.expect(path.toString()).toBe(d);
+});
+
+bro.test("rotation direction", () => {
+  const path = Path.fromD("M 0 1 L -1 0 L 0 -1 L 1 0 z");
+  bro.expect(path.rotatesClockwise()).toBe(false);
+  bro.expect(path.invert().rotatesClockwise()).toBe(true);
+});
+
 bro.test("boolean intersection", () => {
   const center = [half + interCenter, half];
   const end = plus(center, rotatePoint([0, 0], [1000, 0], Math.PI / 3));
@@ -183,7 +197,6 @@ bro.test("boolean intersection", () => {
   s.close();
 
   const intersection = loop.booleanIntersection(s);
-  debugGeometry(intersection.toString());
 
   bro
     .expect(intersection.toString())

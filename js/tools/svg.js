@@ -116,7 +116,7 @@ export function debugPolyline(poly, color = "red", strokeWidth = null) {
 }
 
 /**
- * @param {types.Point[][] | string[]} shapes
+ * @param {(types.Point[] | string | Path)[]} shapes
  */
 export function debugGeometry(...shapes) {
   if (typeof document === "undefined") return;
@@ -155,7 +155,7 @@ export function debugGeometry(...shapes) {
       for (const p of shape) bbox.include(p);
     } else {
       path = document.createElementNS(w3svg, "path");
-      path.setAttribute("d", shape);
+      path.setAttribute("d", shape.toString());
       path.setAttribute("stroke", color);
       path.setAttribute("fill", "none");
       // path.setAttribute("markerStart", "url(#arrow)");
@@ -177,6 +177,6 @@ export function debugGeometry(...shapes) {
   svg.setAttribute(
     "style",
     `stroke-width: ${size / 5e2}px; stroke-dasharray: ${size / 5e2} ${size / 5e2
-    } ${(3 * size) / 5e2} ${size / 5e2}; transform: scale(1, -1);`,
+    } ${(3 * size) / 5e2} ${size / 5e2}; transform: scale(1, -1); max-height: 100vh;`,
   );
 }
