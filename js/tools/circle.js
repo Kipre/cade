@@ -11,9 +11,13 @@ import {
   plus,
   rotatePoint,
 } from "./2d.js";
+import { Path } from "./path.js";
 import { debugGeometry, w3svg } from "./svg.js";
 
 const eps = 1e-5;
+
+const modulo = (a, m) => ((a % m) + m) % m;
+const normalize = (a) => modulo(a + Math.PI, 2 * Math.PI) - Math.PI;
 
 /**
  * @param {types.Point} p1
@@ -115,9 +119,6 @@ export function isInPieSlice(p, start, end, radius, sweep) {
  * @returns {number}
  */
 export function pointCoordinateOnArc(p, start, end, radius, sweep) {
-  const modulo = (a, m) => ((a % m) + m) % m;
-  const normalize = (a) => modulo(a + Math.PI, 2 * Math.PI) - Math.PI;
-
   const center = getCircleCenter(start, end, radius, sweep);
 
   const startAngle = Math.atan2(...minus(start, center));
@@ -147,11 +148,19 @@ export function pointCoordinateOnArc(p, start, end, radius, sweep) {
  * @returns {types.Point}
  */
 export function evaluateArc(x, start, end, radius, sweep) {
-  const path = document.createElementNS(w3svg, "path");
-  path.setAttribute("d", `M ${start} A ${radius} ${radius} 0 0 ${sweep} ${end.join(" ")}`);
-  const total = path.getTotalLength();
-  const point = path.getPointAtLength(total * x);
-  return [point.x, point.y];
+  // const path = document.createElementNS(w3svg, "path");
+  // path.setAttribute("d", `M ${start} A ${radius} ${radius} 0 0 ${sweep} ${end.join(" ")}`);
+  // const total = path.getTotalLength();
+  // const point = path.getPointAtLength(total * x);
+  // return [point.x, point.y];
+
+  const center = getCircleCenter(start, end, radius, sweep);
+  const startAngle = Math.atan2(...minus(start, center).toReversed());
+  const endAngle = Math.atan2(...minus(end, center).toReversed());
+  const opening =
+   (sweep ? 1 : -1) *  Math.abs(normalize(endAngle - startAngle));
+
+  return rotatePoint(center, start, opening * x);
 }
 
 /**
@@ -165,7 +174,7 @@ export function evaluateArc(x, start, end, radius, sweep) {
 export function arcTangentAt(x, start, end, radius, sweep) {
   const point = evaluateArc(x, start, end, radius, sweep);
   const center = getCircleCenter(start, end, radius, sweep);
-  const t2 = rotatePoint(point, center, (1 - 2 * sweep) * Math.PI / 2);
-  const t1 = rotatePoint(point, center, (2 * sweep - 1) * Math.PI / 2);
-  return [t1, t2]
+  const t2 = rotatePoint(point, center, ((1 - 2 * sweep) * Math.PI) / 2);
+  const t1 = rotatePoint(point, center, ((2 * sweep - 1) * Math.PI) / 2);
+  return [t1, t2];
 }

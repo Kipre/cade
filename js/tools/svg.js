@@ -127,6 +127,15 @@ export function debugGeometry(...shapes) {
     svg = document.createElementNS(w3svg, "svg");
     svg.innerHTML = `
 <defs>
+  <marker
+    id="circle"
+    markerWidth="10"
+    markerHeight="10"
+    refX="5"
+    refY="5"
+    markerUnits="strokeWidth">
+    <circle cx="5" cy="5" r="3" stroke-width="1" stroke="context-stroke" fill="context-fill" />
+  </marker>
     <marker
       id="arrow"
       viewBox="0 0 10 10"
@@ -146,27 +155,32 @@ export function debugGeometry(...shapes) {
   const colors = ["red", "green", "blue", "purple", "brown"];
 
   for (let i = 0; i < shapes.length; i++) {
-    const shape = shapes[i];
+    let shape = shapes[i];
     const color = colors[i % shapes.length];
 
+    let marker = "url(#arrow)";
     let path;
     if (Array.isArray(shape)) {
-      path = debugPolyline(shape, color);
-      for (const p of shape) bbox.include(p);
-    } else {
-      path = document.createElementNS(w3svg, "path");
-      path.setAttribute("d", shape.toString());
-      path.setAttribute("stroke", color);
-      path.setAttribute("fill", "none");
-      // path.setAttribute("markerStart", "url(#arrow)");
-      path.setAttribute("marker-mid", "url(#arrow)");
-      path.setAttribute("marker-end", "url(#arrow)");
+      const [first, ...points] = shape;
+      shape = new Path();
+      shape.moveTo(first);
+      for (const point of points) shape.lineTo(point);
+      shape.close();
+      marker = "url(#circle)";
+    }
 
-      const totalLength = path.getTotalLength();
-      for (let i = 0; i < 1; i += 0.01) {
-        const p = path.getPointAtLength(totalLength * i);
-        bbox.include([p.x, p.y]);
-      }
+    path = document.createElementNS(w3svg, "path");
+    path.setAttribute("d", shape.toString());
+    path.setAttribute("stroke", color);
+    path.setAttribute("style", "opacity: 0.8");
+    path.setAttribute("fill", "none");
+    path.setAttribute("marker-mid", marker);
+    path.setAttribute("marker-end", "url(#arrow)");
+
+    const totalLength = path.getTotalLength();
+    for (let i = 0; i < 1; i += 0.01) {
+      const p = path.getPointAtLength(totalLength * i);
+      bbox.include([p.x, p.y]);
     }
     svg.appendChild(path);
   }
@@ -174,9 +188,13 @@ export function debugGeometry(...shapes) {
   svg.setAttribute("viewBox", bbox.toViewBox());
   const size = Math.max(bbox.xMax - bbox.xMin, bbox.yMax - bbox.yMin);
 
+  const mgn = size / 20;
+  svg.innerHTML = `
+  <line x1="${bbox.xMin + mgn}" x2=${bbox.xMax + mgn} stroke="black" marker-end="url(#arrow)"/>
+  <line y1="${bbox.yMin + mgn}" y2=${bbox.yMax + mgn} stroke="black" marker-end="url(#arrow)"/>
+   ${svg.innerHTML}`;
   svg.setAttribute(
     "style",
-    `stroke-width: ${size / 5e2}px; stroke-dasharray: ${size / 5e2} ${size / 5e2
-    } ${(3 * size) / 5e2} ${size / 5e2}; transform: scale(1, -1); max-height: 100vh;`,
+    `font-size: ${size / 100}; stroke-width: 0.2em; transform: scale(1, -1); max-height: 100vh;`,
   );
 }
