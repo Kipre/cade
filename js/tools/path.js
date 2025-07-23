@@ -193,7 +193,7 @@ export class Path {
     }
   }
 
-  mirror() {
+  mirror(l1 = null, l2 = null) {
     const [[first, firstPoint]] = this.controls;
     const [last, lastPoint] = this.controls.at(-1);
 
@@ -204,7 +204,7 @@ export class Path {
       const [type, point, maybeRadius, maybeSweepFlag] = this.controls[i];
       const [, p] = this.controls[i - 1];
 
-      const mirrored = mirrorPoint(p, firstPoint, lastPoint);
+      const mirrored = mirrorPoint(p, l1 ?? firstPoint, l2 ?? lastPoint);
 
       switch (type) {
         case "lineTo":
@@ -220,7 +220,7 @@ export class Path {
       }
     }
 
-    this.close();
+    if (norm(this.controls[0][1], this.controls.at(-1)[1]) < eps) this.close();
     this.simplify();
   }
 
