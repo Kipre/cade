@@ -11,6 +11,7 @@ import {
   plus,
   rotatePoint,
 } from "./2d.js";
+import { debugGeometry, w3svg } from "./svg.js";
 
 const eps = 1e-5;
 
@@ -133,4 +134,38 @@ export function pointCoordinateOnArc(p, start, end, radius, sweep) {
   }
 
   return angle / endAngle;
+}
+
+/**
+ * TODO
+ *
+ * @param {number} x
+ * @param {types.Point} start
+ * @param {types.Point} end
+ * @param {number} radius
+ * @param {number} sweep
+ * @returns {types.Point}
+ */
+export function evaluateArc(x, start, end, radius, sweep) {
+  const path = document.createElementNS(w3svg, "path");
+  path.setAttribute("d", `M ${start} A ${radius} ${radius} 0 0 ${sweep} ${end.join(" ")}`);
+  const total = path.getTotalLength();
+  const point = path.getPointAtLength(total * x);
+  return [point.x, point.y];
+}
+
+/**
+ * @param {number} x
+ * @param {types.Point} start
+ * @param {types.Point} end
+ * @param {number} radius
+ * @param {number} sweep
+ * @returns {[types.Point, types.Point]}
+ */
+export function arcTangentAt(x, start, end, radius, sweep) {
+  const point = evaluateArc(x, start, end, radius, sweep);
+  const center = getCircleCenter(start, end, radius, sweep);
+  const t2 = rotatePoint(point, center, (1 - 2 * sweep) * Math.PI / 2);
+  const t1 = rotatePoint(point, center, (2 * sweep - 1) * Math.PI / 2);
+  return [t1, t2]
 }

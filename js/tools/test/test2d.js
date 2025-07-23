@@ -1,7 +1,7 @@
 // @ts-check
 import { KindaDOMMatrix, KindaDOMPoint } from "../dom.js";
 import {
-    computeVectorAngle,
+  computeVectorAngle,
   intersectLines,
   isToTheLeft,
   mirrorPoint,
@@ -167,45 +167,44 @@ bro.test("rotates point", () => {
     .toBeLessThan(1e-10);
 
   bro
-    .expect(norm(rotatePoint([0, 0], [432.43, 1.2343], 0.34235), [406.92,146.33]))
+    .expect(
+      norm(rotatePoint([0, 0], [432.43, 1.2343], 0.34235), [406.92, 146.33]),
+    )
     .toBeLessThan(1e-2);
 
   bro
     .expect(norm(rotatePoint([0, 0], [432.43, 1.2343], 0), [432.43, 1.2343]))
     .toBeLessThan(1e-10);
-
 });
 
 bro.test("computes angle", () => {
   bro
-    .expect(Math.abs(computeVectorAngle([ 0, -402.3543409078357 ]) - Math.PI * 1.5) % (2  * Math.PI))
+    .expect(
+      Math.abs(computeVectorAngle([0, -402.3543409078357]) - Math.PI * 1.5) %
+      (2 * Math.PI),
+    )
     .toBeLessThan(1e-10);
 
   bro
-    .expect(Math.abs(computeVectorAngle([ 0, 402.3543409078357 ]) - Math.PI / 2) % (2  * Math.PI))
+    .expect(
+      Math.abs(computeVectorAngle([0, 402.3543409078357]) - Math.PI / 2) %
+      (2 * Math.PI),
+    )
     .toBeLessThan(1e-10);
 
-  bro
-    .expect(() => computeVectorAngle([ 0, 0 ]))
-    .toThrow();
+  bro.expect(() => computeVectorAngle([0, 0])).toThrow();
 });
 
 bro.test("mirrorPoint", () => {
-  bro
-    .expect(mirrorPoint([0, -1], [0, 0], [1, 0]))
-    .toRoughlyEqual([0, 1], 1e-5);
+  bro.expect(mirrorPoint([0, -1], [0, 0], [1, 0])).toRoughlyEqual([0, 1], 1e-5);
 
   bro
     .expect(mirrorPoint([0, 0.5], [0, 0], [1, 0]))
     .toRoughlyEqual([0, -0.5], 1e-5);
 
-  bro
-    .expect(mirrorPoint([1, 0], [0, 0], [1, 0]))
-    .toRoughlyEqual([1, 0], 1e-5);
+  bro.expect(mirrorPoint([1, 0], [0, 0], [1, 0])).toRoughlyEqual([1, 0], 1e-5);
 
-  bro
-    .expect(mirrorPoint([0, 0], [0, 0], [1, 0]))
-    .toRoughlyEqual([0, 0], 1e-5);
+  bro.expect(mirrorPoint([0, 0], [0, 0], [1, 0])).toRoughlyEqual([0, 0], 1e-5);
 
   bro
     .expect(mirrorPoint([1, -0.8], [0, 0], [1, 0]))
@@ -213,10 +212,34 @@ bro.test("mirrorPoint", () => {
 });
 
 bro.test("is to the left", () => {
+  bro.expect(isToTheLeft([1, 1], [0, 0], [2, 0])).toBe(true);
+  bro.expect(isToTheLeft([1, -1], [0, 0], [2, 0])).toBe(false);
   bro
-    .expect(isToTheLeft([1, 1], [0, 0], [2, 0]))
-    .toBe(true);
-  bro
-    .expect(isToTheLeft([1, -1], [0, 0], [2, 0]))
+    .expect(
+      isToTheLeft(
+        placeAlong([1555, 583], [2500, 2000], { fraction: 0.1 }),
+        [1638, 527],
+        [1472, 638],
+      ),
+    )
     .toBe(false);
+  bro
+    .expect(
+      isToTheLeft(
+        placeAlong([1555, 583], [2500, 2000], { fraction: 0.5 }),
+        [1638, 527],
+        [1472, 638],
+      ),
+    )
+    .toBe(false);
+  bro
+    .expect(
+      isToTheLeft(
+        placeAlong([1555, 583], [2500, 2000], { fraction: 0.7 }),
+        [1638, 527],
+        [1472, 638],
+      ),
+    )
+    .toBe(false);
+  bro.expect(isToTheLeft([2500, 2000], [1638, 527], [1472, 638])).toBe(false);
 });

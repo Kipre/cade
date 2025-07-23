@@ -4,6 +4,7 @@
 const eps = 1e-5;
 
 import { pairs } from "./iteration.js";
+import { debugGeometry } from "./svg.js";
 
 /**
  * @param {types.Point} p1
@@ -159,7 +160,7 @@ export function intersectLines(p0, p1, l0, l1) {
   const penteL = n / m;
   const biasL = l0[1] - penteL * l0[0];
 
-  if (Math.abs(u) < 1e-10) {
+  if (Math.abs(u) < eps) {
     return [p0[0], p0[0] * penteL + biasL];
   }
 
@@ -322,9 +323,9 @@ export function inflatePolyline(poly, offset) {
  * @returns {boolean}
  */
 export function isToTheLeft(p, l1, l2) {
-  return (
-    (l2[0] - l1[0]) * (p[1] - l1[0]) - (l2[1] - l1[1]) * (p[0] - l1[0]) > 0
-  );
+  const u = minus(l2, l1);
+  const v = minus(p, l1);
+  return (u[0] * v[1] - u[1] * v[0]) > 0; 
 }
 
 /**

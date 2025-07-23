@@ -124,7 +124,21 @@ export function debugGeometry(...shapes) {
   const id = "debug-drawing";
   let svg = document.querySelector(`#${id}`);
   if (!svg) {
-    svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg = document.createElementNS(w3svg, "svg");
+    svg.innerHTML = `
+<defs>
+    <marker
+      id="arrow"
+      viewBox="0 0 10 10"
+      refX="1"
+      refY="5"
+      markerUnits="strokeWidth"
+      markerWidth="5"
+      markerHeight="10"
+      orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
+    </marker>
+</defs>`;
     svg.id = id;
     document.body.appendChild(svg);
   }
@@ -144,6 +158,9 @@ export function debugGeometry(...shapes) {
       path.setAttribute("d", shape);
       path.setAttribute("stroke", color);
       path.setAttribute("fill", "none");
+      // path.setAttribute("markerStart", "url(#arrow)");
+      path.setAttribute("marker-mid", "url(#arrow)");
+      path.setAttribute("marker-end", "url(#arrow)");
 
       const totalLength = path.getTotalLength();
       for (let i = 0; i < 1; i += 0.01) {
@@ -160,6 +177,6 @@ export function debugGeometry(...shapes) {
   svg.setAttribute(
     "style",
     `stroke-width: ${size / 5e2}px; stroke-dasharray: ${size / 5e2} ${size / 5e2
-    } ${(3 * size) / 5e2} ${size / 5e2};`,
+    } ${(3 * size) / 5e2} ${size / 5e2}; transform: scale(1, -1);`,
   );
 }

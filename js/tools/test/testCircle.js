@@ -1,6 +1,12 @@
 // @ts-check
+
 import { rotatePoint } from "../2d.js";
-import { isInPieSlice, pointCoordinateOnArc } from "../circle.js";
+import {
+  arcTangentAt,
+  evaluateArc,
+  isInPieSlice,
+  pointCoordinateOnArc,
+} from "../circle.js";
 import bro from "./brotest/brotest.js";
 
 bro.test("is in pie slice", () => {
@@ -79,4 +85,70 @@ bro.test("point coordinate on arc", () => {
       ),
     )
     .toBe(-0.6);
+});
+
+bro.test("evaluate arc", () => {
+  const eps = 1e-6;
+  bro
+    .expect(evaluateArc(0, [0, -1], [0, 1], 1, 0))
+    .toRoughlyEqual([0, -1], eps);
+  bro.expect(evaluateArc(1, [0, -1], [0, 1], 1, 0)).toRoughlyEqual([0, 1], eps);
+  bro
+    .expect(evaluateArc(0.5, [0, -1], [0, 1], 1, 0))
+    .toRoughlyEqual([-1, 0], eps);
+  bro
+    .expect(evaluateArc(0.5, [0, -1], [0, 1], 1, 1))
+    .toRoughlyEqual([1, 0], eps);
+  bro
+    .expect(evaluateArc(0.25, [0, -1], [0, 1], 1, 1))
+    .toRoughlyEqual([Math.SQRT1_2, -Math.SQRT1_2], eps);
+  bro
+    .expect(evaluateArc(0.5, [-1, 0], [0, 1], 1, 0))
+    .toRoughlyEqual([-Math.SQRT1_2, Math.SQRT1_2], eps);
+  bro
+    .expect(evaluateArc(0.5, [1, 0], [0, 1], 1, 1))
+    .toRoughlyEqual([Math.SQRT1_2, Math.SQRT1_2], eps);
+  bro
+    .expect(evaluateArc(0.5, [1, 0], [0, 1], 1, 0))
+    .toRoughlyEqual([1 - Math.SQRT1_2, 1 - Math.SQRT1_2], eps);
+});
+
+bro.test("find tangent", () => {
+  const eps = 1e-6;
+  bro.expect(arcTangentAt(0, [0, -1], [0, 1], 1, 0)).toRoughlyEqual(
+    [
+      [1, -1],
+      [-1, -1],
+    ],
+    eps,
+  );
+
+  bro.expect(arcTangentAt(1, [0, -1], [0, 1], 1, 0)).toRoughlyEqual(
+    [
+      [-1, 1],
+      [1, 1],
+    ],
+    eps,
+  );
+  bro.expect(arcTangentAt(0.5, [0, -1], [0, 1], 1, 0)).toRoughlyEqual(
+    [
+      [-1, -1],
+      [-1, 1],
+    ],
+    eps,
+  );
+  bro.expect(arcTangentAt(0.5, [0, -1], [0, 1], 1, 1)).toRoughlyEqual(
+    [
+      [1, -1],
+      [1, 1],
+    ],
+    eps,
+  );
+  bro.expect(arcTangentAt(0.25, [0, -1], [0, 1], 1, 1)).toRoughlyEqual(
+    [
+      [0, -1.4142135381698608],
+      [1.4142135381698608, 0],
+    ],
+    eps,
+  );
 });

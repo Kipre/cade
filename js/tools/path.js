@@ -19,23 +19,31 @@ import {
   rotatePoint,
 } from "./2d.js";
 import {
+  arcTangentAt,
+  evaluateArc,
   getCircleCenter,
   intersectLineAndCircle,
   intersectTwoCircles,
   isInPieSlice,
   pointCoordinateOnArc,
 } from "./circle.js";
+import { debugGeometry } from "./svg.js";
 
 const eps = 1e-5;
 
 /**
- * @typedef {{segment: number; x: number}} IntersectionLocation
- * @typedef {{point: types.Point; host: IntersectionLocation}} SimpleIntersection
+ * @typedef {{segment: number; x: number; crossesFromTheRight: boolean}} IntersectionLocation
+ * @typedef {{point: types.Point} & IntersectionLocation} SimpleIntersection
+ * @typedef {{point: types.Point; self: IntersectionLocation, other: IntersectionLocation}} PathIntersection
  */
 
 export class Path {
   constructor() {
     this.controls = [];
+  }
+
+  isEmpty() {
+    return this.controls.length === 0;
   }
 
   /**
@@ -190,23 +198,26 @@ export class Path {
       switch (type) {
         case "moveTo":
           break;
-        case "close": {
+
+        // biome-ignore lint/suspicious/noFallthroughSwitchClause: it's fine
+        case "close":
           p = this.controls[0][1];
           if (Math.abs(norm(lastPoint, p)) < eps) break;
-        }
         case "lineTo": {
           if (pointToLine(center, lastPoint, p) > radius) break;
 
           const roots = intersectLineAndCircle(lastPoint, p, center, radius);
 
-          for (const root of roots) {
-            const rootOnArc = isInPieSlice(root, start, end, radius, sweep);
-            const x = pointCoordinateOnLine(root, lastPoint, p);
+          for (const point of roots) {
+            const xA = pointCoordinateOnArc(point, start, end, radius, sweep);
+            const xL = pointCoordinateOnLine(point, lastPoint, p);
 
-            if (rootOnArc && 0 < x && x < 1) {
-              const host = { segment: i, x };
-              result.push({ point: root, host: host });
-            }
+            if (!(0 < xA && xA < 1 && 0 < xL && xL < 1)) continue;
+
+            const [, tangent] = arcTangentAt(xA, start, end, radius, sweep);
+            const crossesFromTheRight = isToTheLeft(tangent, lastPoint, p);
+
+            result.push({ point, segment: i, x: xL, crossesFromTheRight });
           }
           break;
         }
@@ -217,14 +228,18 @@ export class Path {
 
           const roots = intersectTwoCircles(center, radius, center2, radius2);
 
-          for (const root of roots) {
-            const x = pointCoordinateOnArc(root, lastPoint, p, radius, sweep);
-            const rootOnArc = isInPieSlice(root, start, end, radius, sweep);
+          for (const point of roots) {
+            // for self and other
+            const xS = pointCoordinateOnArc(point, lastPoint, p, radius, sweep);
+            const xO = pointCoordinateOnArc(point, start, end, radius, sweep);
 
-            if (rootOnArc && 0 < x && x < 1) {
-              const host = { segment: i, x };
-              result.push({ host, point: root });
-            }
+            if (!(0 < xS && xS < 1 && 0 < xO && xO < 1)) continue;
+
+            const [, tOther] = arcTangentAt(xO, start, end, radius, sweep);
+            const selfTangent = arcTangentAt(xS, lastPoint, p, radius2, sweep2);
+            const crossesFromTheRight = isToTheLeft(tOther, ...selfTangent);
+
+            result.push({ point, segment: i, x: xS, crossesFromTheRight });
           }
           break;
         }
@@ -239,10 +254,9 @@ export class Path {
   /**
    * @param {types.Point} p1
    * @param {types.Point} p2
-   * @param {boolean} checkBounds
    * @returns {SimpleIntersection[]}
    */
-  intersectLine(p1, p2, checkBounds = true) {
+  intersectLine(p1, p2) {
     const result = [];
     let firstPoint;
     let lastPoint;
@@ -254,24 +268,23 @@ export class Path {
         case "moveTo":
           firstPoint = p;
           break;
-        case "close": {
-          if (Math.abs(norm(lastPoint, firstPoint)) < eps) break;
+
+        // biome-ignore lint/suspicious/noFallthroughSwitchClause: it's fine
+        case "close":
           p = firstPoint;
-        }
         case "lineTo": {
           if (lastPoint == null) throw new Error();
           const int = intersectLines(lastPoint, p, p1, p2);
-          if (int == null) break;
           if (
-            pointInsideLineBbox(int, lastPoint, p) &&
-            (!checkBounds || pointInsideLineBbox(int, p1, p2))
-          ) {
-            const host = {
-              segment: i,
-              x: pointCoordinateOnLine(int, lastPoint, p),
-            };
-            result.push({ point: int, host: host });
-          }
+            int == null ||
+            !pointInsideLineBbox(int, lastPoint, p) ||
+            !pointInsideLineBbox(int, p1, p2)
+          )
+            break;
+
+          const crossesFromTheRight = isToTheLeft(p2, lastPoint, p);
+          const x = pointCoordinateOnLine(int, lastPoint, p);
+          result.push({ point: int, segment: i, x, crossesFromTheRight });
           break;
         }
         case "arc": {
@@ -281,16 +294,15 @@ export class Path {
 
           const roots = intersectLineAndCircle(p1, p2, center, radius);
 
-          for (const root of roots) {
-            const x = pointCoordinateOnArc(root, lastPoint, p, radius, sweep);
+          for (const point of roots) {
+            const x = pointCoordinateOnArc(point, lastPoint, p, radius, sweep);
 
-            const pointOnLine =
-              !checkBounds || pointInsideLineBbox(root, p1, p2);
+            const pointOnLine = pointInsideLineBbox(point, p1, p2);
+            if (!(0 < x && x < 1 && pointOnLine)) continue;
 
-            if (0 < x && x < 1 && pointOnLine) {
-              const host = { segment: i, x };
-              result.push({ host, point: root });
-            }
+            const tangent = arcTangentAt(x, lastPoint, p, radius, sweep);
+            const crossesFromTheRight = isToTheLeft(p2, ...tangent);
+            result.push({ point, segment: i, x, crossesFromTheRight });
           }
           break;
         }
@@ -312,36 +324,256 @@ export class Path {
     )
       throw new Error("boolean intersections require closed shapes");
 
-    const intersections = [];
+    /** @type {PathIntersection[]} */
+    const rawIntersections = [];
     let lastPoint = null;
-    for (const [type, p, maybeRadius, maybeFlag] of this.controls) {
+
+    const nbControls = this.controls.length;
+    for (let i = 0; i < nbControls; i++) {
+      let [type, p, radius, sweep] = this.controls[i];
+
       switch (type) {
         case "moveTo":
           break;
 
-        case "lineTo":
-          intersections.push(...other.intersectLine(lastPoint, p));
-          break;
+        // biome-ignore lint/suspicious/noFallthroughSwitchClause: it's fine
+        case "close":
+          p = this.controls[0][1];
 
-        case "arc":
-          intersections.push(
-            ...other.intersectArc(lastPoint, p, maybeRadius, maybeFlag),
-          );
-          break;
-
-        case "close": {
-          const firstPoint = this.controls[0][1];
-          intersections.push(...other.intersectLine(lastPoint, firstPoint));
+        case "lineTo": {
+          const ints = other.intersectLine(lastPoint, p);
+          for (const { point, ...other } of ints) {
+            const x = pointCoordinateOnLine(point, lastPoint, p);
+            const crossesFromTheRight = !other.crossesFromTheRight;
+            const self = { segment: i, x, crossesFromTheRight };
+            rawIntersections.push({ point, other, self });
+          }
           break;
         }
+        case "arc": {
+          const ints = other.intersectArc(lastPoint, p, radius, sweep);
+          for (const { point, ...other } of ints) {
+            const x = pointCoordinateOnArc(point, lastPoint, p, radius, sweep);
+            const crossesFromTheRight = !other.crossesFromTheRight;
+            const self = { segment: i, x, crossesFromTheRight };
+            rawIntersections.push({ point, other, self });
+          }
+          break;
+        }
+
         default:
           throw new Error("failed");
       }
       lastPoint = p;
     }
-    return intersections;
 
-    return new Path();
+    // determine intersection loops
+    const loops = [];
+
+    function sortIntersections(left, right, forSide) {
+      const n1 = 10 * left[forSide].segment + left[forSide].x;
+      const n2 = 10 * right[forSide].segment + right[forSide].x;
+      return n1 - n2;
+    }
+
+    const length = rawIntersections.length;
+
+    const intersections = [];
+    for (let i = 0; i < length; i++) {
+      const int = rawIntersections[i];
+      intersections.push({ ...int, index: i });
+    }
+
+    const selfOrdered = intersections.toSorted((i1, i2) =>
+      sortIntersections(i1, i2, "self"),
+    );
+    const otherOrdered = intersections.toSorted((i1, i2) =>
+      sortIntersections(i1, i2, "other"),
+    );
+
+    for (let i = 0; i < length; i++) {
+      const before = (((i - 1) % length) + length) % length;
+      const after = (((i + 1) % length) + length) % length;
+      for (const [info, ordered] of [
+        [intersections[otherOrdered[i].index].other, otherOrdered],
+        [intersections[selfOrdered[i].index].self, selfOrdered],
+      ]) {
+        info.order = i;
+        info.after = ordered[after].index;
+        info.before = ordered[before].index;
+      }
+    }
+
+    const exploredPaths = {};
+    let intersectionLoop = null;
+
+    for (let idx = 0; idx < length; idx++) {
+      for (let side of ["self", "other"]) {
+        const loop = [];
+
+        let i = idx;
+        let crossesFromTheRight = true;
+        let counter = 0;
+
+        do {
+          const path = [i, side, !crossesFromTheRight];
+
+          const key = path.toString();
+          if (exploredPaths[key] !== undefined) {
+            intersectionLoop = loops[exploredPaths[key]];
+            break;
+          }
+          exploredPaths[key] = loops.length;
+
+          loop.push(path);
+
+          const info = intersections[i][side];
+          i = crossesFromTheRight ? info.after : info.before;
+
+          side = side === "self" ? "other" : "self";
+          crossesFromTheRight = info.crossesFromTheRight;
+          counter++;
+        } while (i !== idx && counter < 10);
+        if (counter === 10) throw new Error("failed to find loop");
+
+        if (intersectionLoop) break;
+        loops.push(loop);
+      }
+      if (intersectionLoop) break;
+    }
+
+    const loop = intersectionLoop;
+    if (loop == null) throw new Error();
+    const path = new Path();
+
+    for (let i = 1; i <= loop.length; i++) {
+      const idx = i % loop.length;
+      const [from, side, invert] = loop[i - 1];
+      const [to] = loop[idx];
+      const { segment: startSegment, x: startX } = intersections[from][side];
+      const { segment: endSegment, x: endX } = intersections[to][side];
+
+      const sub = (side === "self" ? this : other).subpath(
+        startSegment,
+        startX,
+        endSegment,
+        endX,
+        invert,
+      );
+      path.merge(sub);
+    }
+
+    return path;
+  }
+
+  /**
+   * @param {Path} other
+   */
+  merge(other) {
+    if (this.controls.length === 0) {
+      this.controls.push(...other.controls);
+      return;
+    }
+
+    if (this.controls.at(-1)[0] === "close")
+      throw new Error("cannot merge to a closed path");
+
+    if (norm(other.controls[0][1], this.controls.at(-1)[1]) > 1e-1)
+      throw new Error("cannot merge");
+
+    this.controls.push(...other.controls.slice(1));
+    if (norm(this.controls[0][1], other.controls.at(-1)[1]) < eps) this.close();
+  }
+
+  invert() {
+    const path = new Path();
+    const [type, point] = this.controls.at(-1);
+    path.moveTo(type === "close" ? this.controls[0][1] : point);
+
+    const length = this.controls.length;
+
+    for (let i = length - 1; i > 0; i--) {
+      const [, lastPoint] = this.controls[i - 1];
+      const [type, , maybeRadius, maybeSweep] = this.controls[i];
+
+      switch (type) {
+        case "close":
+        case "lineTo":
+          path.lineTo(lastPoint);
+          break;
+        case "arc":
+          path.arc(lastPoint, maybeRadius, maybeSweep ? 0 : 1);
+          break;
+        default:
+          throw new Error();
+      }
+    }
+    if (type === "close") path.close();
+    return path;
+  }
+
+  /**
+   * @param {number} segment
+   * @param {number} x
+   */
+  evaluate(segment, x) {
+    let [[, lastPoint], [type, p, maybeRadius, maybeSweep]] =
+      this.controls.slice(segment - 1);
+    switch (type) {
+      // biome-ignore lint/suspicious/noFallthroughSwitchClause: <explanation>
+      case "close":
+        p = this.controls[0][1];
+      case "lineTo":
+        return placeAlong(lastPoint, p, { fraction: x });
+      case "arc":
+        return evaluateArc(x, lastPoint, p, maybeRadius, maybeSweep);
+      default:
+        throw new Error();
+    }
+  }
+
+  /**
+   * @param {number} startSegment
+   * @param {number} startX
+   * @param {number} endSegment
+   * @param {number} endX
+   * @returns {Path}
+   */
+  subpath(startSegment, startX, endSegment, endX, invert = false) {
+    const result = new Path();
+    result.moveTo(this.evaluate(startSegment, startX));
+
+    const length = this.controls.length;
+
+    for (
+      let i = startSegment;
+      ;
+      i = (((invert ? i - 1 : i + 1) % length) + length) % length
+    ) {
+      if (i === 0) continue;
+
+      const [, lastPoint] = this.controls[i - 1];
+      const [type, point, maybeRadius, maybeSweep] = this.controls[i];
+      let p = invert ? lastPoint : point;
+
+      switch (type) {
+        // biome-ignore lint/suspicious/noFallthroughSwitchClause: <explanation>
+        case "close":
+          p = invert ? lastPoint : this.controls[0][1];
+        case "lineTo":
+          result.lineTo(p);
+          break;
+        case "arc":
+          result.arc(p, maybeRadius, invert !== !!maybeSweep ? 1 : 0);
+          break;
+        default:
+          throw new Error();
+      }
+      if (i === endSegment) break;
+    }
+    const end = this.evaluate(endSegment, endX);
+    result.controls.at(-1)[1] = end;
+    return result;
   }
 
   toString() {
