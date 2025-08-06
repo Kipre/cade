@@ -23,7 +23,9 @@ import {
   arcTangentAt,
   evaluateArc,
   getCircleCenter,
+  intersectLineAndArc,
   intersectLineAndCircle,
+  intersectTwoArcs,
   intersectTwoCircles,
   isInPieSlice,
   pointCoordinateOnArc,
@@ -712,6 +714,132 @@ export class Path {
 
         case "close":
           result += " Z";
+          break;
+        default:
+          throw new Error("failed");
+      }
+    }
+    return result;
+  }
+
+  clone() {
+    const result = new Path();
+    result.controls = structuredClone(this.controls);
+    return result;
+  }
+
+  isClosed() {
+    return this.controls.at(-1)[0] === "close";
+  }
+
+  /**
+   * @param {number} offset
+   */
+  offset(offset) {
+    function offsetSegment(t0, t1, offset) {
+      const distance = Math.abs(offset);
+      const folded = placeAlong(t0, t1, { distance });
+      const p2 = rotatePoint(
+        t0,
+        folded,
+        (offset * Math.PI) / 2 / (distance || 1),
+      );
+      return [p2, plus(minus(p2, t0), t1)];
+    }
+
+    function offsetArc(lastPoint, point, radius, sweep, offset) {
+      const center = getCircleCenter(lastPoint, point, radius, sweep);
+      const delta = offset * (2 * sweep - 1);
+      const start = placeAlong(lastPoint, center, { fromStart: delta });
+      const end = placeAlong(point, center, { fromStart: delta });
+      return [start, end, radius - delta, sweep];
+    }
+    const result = this.clone();
+
+    const length = this.controls.length;
+
+    for (let i = 1; i < length; i++) {
+      const [lastType, lp] = this.controls[i - 1];
+      const [type, p, r1, s1] = this.controls[i];
+      const [nextType, np, r2, s2] = this.controls[i + 1] ?? [];
+
+      let p0, p1, p2, p3;
+      let nr1, nr2;
+
+      if (type === "lineTo" && nextType === "lineTo") {
+        [p0, p1] = offsetSegment(lp, p, offset);
+        [p2, p3] = offsetSegment(p, np, offset);
+        result.controls[i][1] = intersectLines(p0, p1, p2, p3);
+      } else if (type === "lineTo" && nextType === "arc") {
+        [p0, p1] = offsetSegment(lp, p, offset);
+        [p2, p3, nr2] = offsetArc(p, np, r2, s2, offset);
+        result.controls[i][1] = intersectLineAndArc(p0, p1, p2, p3, nr2, s2);
+      } else if (type === "arc" && nextType === "lineTo") {
+        [p0, p1, nr1] = offsetArc(lp, p, r1, s1, offset);
+        [p2, p3] = offsetSegment(p, np, offset);
+        result.controls[i][1] = intersectLineAndArc(p2, p3, p0, p1, nr1, s1);
+        result.controls[i][2] = nr1;
+      } else if (type === "arc" && nextType === "arc") {
+        [p0, p1, nr1] = offsetArc(lp, p, r1, s1, offset);
+        [p2, p3, nr2] = offsetArc(lp, p, r2, s2, offset);
+        result.controls[i][1] = intersectTwoArcs(
+          p0,
+          p1,
+          nr1,
+          s1,
+          p2,
+          p3,
+          nr2,
+          s2,
+        );
+        result.controls[i][2] = nr1;
+      }
+
+      if (lastType === "moveTo") {
+        result.controls[i - 1][1] = p0;
+      }
+
+      if (i + 2 === length) {
+        result.controls[i + 1][1] = p3;
+        if (nextType === "arc") result.controls[i + 1][2] = nr2;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * @param {number} offset
+   */
+  thickenAndClose(offset) {
+    const result = this.clone();
+    let end = this.invert();
+    end = end.offset(offset);
+    result.lineTo(end.controls[0][1]);
+    result.merge(end);
+    result.close();
+
+    return result;
+  }
+
+  repr() {
+    let result = "const pathToRename = new Path();\n";
+    for (const [type, [x, y], maybeRadius, maybeFlag] of this.controls) {
+      switch (type) {
+        case "moveTo":
+          result += `pathToRename.moveTo([${x}, ${y}]);\n`;
+          break;
+
+        case "lineTo":
+          result += `pathToRename.moveTo([${x}, ${y}]);\n`;
+          break;
+
+        case "arc":
+          result += `pathToRename.arc([${x}, ${y}], ${maybeRadius}, ${maybeFlag});\n`;
+          break;
+
+        case "close":
+          result += "pathToRename.close();";
           break;
         default:
           throw new Error("failed");

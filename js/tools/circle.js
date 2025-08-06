@@ -44,6 +44,25 @@ export function getCircleCenter(p1, p2, radius, sweep) {
 /**
  * @param {types.Point} p1
  * @param {types.Point} p2
+ * @param {types.Point} start
+ * @param {types.Point} end
+ * @param {number} radius
+ * @param {number} sweep
+ * @returns {types.Point}
+ */
+export function intersectLineAndArc(p1, p2, start, end, radius, sweep) {
+  const center = getCircleCenter(start, end, radius, sweep);
+  const roots = intersectLineAndCircle(p1, p2, center, radius);
+  if (roots.length === 1) return roots[0];
+
+  for (const root of roots)
+    if (isInPieSlice(root, start, end, radius, sweep)) return root;
+  throw new Error("failed");
+}
+
+/**
+ * @param {types.Point} p1
+ * @param {types.Point} p2
  * @param {types.Point} center
  * @param {number} radius
  * @returns {types.Point[]}
@@ -98,6 +117,30 @@ export function intersectTwoCircles(center, radius, center2, radius2) {
 }
 
 /**
+ * @param {types.Point} start1
+ * @param {types.Point} end1
+ * @param {number} r1
+ * @param {number} s1
+ * @param {types.Point} start2
+ * @param {types.Point} end2
+ * @param {number} r2
+ * @param {number} s2
+ * @returns {types.Point}
+ */
+export function intersectTwoArcs(start1, end1, r1, s1, start2, end2, r2, s2) {
+  const center1 = getCircleCenter(start1, end1, r1, s1);
+  const center2 = getCircleCenter(start2, end2, r2, s2);
+  const roots = intersectLineAndCircle(center1, r1, center2, r2);
+  for (const root of roots)
+    if (
+      isInPieSlice(root, start1, end1, r1, s1) &&
+      isInPieSlice(root, start2, end2, r2, s2)
+    )
+      return root;
+  throw new Error("failed");
+}
+
+/**
  * @param {types.Point} p
  * @param {types.Point} start
  * @param {types.Point} end
@@ -107,7 +150,7 @@ export function intersectTwoCircles(center, radius, center2, radius2) {
  */
 export function isInPieSlice(p, start, end, radius, sweep) {
   const x = pointCoordinateOnArc(p, start, end, radius, sweep);
-  return 0 < x && x < 1;
+  return 0 <= x && x <= 1;
 }
 
 /**
@@ -157,8 +200,7 @@ export function evaluateArc(x, start, end, radius, sweep) {
   const center = getCircleCenter(start, end, radius, sweep);
   const startAngle = Math.atan2(...minus(start, center).toReversed());
   const endAngle = Math.atan2(...minus(end, center).toReversed());
-  const opening =
-   (sweep ? 1 : -1) *  Math.abs(normalize(endAngle - startAngle));
+  const opening = (sweep ? 1 : -1) * Math.abs(normalize(endAngle - startAngle));
 
   return rotatePoint(center, start, opening * x);
 }
