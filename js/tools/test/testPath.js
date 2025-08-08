@@ -216,6 +216,16 @@ bro.test("offset", () => {
     );
 });
 
+bro.test("simple line thicken", () => {
+  let doorSpace = new Path();
+  doorSpace.moveTo([0, 400]);
+  doorSpace.lineTo([500, 400]);
+  doorSpace = doorSpace.thickenAndClose(100);
+  bro
+    .expect(doorSpace.toString())
+    .toBe("M 0 400 L 500 400 L 500 300 L 0 300 Z");
+});
+
 bro.test("thicken", () => {
   const path = Path.fromD(
     "M 900 700 A 200 200 0 0 0 900 1100 L 2020 1100 A 200 200 0 0 0 2020 700",

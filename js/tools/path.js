@@ -766,7 +766,10 @@ export class Path {
       let p0, p1, p2, p3;
       let nr1, nr2;
 
-      if (type === "lineTo" && nextType === "lineTo") {
+      if (type === "lineTo" && nextType == null) {
+        [p0, p1] = offsetSegment(lp, p, offset);
+        result.controls[i][1] = p1;
+      } else if (type === "lineTo" && nextType === "lineTo") {
         [p0, p1] = offsetSegment(lp, p, offset);
         [p2, p3] = offsetSegment(p, np, offset);
         result.controls[i][1] = intersectLines(p0, p1, p2, p3);
