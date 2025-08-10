@@ -1,23 +1,18 @@
 // @ts-check
 /** @import * as types from './types' */
 
-import {
-  computeVectorAngle,
-  isToTheLeft,
-  minus,
-  mult,
-  norm,
-  placeAlong,
-  plus,
-  rotatePoint,
-} from "./2d.js";
-import { Path } from "./path.js";
-import { debugGeometry, w3svg } from "./svg.js";
+import { minus, mult, norm, placeAlong, plus, rotatePoint } from "./2d.js";
+import { modulo } from "./utils.js";
 
 const eps = 1e-5;
 
-const modulo = (a, m) => ((a % m) + m) % m;
-const normalize = (a) => modulo(a + Math.PI, 2 * Math.PI) - Math.PI;
+/**
+ * @param {number} a
+ * @returns {number}
+ */
+export function normalizeAngle(a) {
+  return modulo(a + Math.PI, 2 * Math.PI) - Math.PI;
+}
 
 /**
  * @param {types.Point} p1
@@ -166,8 +161,8 @@ export function pointCoordinateOnArc(p, start, end, radius, sweep) {
 
   const startAngle = Math.atan2(...minus(start, center));
 
-  let angle = normalize(Math.atan2(...minus(p, center)) - startAngle);
-  let endAngle = normalize(Math.atan2(...minus(end, center)) - startAngle);
+  let angle = normalizeAngle(Math.atan2(...minus(p, center)) - startAngle);
+  let endAngle = normalizeAngle(Math.atan2(...minus(end, center)) - startAngle);
 
   // will need some adjustment when long arcs will be possible
   if (Math.abs(endAngle + Math.PI) < eps && sweep === 0) endAngle = Math.PI;
@@ -200,7 +195,8 @@ export function evaluateArc(x, start, end, radius, sweep) {
   const center = getCircleCenter(start, end, radius, sweep);
   const startAngle = Math.atan2(...minus(start, center).toReversed());
   const endAngle = Math.atan2(...minus(end, center).toReversed());
-  const opening = (sweep ? 1 : -1) * Math.abs(normalize(endAngle - startAngle));
+  const opening =
+    (sweep ? 1 : -1) * Math.abs(normalizeAngle(endAngle - startAngle));
 
   return rotatePoint(center, start, opening * x);
 }

@@ -226,6 +226,29 @@ bro.test("simple line thicken", () => {
     .toBe("M 0 400 L 500 400 L 500 300 L 0 300 Z");
 });
 
+bro.test("issue with corners", () => {
+  const radius = 5;
+  const bigRadius = 15;
+  const structThickness = 50;
+  const structWidth = 70;
+
+  let bottomProfile = new Path();
+  bottomProfile.moveTo([-40, 0]);
+  bottomProfile.lineTo([0, 0]);
+  bottomProfile.arcTo([0, structThickness], radius);
+  bottomProfile.arcTo([-structWidth, structThickness], radius);
+  bottomProfile.arcTo([-structWidth, 0], bigRadius);
+  bottomProfile.arcTo([-50, 0], bigRadius);
+  bottomProfile.close();
+  bottomProfile = bottomProfile.translate([0, 42]);
+
+  bro
+    .expect(bottomProfile.toString())
+    .toBe(
+      "M -40 42 L -5 42 A 5 5 0 0 1 0 47 L 0 87 A 5 5 0 0 1 -4.999999999999999 92 L -55 92 A 15 15 0 0 1 -70 77 L -70 57 A 15 15 0 0 1 -55 42 L -50 42 Z",
+    );
+});
+
 bro.test("thicken", () => {
   const path = Path.fromD(
     "M 900 700 A 200 200 0 0 0 900 1100 L 2020 1100 A 200 200 0 0 0 2020 700",

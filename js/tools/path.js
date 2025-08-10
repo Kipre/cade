@@ -30,7 +30,7 @@ import {
   isInPieSlice,
   pointCoordinateOnArc,
 } from "./circle.js";
-import { debugGeometry } from "./svg.js";
+import { normalizeAngle } from "./circle.js";
 
 const eps = 1e-5;
 
@@ -131,8 +131,11 @@ export class Path {
     const start = pointToLine(center, p1, p2);
     const end = pointToLine(center, p2, p3);
 
-    const angle = computeAngleBetween(minus(start, center), minus(end, center));
-    const sweepFlag = (angle / Math.abs(angle) + 1) / 2;
+    const angle1 = Math.atan2(...minus(start, center).toReversed());
+    const angle2 = Math.atan2(...minus(end, center).toReversed());
+    const angle = normalizeAngle(angle2 - angle1);
+
+    const sweepFlag = angle > 0 ? 1 : 0;
 
     if (norm(p1, start) > eps) this.lineTo(start);
 
