@@ -42,6 +42,23 @@ bro.test("mirror", () => {
     );
 });
 
+bro.test("mirror 2", () => {
+  const spindleDiameter = 6;
+  const mortiseWidth = 30;
+  const woodThickness = 15;
+  const path = new Path();
+  path.moveTo([-spindleDiameter - mortiseWidth / 2, 0]);
+  path.arc([-mortiseWidth / 2, 0], spindleDiameter / 2, 1);
+  path.lineTo([-mortiseWidth / 2, woodThickness]);
+  path.mirror([0, 0], [0, 1]);
+
+  bro
+    .expect(path.toString())
+    .toEqual(
+      "M -21 0 A 3 3 0 0 1 -15 0 L -15 15 L 15 15.000000000000005 L 15 0 A 3 3 0 0 1 21 0",
+    );
+});
+
 const half = 500;
 const radius = 100;
 const interCenter = 1000;

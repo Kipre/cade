@@ -4,9 +4,10 @@
 import { Path } from "./path.js";
 
 export const w3svg = "http://www.w3.org/2000/svg";
+const defaultMarginPercents = 5;
 
 export class BBox {
-  constructor(marginPercents = 5) {
+  constructor(marginPercents = defaultMarginPercents) {
     this.xMin = Number.POSITIVE_INFINITY;
     this.yMin = Number.POSITIVE_INFINITY;
     this.xMax = 0;
@@ -40,8 +41,26 @@ export class BBox {
     return values.join(" ");
   };
 
+  toDataset = (element) => {
+    element.dataset.xMin = this.xMin;
+    element.dataset.yMin = this.yMin;
+    element.dataset.xMax = this.xMax;
+    element.dataset.yMax = this.yMax;
+  };
+
+  static fromDataset(element) {
+    const self = new BBox();
+    self.xMin = Number.parseFloat(element.dataset.xMin) || Number.POSITIVE_INFINITY ;
+    self.yMin = Number.parseFloat(element.dataset.yMin) || Number.POSITIVE_INFINITY ;
+    self.xMax = Number.parseFloat(element.dataset.xMax) || 0;
+    self.yMax = Number.parseFloat(element.dataset.yMax) || 0;
+    return self;
+  }
+
   /**
    * @param {string?} viewBox
+   *
+   * Caution: will mess-up the margin
    */
   static fromViewBox(viewBox) {
     const self = new BBox();
@@ -151,7 +170,7 @@ export function debugGeometry(...shapes) {
     svg.id = id;
     document.body.appendChild(svg);
   }
-  const bbox = BBox.fromViewBox(svg.getAttribute("viewBox"));
+  const bbox = BBox.fromDataset(svg);
   const colors = ["red", "green", "blue", "purple", "brown"];
 
   for (let i = 0; i < shapes.length; i++) {
@@ -185,13 +204,16 @@ export function debugGeometry(...shapes) {
     svg.appendChild(path);
   }
 
+  bbox.toDataset(svg);
   svg.setAttribute("viewBox", bbox.toViewBox());
   const size = Math.max(bbox.xMax - bbox.xMin, bbox.yMax - bbox.yMin);
 
   const mgn = size / 20;
+
+  for (const el of svg.querySelectorAll(".axes")) el.remove();
   svg.innerHTML = `
-  <line x1="${bbox.xMin + mgn}" x2=${bbox.xMax + mgn} stroke="black" marker-end="url(#arrow)"/>
-  <line y1="${bbox.yMin + mgn}" y2=${bbox.yMax + mgn} stroke="black" marker-end="url(#arrow)"/>
+  <line class="axes" x1="${bbox.xMin + mgn}" x2=${bbox.xMax + mgn} stroke="black" marker-end="url(#arrow)"/>
+  <line class="axes" y1="${bbox.yMin + mgn}" y2=${bbox.yMax + mgn} stroke="black" marker-end="url(#arrow)"/>
    ${svg.innerHTML}`;
   svg.setAttribute(
     "style",

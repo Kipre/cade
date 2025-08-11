@@ -205,11 +205,21 @@ export class Path {
     if (first !== "moveTo") throw new Error("path not well formed");
     if (last === "close") throw new Error("can't mirror a closed path");
 
+    let checkedFirstPoint = false;
     for (let i = this.controls.length - 1; i > 0; i--) {
       const [type, point, maybeRadius, maybeSweepFlag] = this.controls[i];
       const [, p] = this.controls[i - 1];
 
       const mirrored = mirrorPoint(p, l1 ?? firstPoint, l2 ?? lastPoint);
+      if (!checkedFirstPoint) {
+        checkedFirstPoint = true;
+        const firstMirrored = mirrorPoint(
+          point,
+          l1 ?? firstPoint,
+          l2 ?? lastPoint,
+        );
+        if (norm(point, firstMirrored) > eps) this.lineTo(firstMirrored);
+      }
 
       switch (type) {
         case "lineTo":
@@ -554,10 +564,11 @@ export class Path {
     if (this.controls.at(-1)[0] === "close")
       throw new Error("cannot merge to a closed path");
 
-    if (norm(other.controls[0][1], this.controls.at(-1)[1]) > 1e-1)
-      throw new Error("cannot merge");
+    if (norm(other.controls[0][1], this.controls.at(-1)[1]) > 1e-1) {
+      this.lineTo(other.controls[0][1]);
+      this.controls.push(...other.controls.slice(1));
+    } else this.controls.push(...other.controls.slice(1));
 
-    this.controls.push(...other.controls.slice(1));
     if (norm(this.controls[0][1], other.controls.at(-1)[1]) < eps) this.close();
   }
 
