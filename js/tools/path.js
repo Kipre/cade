@@ -47,7 +47,10 @@ export class Path {
 
   static fromD(path) {
     const result = new Path();
-    const tokens = path.split(" ");
+    const tokens = path
+      .replaceAll(",", " ")
+      .replaceAll(/[A-Za-z]\d/g, (match) => `${match[0]} ${match.slice(1)}`)
+      .split(" ");
     let i = 0;
 
     while (i < tokens.length) {
@@ -83,7 +86,7 @@ export class Path {
           result.close();
           break;
         default:
-          throw new Error("unsupported command");
+          throw new Error(`unsupported command: ${tokens[i - 1]}`);
       }
     }
     return result;
