@@ -8,7 +8,7 @@ import {
 } from "./dimensions.js";
 import { norm, placeAlong } from "./tools/2d.js";
 import { Path } from "./tools/path.js";
-import { debugGeometry } from "./tools/svg.js";
+import { BBox, debugGeometry, w3svg } from "./tools/svg.js";
 
 const bridgeTopThickness = zAxisTravel;
 const bridgeTop = openArea.z + bridgeTopThickness;
@@ -16,9 +16,46 @@ const joinOffset = 10;
 const bridgeJoinWidth = 100 - 2 * woodThickness;
 
 class FlatPart {
-  constructor(outside) {
+  /**
+   * @param {Path} outside
+   * @param {Path[]} [insides]
+   */
+  constructor(outside, insides = []) {
     this.outside = outside;
-    this.insides = [];
+    this.insides = insides;
+    this._id = Math.random().toString().slice(2);
+  }
+
+  /**
+   * @param {Path[]} insides
+   */
+  addInsides(...insides) {
+    this.insides.push(...insides);
+  }
+
+  display() {
+    const svg = document.createElementNS(w3svg, "svg");
+    svg.id = this._id;
+    document.body.appendChild(svg);
+
+    const bbox = BBox.fromDataset(svg);
+
+    for (const shape of [this.outside, ...this.insides]) {
+      const path = document.createElementNS(w3svg, "path");
+      path.setAttribute("d", shape.toString());
+      path.setAttribute("stroke", "blue");
+      path.setAttribute("style", "opacity: 0.8");
+      path.setAttribute("fill", "none");
+
+      const totalLength = path.getTotalLength();
+      for (let i = 0; i < 1; i += 0.01) {
+        const p = path.getPointAtLength(totalLength * i);
+        bbox.include([p.x, p.y]);
+      }
+      svg.appendChild(path);
+    }
+
+    svg.setAttribute("viewBox", bbox.toViewBox());
   }
 }
 
@@ -76,8 +113,8 @@ function addSimpleReinforcingJoin(part1, part2, l1, l2, width, thickness) {
   const offset = 50;
   const fastenerPitch = (length - 2 * offset) / (nbFasteners - 1);
 
-  const joinPart = new Path();
-  joinPart.moveTo([0, width / 2]);
+  const joinPartPath = new Path();
+  joinPartPath.moveTo([0, width / 2]);
 
   const firstBolt = placeAlong(l1, l2, { fromStart: offset });
   cutouts.push(fastenerHole.translate(firstBolt));
@@ -97,16 +134,21 @@ function addSimpleReinforcingJoin(part1, part2, l1, l2, width, thickness) {
     const loc = (lastLocation + location) / 2;
     const nextMortise = placeAlong(l1, l2, { fromStart: loc });
     cutouts.push(mortise.translate(nextMortise));
-    joinPart.merge(maleMortise.translate([loc, width / 2]));
+    joinPartPath.merge(maleMortise.translate([loc, width / 2]));
 
     lastLocation = location;
   }
 
-  joinPart.lineTo([length, width / 2]);
-  joinPart.mirror([0, 0], [1, 0]);
-  joinPart.close();
+  joinPartPath.lineTo([length, width / 2]);
+  joinPartPath.mirror([0, 0], [1, 0]);
+  joinPartPath.close();
 
-  return [cutouts, joinCutouts, joinPart];
+  part1.addInsides(...cutouts);
+  part2.addInsides(...cutouts);
+
+  const joinPart = new FlatPart(joinPartPath, joinCutouts);
+
+  return joinPart;
 }
 
 const zJoin = bridgeTop - joinOffset - woodThickness / 2;
@@ -114,7 +156,15 @@ const [from, to] = p
   .intersectLine([-10, zJoin], [2 * xRailSupportWidth + openArea.y + 10, zJoin])
   .map((int) => int.point);
 
-const [cutouts, joinCutouts, join] = addSimpleReinforcingJoin(
+const zJoin2 = openArea.z + joinOffset + woodThickness / 2;
+const [from2, to2] = p
+  .intersectLine(
+    [-10, zJoin2],
+    [2 * xRailSupportWidth + openArea.y + 10, zJoin2],
+  )
+  .map((int) => int.point);
+
+const join = addSimpleReinforcingJoin(
   part1,
   part2,
   from,
@@ -123,7 +173,16 @@ const [cutouts, joinCutouts, join] = addSimpleReinforcingJoin(
   woodThickness,
 );
 
-debugGeometry(p, join);
+const join2 = addSimpleReinforcingJoin(
+  part1,
+  part2,
+  from2,
+  to2,
+  bridgeJoinWidth,
+  woodThickness,
+);
 
-for (const j of cutouts) debugGeometry(j);
-for (const j of joinCutouts) debugGeometry(j);
+part1.display();
+// part2.display();
+join.display();
+join2.display();
