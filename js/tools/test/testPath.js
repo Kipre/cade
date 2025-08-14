@@ -158,9 +158,17 @@ bro.test("subpath", () => {
     .toBe(
       "M 1550.090662536071 586.5501330253019 A 100 100 0 0 0 1500 400 L 500 400 A 100 100 0 0 0 500 600 L 500.00000000000006 1000 L 0 1000 L 0 0 L 2000 0 L 1900 1000 L 1788.4 1000",
     );
+
+  const path = Path.fromD("M 0 0 L 0 10 L 10 10 L 10 0 Z");
+
+  bro.expect(path.subpath(3, 0, 3, 1).toString()).toBe("M 10 10 L 10 0");
+  bro.expect(path.subpath(3, 1, 3, 0, true).toString()).toBe("M 10 0 L 10 10");
+  bro.expect(path.subpath(3, 0, 3, 1, true).toString()).toBe("M 10 10 L 0 10 L 0 0 L 10 0");
+  bro.expect(path.subpath(3, 1, 3, 0).toString()).toBe("M 10 0 L 0 0 L 0 10 L 10 10");
+  bro.expect(path.subpath(3, 0, 3, 1, true).toString()).toBe("M 10 10 L 0 10 L 0 0 L 10 0");
 });
 
-bro.test("subpath", () => {
+bro.test("more conmplex subpath", () => {
   const s = new Path();
   s.moveTo([0, 0]);
   s.lineTo([1, 0]);
@@ -283,4 +291,14 @@ bro.test("thicken", () => {
     .toBe(
       "M 900 700 A 200 200 0 0 0 900 1100 L 2020 1100 A 200 200 0 0 0 2020 700 L 2020 800 A 100 100 0 0 1 2020 1000 L 900 1000 A 100 100 0 0 1 900 800 Z",
     );
+});
+
+bro.test("union", () => {
+  const path = Path.fromD("M 0 0 L 0 10 L 10 10 L 10 0 Z");
+  let path2 = Path.fromD("M 10 0 L 10 10 L 20 10 L 20 0 Z");
+
+  bro.expect(path.booleanUnion(path2).toString()).toBe("M 10 0 L 0 0 L 0 10 L 20 10 L 20 0 L 10 0 Z");
+
+  path2 = path2.invert();
+  bro.expect(path.booleanUnion(path2).toString()).toBe("M 10 0 L 0 0 L 0 10 L 20 10 L 20 0 L 10 0 Z");
 });

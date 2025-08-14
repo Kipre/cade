@@ -189,9 +189,18 @@ export class Path {
 
   simplify() {
     const toRemove = [];
-    const nbControls = this.controls.length - 1;
-    for (let i = 1; i < nbControls - 1; i++) {
+    let nbControlsToCheck = this.controls.length - 1;
+    if (this.isClosed()) nbControlsToCheck--;
+
+    for (let i = 1; i < nbControlsToCheck; i++) {
       const [[_, p0], [type1, p1], [type2, p2]] = this.controls.slice(i - 1);
+
+      if (norm(p1, p2) < eps) {
+        toRemove.unshift(i + 1);
+        i++;
+        continue;
+      }
+
       if (type1 === "lineTo" && type2 === "lineTo" && areOnSameLine(p0, p1, p2))
         toRemove.unshift(i);
     }
@@ -628,6 +637,8 @@ export class Path {
    * @param {number} endSegment
    * @param {number} endX
    * @returns {Path}
+   *
+   * TODO index at zero
    */
   subpath(startSegment, startX, endSegment, endX, invert = false) {
     const result = new Path();
@@ -635,6 +646,7 @@ export class Path {
 
     const length = this.controls.length;
 
+    let shouldSkip = startSegment === endSegment && startX > endX === !invert;
     for (
       let i = startSegment;
       ;
@@ -659,10 +671,12 @@ export class Path {
         default:
           throw new Error();
       }
-      if (i === endSegment) break;
+      if (i === endSegment && !shouldSkip) break;
+      shouldSkip = false;
     }
     const end = this.evaluate(endSegment, endX);
     result.controls.at(-1)[1] = end;
+    result.simplify();
     return result;
   }
 
@@ -829,6 +843,51 @@ export class Path {
   }
 
   /**
+   * @param {Path} other
+   *
+   * Very limited functionnality for now, only merging paths with common lines
+   */
+  booleanUnion(other) {
+    if (!this.isClosed() || !other.isClosed())
+      throw new Error("paths should be closed to do boolean operations");
+
+    const length1 = this.controls.length - 1;
+    const length2 = other.controls.length - 1;
+
+    for (let i = 0; i < length1; i++) {
+      const [, lastPoint] = this.controls[i];
+      const [type, point] = this.controls[i + 1];
+      if (type !== "lineTo") continue;
+
+      for (let j = 0; j < length2; j++) {
+        const [, lp2] = other.controls[j];
+        const [type, p2] = other.controls[j + 1];
+        if (type !== "lineTo") continue;
+
+        const seg = i + 1;
+        const otherSeg = j + 1;
+
+        if (norm(lastPoint, lp2) < eps && norm(point, p2) < eps) {
+          const part = this.subpath(seg, 1, seg, 0);
+          part.merge(other.subpath(otherSeg, 0, otherSeg, 1, true));
+          part.simplify();
+          return part;
+        }
+
+        if (norm(lastPoint, p2) > eps || norm(point, lp2) > eps) continue;
+
+        const part = this.subpath(seg, 1, seg, 0);
+        const part2 = other.subpath(otherSeg, 1, otherSeg, 0);
+        part.merge(part2);
+        part.simplify();
+        return part;
+      }
+    }
+
+    throw new Error("did not find a common line");
+  }
+
+  /**
    * @param {number} offset
    */
   thickenAndClose(offset) {
@@ -851,7 +910,7 @@ export class Path {
           break;
 
         case "lineTo":
-          result += `pathToRename.moveTo([${x}, ${y}]);\n`;
+          result += `pathToRename.lineTo([${x}, ${y}]);\n`;
           break;
 
         case "arc":
