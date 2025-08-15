@@ -31,6 +31,8 @@ import {
   pointCoordinateOnArc,
 } from "./circle.js";
 import { normalizeAngle } from "./circle.js";
+import { debugGeometry } from "./svg.js";
+import { modulo } from "./utils.js";
 
 const eps = 1e-5;
 
@@ -208,6 +210,16 @@ export class Path {
     for (const i of toRemove) {
       this.controls.splice(i, 1);
     }
+
+    // if close is zero length and first segment is a line
+    if (
+      this.isClosed() &&
+      norm(this.controls[0][1], this.controls.at(-2)[1]) < eps &&
+      this.controls[1][0] === "lineTo"
+    ) {
+      this.controls.shift();
+      this.controls[0][0] = "moveTo";
+    }
   }
 
   mirror(l1 = null, l2 = null) {
@@ -249,6 +261,17 @@ export class Path {
 
     if (norm(this.controls[0][1], this.controls.at(-1)[1]) < eps) this.close();
     this.simplify();
+  }
+
+  /**
+   * @param {number} nbItems
+   */
+  pop(nbItems) {
+    const result = [];
+    for (let i = 0; i < nbItems; i++) {
+      result.unshift(this.controls.pop());
+    }
+    return result;
   }
 
   /**
@@ -333,6 +356,9 @@ export class Path {
     let firstPoint;
     let lastPoint;
 
+    if (norm(p1, p2) < eps)
+      throw new Error("cannot intersect zero length line");
+
     const nbControls = this.controls.length;
     for (let i = 0; i < nbControls; i++) {
       let [type, p, ...rest] = this.controls[i];
@@ -388,16 +414,11 @@ export class Path {
 
   /**
    * @param {Path} other
+   * @returns {PathIntersection[]}
    */
-  booleanIntersection(other) {
-    if (
-      this.controls.at(-1)[0] !== "close" ||
-      other.controls.at(-1)[0] !== "close"
-    )
-      throw new Error("boolean intersections require closed shapes");
-
+  findPathIntersections(other) {
     /** @type {PathIntersection[]} */
-    const rawIntersections = [];
+    const intersections = [];
     let lastPoint = null;
 
     const nbControls = this.controls.length;
@@ -418,7 +439,7 @@ export class Path {
             const x = pointCoordinateOnLine(point, lastPoint, p);
             const crossesFromTheRight = !other.crossesFromTheRight;
             const self = { segment: i, x, crossesFromTheRight };
-            rawIntersections.push({ point, other, self });
+            intersections.push({ point, other, self });
           }
           break;
         }
@@ -428,7 +449,7 @@ export class Path {
             const x = pointCoordinateOnArc(point, lastPoint, p, radius, sweep);
             const crossesFromTheRight = !other.crossesFromTheRight;
             const self = { segment: i, x, crossesFromTheRight };
-            rawIntersections.push({ point, other, self });
+            intersections.push({ point, other, self });
           }
           break;
         }
@@ -438,6 +459,48 @@ export class Path {
       }
       lastPoint = p;
     }
+
+    return intersections;
+  }
+
+  /**
+   * @param {Path} other
+   */
+  intersectOpenPath(other) {
+    if (
+      this.controls.at(-1)[0] !== "close" ||
+      other.controls.at(-1)[0] === "close"
+    )
+      throw new Error("this should be closed and other shoud be open");
+
+    const intersections = this.findPathIntersections(other);
+
+    if (intersections.length !== 2)
+      throw new Error("expected exactly two intersections");
+
+    let start = intersections[0].other;
+    let end = intersections[1].other;
+
+    if (
+      start.segment > end.segment ||
+      (start.segment === end.segment && start.x > end.x)
+    )
+      [start, end] = [end, start];
+
+    return other.subpath(start.segment, start.x, end.segment, end.x);
+  }
+
+  /**
+   * @param {Path} other
+   */
+  booleanIntersection(other) {
+    if (
+      this.controls.at(-1)[0] !== "close" ||
+      other.controls.at(-1)[0] !== "close"
+    )
+      throw new Error("boolean intersections require closed shapes");
+
+    const rawIntersections = this.findPathIntersections(other);
 
     // determine intersection loops
     const loops = [];
@@ -464,8 +527,8 @@ export class Path {
     );
 
     for (let i = 0; i < length; i++) {
-      const before = (((i - 1) % length) + length) % length;
-      const after = (((i + 1) % length) + length) % length;
+      const before = modulo(i - 1, length);
+      const after = modulo(i + 1, length);
       for (const [info, ordered] of [
         [intersections[otherOrdered[i].index].other, otherOrdered],
         [intersections[selfOrdered[i].index].self, selfOrdered],
@@ -553,6 +616,7 @@ export class Path {
     //   ...result.slice(0, 1),
     //   intersections.map((int) => int.point),
     // );
+    path.simplify();
     return path;
   }
 
@@ -842,6 +906,17 @@ export class Path {
     return result;
   }
 
+  *iterateOver() {
+    const length = this.controls.length - 1;
+
+    for (let i = 0; i < length; i++) {
+      const [, lastPoint] = this.controls[i];
+      const [type, ...rest] = this.controls[i + 1];
+      if (type === "close") yield [i + 1, lastPoint, "lineTo", this.controls[0][1]];
+      else yield [i + 1, lastPoint, type, ...rest];
+    }
+  }
+
   /**
    * @param {Path} other
    *
@@ -851,21 +926,11 @@ export class Path {
     if (!this.isClosed() || !other.isClosed())
       throw new Error("paths should be closed to do boolean operations");
 
-    const length1 = this.controls.length - 1;
-    const length2 = other.controls.length - 1;
-
-    for (let i = 0; i < length1; i++) {
-      const [, lastPoint] = this.controls[i];
-      const [type, point] = this.controls[i + 1];
+    for (const [seg, lastPoint, type, point] of this.iterateOver()) {
       if (type !== "lineTo") continue;
 
-      for (let j = 0; j < length2; j++) {
-        const [, lp2] = other.controls[j];
-        const [type, p2] = other.controls[j + 1];
+      for (const [otherSeg, lp2, type, p2] of other.iterateOver()) {
         if (type !== "lineTo") continue;
-
-        const seg = i + 1;
-        const otherSeg = j + 1;
 
         if (norm(lastPoint, lp2) < eps && norm(point, p2) < eps) {
           const part = this.subpath(seg, 1, seg, 0);

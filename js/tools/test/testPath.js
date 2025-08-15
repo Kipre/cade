@@ -38,7 +38,7 @@ bro.test("mirror", () => {
   bro
     .expect(p.toString())
     .toEqual(
-      "M -1 0 L -1 -1 L 0.8 -1 A 0.2 0.2 0 0 1 1 -0.8 L 1.0000000000000009 0.8 A 0.2 0.2 0 0 1 0.8000000000000002 1 L -0.9999999999999999 1 L -1 0 Z",
+      "M -1 -1 L 0.8 -1 A 0.2 0.2 0 0 1 1 -0.8 L 1.0000000000000009 0.8 A 0.2 0.2 0 0 1 0.8000000000000002 1 L -0.9999999999999999 1 L -1 0 Z",
     );
 });
 
@@ -163,9 +163,15 @@ bro.test("subpath", () => {
 
   bro.expect(path.subpath(3, 0, 3, 1).toString()).toBe("M 10 10 L 10 0");
   bro.expect(path.subpath(3, 1, 3, 0, true).toString()).toBe("M 10 0 L 10 10");
-  bro.expect(path.subpath(3, 0, 3, 1, true).toString()).toBe("M 10 10 L 0 10 L 0 0 L 10 0");
-  bro.expect(path.subpath(3, 1, 3, 0).toString()).toBe("M 10 0 L 0 0 L 0 10 L 10 10");
-  bro.expect(path.subpath(3, 0, 3, 1, true).toString()).toBe("M 10 10 L 0 10 L 0 0 L 10 0");
+  bro
+    .expect(path.subpath(3, 0, 3, 1, true).toString())
+    .toBe("M 10 10 L 0 10 L 0 0 L 10 0");
+  bro
+    .expect(path.subpath(3, 1, 3, 0).toString())
+    .toBe("M 10 0 L 0 0 L 0 10 L 10 10");
+  bro
+    .expect(path.subpath(3, 0, 3, 1, true).toString())
+    .toBe("M 10 10 L 0 10 L 0 0 L 10 0");
 });
 
 bro.test("more conmplex subpath", () => {
@@ -234,7 +240,7 @@ bro.test("boolean intersection", () => {
   bro
     .expect(intersection.toString())
     .toEqual(
-      "M 1549.9999999999998 586.6025403784439 L 1788.6751345948128 1000 L 1900 1000 L 1950 500 L 1600 500 A 100 100 0 0 1 1550 586.6025403784439 Z",
+      "M 1788.6751345948128 1000 L 1900 1000 L 1950 500 L 1600 500 A 100 100 0 0 1 1550 586.6025403784439 Z",
     );
 });
 
@@ -297,8 +303,32 @@ bro.test("union", () => {
   const path = Path.fromD("M 0 0 L 0 10 L 10 10 L 10 0 Z");
   let path2 = Path.fromD("M 10 0 L 10 10 L 20 10 L 20 0 Z");
 
-  bro.expect(path.booleanUnion(path2).toString()).toBe("M 10 0 L 0 0 L 0 10 L 20 10 L 20 0 L 10 0 Z");
+  bro
+    .expect(path.booleanUnion(path2).toString())
+    .toBe("M 0 0 L 0 10 L 20 10 L 20 0 L 10 0 Z");
 
   path2 = path2.invert();
-  bro.expect(path.booleanUnion(path2).toString()).toBe("M 10 0 L 0 0 L 0 10 L 20 10 L 20 0 L 10 0 Z");
+  bro
+    .expect(path.booleanUnion(path2).toString())
+    .toBe("M 0 0 L 0 10 L 20 10 L 20 0 L 10 0 Z");
+});
+
+bro.test("union 2", () => {
+  const path1 = new Path();
+  path1.moveTo([2809.035376609967, -1279.9794107166]);
+  path1.lineTo([2871.8921034601253, -900]);
+  path1.lineTo([2220, -900]);
+  path1.arc([2200.193773580484, -986.7767478235116], 200, 0);
+  path1.close();
+
+  const path2 = new Path();
+  path2.moveTo([2871.892103460126, -900]);
+  path2.lineTo([2945.630362317931, -454.2399111100681]);
+  path2.lineTo([2200.193773580484, -813.2232521764884]);
+  path2.arc([2220, -900], 200, 0);
+  path2.close();
+
+  bro
+    .expect(path1.booleanUnion(path2).toString())
+    .toBe("M 2220 -900 A 200 200 0 0 0 2200.193773580484 -986.7767478235116 L 2809.035376609967 -1279.9794107166 L 2945.630362317931 -454.2399111100681 L 2200.193773580484 -813.2232521764884 A 200 200 0 0 0 2220 -900 Z");
 });

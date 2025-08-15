@@ -2,6 +2,7 @@
 /** @import * as types from './types' */
 
 import { minus, mult, norm, placeAlong, plus, rotatePoint } from "./2d.js";
+import { debugGeometry } from "./svg.js";
 import { modulo } from "./utils.js";
 
 const eps = 1e-5;
@@ -21,7 +22,7 @@ export function normalizeAngle(a) {
  * @param {number} sweep
  */
 export function getCircleCenter(p1, p2, radius, sweep) {
-  if (norm(p1, p2) > 2 * radius) {
+  if (norm(p1, p2) > eps + 2 * radius) {
     console.error(p1, p2, radius, sweep);
     throw new Error("this arc does not exist");
   }
@@ -96,6 +97,9 @@ export function intersectLineAndCircle(p1, p2, center, radius) {
 export function intersectTwoCircles(center, radius, center2, radius2) {
   const roots = [];
   const d = norm(center, center2);
+
+  if (d < eps) return [];
+
   const radical = (d ** 2 - radius2 ** 2 + radius ** 2) / (2 * d);
 
   const halfChord = Math.sqrt(radius ** 2 - radical ** 2);

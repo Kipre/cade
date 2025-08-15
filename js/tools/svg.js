@@ -10,8 +10,8 @@ export class BBox {
   constructor(marginPercents = defaultMarginPercents) {
     this.xMin = Number.POSITIVE_INFINITY;
     this.yMin = Number.POSITIVE_INFINITY;
-    this.xMax = 0;
-    this.yMax = 0;
+    this.xMax = Number.NEGATIVE_INFINITY;
+    this.yMax = Number.NEGATIVE_INFINITY;
     this.marginPercents = marginPercents;
   }
 
@@ -212,8 +212,8 @@ export function debugGeometry(...shapes) {
 
   for (const el of svg.querySelectorAll(".axes")) el.remove();
   svg.innerHTML = `
-  <line class="axes" x1="${bbox.xMin + mgn}" x2=${bbox.xMax + mgn} stroke="black" marker-end="url(#arrow)"/>
-  <line class="axes" y1="${bbox.yMin + mgn}" y2=${bbox.yMax + mgn} stroke="black" marker-end="url(#arrow)"/>
+  <line class="axes" x1="${bbox.xMin - mgn / 2}" x2=${bbox.xMax + mgn / 2} stroke="black" marker-end="url(#arrow)"/>
+  <line class="axes" y1="${bbox.yMin - mgn / 2}" y2=${bbox.yMax + mgn / 2} stroke="black" marker-end="url(#arrow)"/>
    ${svg.innerHTML}`;
   svg.setAttribute(
     "style",
