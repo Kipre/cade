@@ -1,7 +1,7 @@
 // @ts-check
 import { plus, pointToLine, rotatePoint } from "../2d.js";
 import { Path } from "../path.js";
-import { debugGeometry } from "../svg.js";
+import { debugGeometry, w3svg } from "../svg.js";
 import bro from "./brotest/brotest.js";
 
 bro.test("simple case", () => {
@@ -145,6 +145,22 @@ bro.test("evaluate", () => {
   bro
     .expect(loop.evaluate(3, 0.833))
     .toRoughlyEqual([1550.090662536071, 586.5501330253019], 1e-6);
+});
+
+bro.test("get total length", () => {
+  bro.expect(loop.getLengthInfo().length).toRoughlyEqual(7333.3, 1e-1);
+});
+
+bro.test("evaluate anywhere", () => {
+  // const path = document.createElementNS(w3svg, "path");
+  // path.setAttribute("d", loop.toString());
+  // console.log(path.getPointAtLength(0.5 * 7333.3));
+  bro
+    .expect(loop.evaluateAnywhere(0.34))
+    .toRoughlyEqual([1906.4682930709753, 935.3170692902487]);
+  bro
+    .expect(loop.evaluateAnywhere(0.5))
+    .toRoughlyEqual([1766.6530464150237, 0]);
 });
 
 bro.test("subpath", () => {
@@ -330,5 +346,138 @@ bro.test("union 2", () => {
 
   bro
     .expect(path1.booleanUnion(path2).toString())
-    .toBe("M 2220 -900 A 200 200 0 0 0 2200.193773580484 -986.7767478235116 L 2809.035376609967 -1279.9794107166 L 2945.630362317931 -454.2399111100681 L 2200.193773580484 -813.2232521764884 A 200 200 0 0 0 2220 -900 Z");
+    .toBe(
+      "M 2220 -900 A 200 200 0 0 0 2200.193773580484 -986.7767478235116 L 2809.035376609967 -1279.9794107166 L 2945.630362317931 -454.2399111100681 L 2200.193773580484 -813.2232521764884 A 200 200 0 0 0 2220 -900 Z",
+    );
+});
+
+bro.test("rounded fillet", () => {
+  const length = 400;
+  const width = 300;
+
+  const opening = new Path();
+  opening.moveTo([0, 0]);
+  opening.lineTo([length, 0]);
+  opening.lineTo([length, width]);
+  opening.roundFillet(10);
+  opening.lineTo([0, width]);
+  opening.roundFillet(10);
+  opening.close();
+  bro
+    .expect(opening.toString())
+    .toBe(
+      "M 0 0 L 389.99999999999994 0 A 10 10 0 0 1 400 10.000000000000002 L 400 290.00000000000006 A 10 10 0 0 1 390 300 L 0 300 Z",
+    );
+});
+
+bro.test("segment getter", () => {
+  const path = new Path();
+  path.moveTo([0, 0]);
+  path.lineTo([10, 0]);
+  path.lineTo([20, 30]);
+  path.lineTo([0, 40]);
+  path.close();
+
+  bro.expect(path.getSegmentAt(0)).toEqual([4, [0, 40], "lineTo", [0, 0]]);
+  bro.expect(path.getSegmentAt(1)).toEqual([1, [0, 0], "lineTo", [10, 0]]);
+  bro.expect(path.getSegmentAt(2)).toEqual([2, [10, 0], "lineTo", [20, 30]]);
+  bro.expect(path.getSegmentAt(3)).toEqual([3, [20, 30], "lineTo", [0, 40]]);
+  bro.expect(path.getSegmentAt(-1)).toEqual([3, [20, 30], "lineTo", [0, 40]]);
+  bro.expect(path.getSegmentAt(4)).toEqual([4, [0, 40], "lineTo", [0, 0]]);
+});
+
+bro.test("segment getter on open path", () => {
+  const path = new Path();
+  path.moveTo([0, 0]);
+  path.lineTo([10, 0]);
+  path.lineTo([20, 30]);
+  path.lineTo([0, 40]);
+
+  bro.expect(path.getSegmentAt(0)).toEqual([]);
+  bro.expect(path.getSegmentAt(1)).toEqual([1, [0, 0], "lineTo", [10, 0]]);
+  bro.expect(path.getSegmentAt(2)).toEqual([2, [10, 0], "lineTo", [20, 30]]);
+  bro.expect(path.getSegmentAt(3)).toEqual([3, [20, 30], "lineTo", [0, 40]]);
+  bro.expect(path.getSegmentAt(-1)).toEqual([3, [20, 30], "lineTo", [0, 40]]);
+  bro.expect(path.getSegmentAt(4)).toEqual([]);
+});
+
+bro.test("juntion getter", () => {
+  const path = new Path();
+  path.moveTo([0, 0]);
+  path.lineTo([10, 0]);
+  path.lineTo([20, 30]);
+  path.lineTo([0, 40]);
+  path.close();
+
+  bro.expect(path.getJunctionAt(0)).toEqual([
+    [4, [0, 40], "lineTo", [0, 0]],
+    [1, [0, 0], "lineTo", [10, 0]],
+  ]);
+  bro.expect(path.getJunctionAt(1)).toEqual([
+    [1, [0, 0], "lineTo", [10, 0]],
+    [2, [10, 0], "lineTo", [20, 30]],
+  ]);
+  bro.expect(path.getJunctionAt(2)).toEqual([
+    [2, [10, 0], "lineTo", [20, 30]],
+    [3, [20, 30], "lineTo", [0, 40]],
+  ]);
+  bro.expect(path.getJunctionAt(3)).toEqual([
+    [3, [20, 30], "lineTo", [0, 40]],
+    [4, [0, 40], "lineTo", [0, 0]],
+  ]);
+  bro.expect(path.getJunctionAt(4)).toEqual([
+    [4, [0, 40], "lineTo", [0, 0]],
+    [1, [0, 0], "lineTo", [10, 0]],
+  ]);
+  bro.expect(path.getJunctionAt(-1)).toEqual([
+    [3, [20, 30], "lineTo", [0, 40]],
+    [4, [0, 40], "lineTo", [0, 0]],
+  ]);
+});
+
+bro.test("juntion getter", () => {
+  const path = new Path();
+  path.moveTo([0, 0]);
+  path.lineTo([10, 0]);
+  path.lineTo([20, 30]);
+  path.lineTo([0, 40]);
+  path.close();
+
+  bro.expect([...path.iterateOverJunctions()]).toEqual([
+    [
+      [1, [0, 0], "lineTo", [10, 0]],
+      [2, [10, 0], "lineTo", [20, 30]],
+    ],
+    [
+      [2, [10, 0], "lineTo", [20, 30]],
+      [3, [20, 30], "lineTo", [0, 40]],
+    ],
+    [
+      [3, [20, 30], "lineTo", [0, 40]],
+      [4, [0, 40], "lineTo", [0, 0]],
+    ],
+    [
+      [4, [0, 40], "lineTo", [0, 0]],
+      [1, [0, 0], "lineTo", [10, 0]],
+    ],
+  ]);
+});
+
+bro.test("rounded fillet all", () => {
+  const length = 400;
+  const width = 300;
+
+  const opening = new Path();
+  opening.moveTo([0, 0]);
+  opening.lineTo([length, 0]);
+  opening.lineTo([length, width]);
+  opening.lineTo([0, width]);
+  opening.close();
+  opening.roundFilletAll(20);
+
+  bro
+    .expect(opening.toString())
+    .toBe(
+      "M 0 19.999999999999996 A 20 20 0 0 1 20.000000000000004 0 L 379.99999999999994 0 A 20 20 0 0 1 400 20.000000000000004 L 400 280 A 20 20 0 0 1 380 300 L 20.00000000000002 300 A 20 20 0 0 1 0 280 Z",
+    );
 });

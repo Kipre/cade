@@ -179,6 +179,13 @@ export function pointCoordinateOnArc(p, start, end, radius, sweep) {
   return angle / endAngle;
 }
 
+export function getArcAngularLength(start, end, radius, sweep) {
+  const center = getCircleCenter(start, end, radius, sweep);
+  const startAngle = Math.atan2(...minus(start, center).toReversed());
+  const endAngle = Math.atan2(...minus(end, center).toReversed());
+  return (sweep ? 1 : -1) * Math.abs(normalizeAngle(endAngle - startAngle));
+}
+
 /**
  * TODO
  *
@@ -197,10 +204,7 @@ export function evaluateArc(x, start, end, radius, sweep) {
   // return [point.x, point.y];
 
   const center = getCircleCenter(start, end, radius, sweep);
-  const startAngle = Math.atan2(...minus(start, center).toReversed());
-  const endAngle = Math.atan2(...minus(end, center).toReversed());
-  const opening =
-    (sweep ? 1 : -1) * Math.abs(normalizeAngle(endAngle - startAngle));
+  const opening = getArcAngularLength(start, end, radius, sweep);
 
   return rotatePoint(center, start, opening * x);
 }

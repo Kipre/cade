@@ -22,6 +22,7 @@ import {
 import {
   arcTangentAt,
   evaluateArc,
+  getArcAngularLength,
   getCircleCenter,
   intersectLineAndArc,
   intersectLineAndCircle,
@@ -121,10 +122,11 @@ export class Path {
   /**
    * @param {number} radius
    */
-  roundFillet(radius) {
-    const [type, p3] = this.controls.pop();
-    const [preType, p2] = this.controls.pop();
-    const [, p1] = this.controls.at(-1);
+  roundFillet(radius, maybeIndex = null) {
+    const length = this.controls.length;
+    const index = maybeIndex ?? length - 1;
+
+    const [[, p1, preType, p2], [, , type, p3]] = this.getJunctionAt(index - 1);
 
     if (type !== "lineTo" || preType !== "lineTo")
       throw new Error("round fillets need lines to operate");
@@ -142,11 +144,31 @@ export class Path {
 
     const sweepFlag = angle > 0 ? 1 : 0;
 
-    if (norm(p1, start) > eps) this.lineTo(start);
+    const toInsert = [];
+    if (norm(p1, start) > eps)
+      toInsert.push([index === 1 ? "moveTo" : "lineTo", start]);
 
-    this.controls.push(["arc", end, radius, sweepFlag]);
+    toInsert.push(["arc", end, radius, sweepFlag]);
 
-    if (norm(p3, end) > eps) this.lineTo(p3);
+    if (norm(p3, end) > eps)
+      toInsert.push(
+        index + 1 === length && this.isClosed()
+          ? ["close", []]
+          : ["lineTo", p3],
+      );
+
+    this.controls.splice(index - 1, 2, ...toInsert);
+  }
+
+  /**
+   * @param {number} radius
+   */
+  roundFilletAll(radius) {
+    for (let i = 0; i < this.controls.length; i++) {
+      try {
+        this.roundFillet(radius, i + 1);
+      } catch (e) { }
+    }
   }
 
   /**
@@ -266,7 +288,7 @@ export class Path {
   /**
    * @param {number} nbItems
    */
-  pop(nbItems) {
+  pop(nbItems = 1) {
     const result = [];
     for (let i = 0; i < nbItems; i++) {
       result.unshift(this.controls.pop());
@@ -695,6 +717,55 @@ export class Path {
     }
   }
 
+  getLengthInfo() {
+    let result = 0;
+    const mapping = [];
+    for (const [
+      ,
+      lp,
+      type,
+      p,
+      maybeRadius,
+      maybeSweep,
+    ] of this.iterateOverSegments()) {
+      const before = result;
+      switch (type) {
+        case "lineTo": {
+          result += norm(lp, p);
+          break;
+        }
+        case "arc": {
+          result +=
+            Math.abs(getArcAngularLength(lp, p, maybeRadius, maybeSweep)) *
+            maybeRadius;
+          break;
+        }
+        default:
+          throw new Error();
+      }
+      mapping.push([before, result]);
+    }
+    return { length: result, info: mapping };
+  }
+
+  /**
+   * @param {number} x
+   */
+  evaluateAnywhere(x) {
+    if (x < 0 || x > 1) throw new TypeError();
+
+    const { length, info } = this.getLengthInfo();
+    const pos = length * x;
+
+    const i = info.findIndex(([from, to]) => to >= pos);
+    const [from, to] = info[i];
+
+    if (to === from) throw new Error("problem");
+
+    const localPos = (pos - from) / (to - from);
+    return this.evaluate(i + 1, localPos);
+  }
+
   /**
    * @param {number} startSegment
    * @param {number} startX
@@ -906,15 +977,48 @@ export class Path {
     return result;
   }
 
-  *iterateOver() {
+  /**
+   * @param {number} rawIndex
+   */
+  getSegmentAt(rawIndex) {
+    const isClosed = this.isClosed();
+    const length = this.controls.length + (isClosed ? -1 : 0);
+    const prev = modulo(rawIndex - 1, length);
+    const next = modulo(prev + 1, length);
+
+    if (!isClosed && next === 0) return [];
+
+    const [, lastPoint] = this.controls[prev];
+    let [type, ...rest] = this.controls[next];
+    if (type === "close")
+      return [prev + 1, lastPoint, "lineTo", this.controls[0][1]];
+    if (type === "moveTo") type = "lineTo";
+    return [prev + 1, lastPoint, type, ...rest];
+  }
+
+  *iterateOverSegments() {
     const length = this.controls.length - 1;
 
     for (let i = 0; i < length; i++) {
-      const [, lastPoint] = this.controls[i];
-      const [type, ...rest] = this.controls[i + 1];
-      if (type === "close") yield [i + 1, lastPoint, "lineTo", this.controls[0][1]];
-      else yield [i + 1, lastPoint, type, ...rest];
+      yield this.getSegmentAt(i + 1);
     }
+  }
+
+  *iterateOverJunctions() {
+    const iterator = this.iterateOverSegments();
+    const first = iterator.next().value;
+    let lastOne = first;
+
+    for (const info of iterator) {
+      yield [lastOne, info];
+      lastOne = info;
+    }
+
+    yield [lastOne, first];
+  }
+
+  getJunctionAt(index) {
+    return [this.getSegmentAt(index), this.getSegmentAt(index + 1)];
   }
 
   /**
@@ -926,10 +1030,10 @@ export class Path {
     if (!this.isClosed() || !other.isClosed())
       throw new Error("paths should be closed to do boolean operations");
 
-    for (const [seg, lastPoint, type, point] of this.iterateOver()) {
+    for (const [seg, lastPoint, type, point] of this.iterateOverSegments()) {
       if (type !== "lineTo") continue;
 
-      for (const [otherSeg, lp2, type, p2] of other.iterateOver()) {
+      for (const [otherSeg, lp2, type, p2] of other.iterateOverSegments()) {
         if (type !== "lineTo") continue;
 
         if (norm(lastPoint, lp2) < eps && norm(point, p2) < eps) {
