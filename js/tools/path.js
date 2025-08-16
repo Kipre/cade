@@ -153,7 +153,7 @@ export class Path {
     if (norm(p3, end) > eps)
       toInsert.push(
         index + 1 === length && this.isClosed()
-          ? ["close", []]
+          ? ["close", [0, 0]]
           : ["lineTo", p3],
       );
 
@@ -746,6 +746,18 @@ export class Path {
       mapping.push([before, result]);
     }
     return { length: result, info: mapping };
+  }
+
+  /**
+   * @param {number} radius
+   */
+  static makeCircle(radius) {
+    const result = new Path();
+    result.moveTo([-radius, 0]);
+    result.arc([radius, 0], radius, 0);
+    result.arc([-radius, 0], radius, 0);
+    result.close();
+    return result;
   }
 
   /**
