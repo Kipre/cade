@@ -1,8 +1,12 @@
 const std = @import("std");
-const cpp = @cImport({
+const bottle = @cImport({
     @cInclude("MakeBottle.h");
 });
 
+const solidify = @cImport({
+    @cInclude("Solidify.h");
+});
+
 pub fn main() !void {
-    cpp.helloWorld();
+    _ = solidify.pathToSolid();
 }

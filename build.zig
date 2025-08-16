@@ -75,6 +75,7 @@ pub fn build(b: *std.Build) void {
     exe.addIncludePath(b.path("src"));
     exe.addIncludePath(b.path("inc"));
     exe.addCSourceFile(.{ .file = b.path("src/MakeBottle.cxx") });
+    exe.addCSourceFile(.{ .file = b.path("src/Solidify.cxx") });
 
     exe.linkLibrary(addOCCTModule(b, target, optimize, "TKernel", &sources_TKernel));
     exe.linkLibrary(addOCCTModule(b, target, optimize, "TKMath", &sources_TKMath));
