@@ -40,13 +40,7 @@
 // #include <XCAFApp_Application.hxx>
 // #include <XCAFDoc_ShapeTool.hxx>
 
-struct PathSegment {
-    char command;
-    float x;
-    float y;
-    float radius;
-    char sweep;
-};
+#include "Solidify.hxx"
 
 bool WriteCompoundToSTEPString2(const TopoDS_Compound& compound, std::string& stepString) {
     // Create STEP writer
@@ -64,7 +58,7 @@ bool WriteCompoundToSTEPString2(const TopoDS_Compound& compound, std::string& st
     }
     
     // Write to a temporary file first (OpenCascade doesn't directly support string output)
-    const char* tempFileName = "/tmp/temp_step_output.stp";
+    const char* tempFileName = "C:/Users/kipr/Downloads/test.stp";
     status = writer.Write(tempFileName);
     if (status != IFSelect_RetDone) {
         std::cerr << "Error: Failed to write STEP file" << std::endl;
@@ -84,7 +78,7 @@ bool WriteCompoundToSTEPString2(const TopoDS_Compound& compound, std::string& st
     file.close();
     
     // Clean up temporary file
-    std::remove(tempFileName);
+    // std::remove(tempFileName);
     
     return true;
 }
@@ -136,6 +130,7 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment* segments, size_t size)
 
     for (size_t i = 0; i < size; i++) {
       const auto segment = segments[i];
+      // std::cout << "segment: " << segment.command << " at index " << i << std::endl;
 
         TopoDS_Edge edge;
         gp_Pnt2d currentPoint(segment.x, segment.y);
@@ -151,8 +146,6 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment* segments, size_t size)
             }
             case 'L': // Lineto
             {
-                // Handle(Geom_Line) geomLine = new Geom_Line(lastPoint, currentPoint);
-                // edge = BRepBuilderAPI_MakeEdge(geomLine);
                 edge = BRepBuilderAPI_MakeEdge(promote(lastPoint), promote(currentPoint));
                 break;
             }
@@ -175,9 +168,7 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment* segments, size_t size)
             {
                 // If the last point is not the start point, create a line segment to close the path
                 if (!lastPoint.IsEqual(startPoint, Precision::Confusion())) {
-                    // Handle(Geom_Line) geomLine = new Geom_Line(lastPoint, startPoint);
-                    // edge = BRepBuilderAPI_MakeEdge(geomLine);
-                edge = BRepBuilderAPI_MakeEdge(promote(startPoint), promote(lastPoint));
+                  edge = BRepBuilderAPI_MakeEdge(promote(startPoint), promote(lastPoint));
                 }
                 break;
             }
@@ -200,18 +191,11 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment* segments, size_t size)
     }
 }
 
-extern "C" int pathToSolid(void) {
+extern "C" int pathToSolid(const PathSegment* segments, size_t size) {
     std::cout << "Parsing SVG Path" << std::endl;
+    std::cout << "Size " << size <<  std::endl;
 
-    PathSegment segments[] = {
-        {'M', 10, 10, 0, 0},
-        {'L', 100, 10, 0, 0},
-        {'L', 100, 100, 0, 0},
-        {'A', 10, 100, 50, 0},
-        {'Z', 0, 0, 0, 0},
-    };
-
-    TopoDS_Wire wire = createWireFromPathSegments(segments, 5);
+    TopoDS_Wire wire = createWireFromPathSegments(segments, size);
 
     if (wire.IsNull()) {
         std::cerr << "\nFailed to create OpenCASCADE TopoDS_Wire." << std::endl;
@@ -234,21 +218,21 @@ extern "C" int pathToSolid(void) {
     }
     gp_Vec aVector(0, 0, 15);
 
-BRepPrimAPI_MakePrism aPrismMaker(makeFace, aVector);
-TopoDS_Shape aSolid = aPrismMaker.Shape();
-  TopoDS_Compound aRes;
-  BRep_Builder aBuilder;
-  aBuilder.MakeCompound (aRes);
-  aBuilder.Add (aRes, aSolid);
+    BRepPrimAPI_MakePrism aPrismMaker(makeFace, aVector);
+    TopoDS_Shape aSolid = aPrismMaker.Shape();
+    TopoDS_Compound aRes;
+    BRep_Builder aBuilder;
+    aBuilder.MakeCompound (aRes);
+    aBuilder.Add (aRes, aSolid);
 
-  std::string stepContent;
-  if (WriteCompoundToSTEPString2(aRes, stepContent)) {
-      // Output to stdout (stdin in your terminology, but I assume you mean stdout)
-      std::cout << stepContent << std::endl;
-  } else {
-      std::cerr << "Failed to convert compound to STEP format" << std::endl;
-      // return 1;
-  }
+    std::string stepContent;
+    if (WriteCompoundToSTEPString2(aRes, stepContent)) {
+        // Output to stdout (stdin in your terminology, but I assume you mean stdout)
+        // std::cout << stepContent << std::endl;
+    } else {
+        std::cerr << "Failed to convert compound to STEP format" << std::endl;
+        // return 1;
+    }
 
 
     return 0;
