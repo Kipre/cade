@@ -2,13 +2,18 @@ const std = @import("std");
 const testing = std.testing;
 const tokenize = std.ascii;
 
-pub const PathSegment = extern struct {
-    command: u8,
-    x: f32,
-    y: f32,
-    radius: f32,
-    sweep: u8,
-};
+const solidify = @cImport({
+    @cInclude("Solidify.h");
+});
+const PathSegment = solidify.PathSegment;
+
+// const PathSegment = extern struct {
+//     command: u8,
+//     x: f32,
+//     y: f32,
+//     radius: f32,
+//     sweep: u8,
+// };
 
 // Error type for parsing issues.
 pub const ParseError = error{
@@ -121,16 +126,6 @@ pub fn parsePath(
         }
     }
     return segments;
-}
-
-pub fn main() !void {
-    const stdout = std.io.getStdOut().writer();
-    const path_string = "M 10 20 L 30 40 A 50 50 0 1 0 60 70 Z";
-
-    stdout.print("Parsing path: \"{s}\"\n", .{path_string}) catch {};
-
-    var segments = try parsePath(path_string);
-    defer segments.deinit();
 }
 
 test "SVG path parsing" {
