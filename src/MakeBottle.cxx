@@ -273,7 +273,6 @@ MakeBottle(const Standard_Real myWidth, const Standard_Real myHeight,
   // return aRes;
 }
 
-
 extern "C" void helloWorld(void) {
-  MakeBottle(100, 100, 100);
+  MakeBottle(100, 200, 100);
 }
