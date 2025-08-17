@@ -21,6 +21,7 @@ import {
 } from "./2d.js";
 import {
   arcTangentAt,
+  areOnSameCircle,
   evaluateArc,
   getArcAngularLength,
   getCircleCenter,
@@ -212,25 +213,32 @@ export class Path {
   }
 
   simplify() {
-    const toRemove = [];
     let nbControlsToCheck = this.controls.length - 1;
     if (this.isClosed()) nbControlsToCheck--;
 
-    for (let i = 1; i < nbControlsToCheck; i++) {
-      const [[_, p0], [type1, p1], [type2, p2]] = this.controls.slice(i - 1);
+    for (let i = 1; i < nbControlsToCheck - 1; i++) {
+      const [[, p0, type1, p1, r1, s1], [index, , type2, p2, r2, s2]] =
+        this.getJunctionAt(i);
+
+      if (!index || this.controls[index][0] === "close") break;
+
+      if (!type1 || !type2) continue;
 
       if (norm(p1, p2) < eps) {
-        toRemove.unshift(i + 1);
-        i++;
+        this.controls.splice(i + 1, 1);
+        i--;
         continue;
       }
 
       if (type1 === "lineTo" && type2 === "lineTo" && areOnSameLine(p0, p1, p2))
-        toRemove.unshift(i);
-    }
+        this.controls.splice(i, 1);
 
-    for (const i of toRemove) {
-      this.controls.splice(i, 1);
+      if (
+        type1 === "arc" &&
+        type2 === "arc" &&
+        areOnSameCircle(p0, p1, r1, s1, p1, p2, r2, s2)
+      )
+        this.controls.splice(i, 1);
     }
 
     // if close is zero length and first segment is a line
@@ -792,13 +800,11 @@ export class Path {
     result.moveTo(this.evaluate(startSegment, startX));
 
     const length = this.controls.length;
+    startSegment = modulo(startSegment, length);
+    endSegment = modulo(endSegment, length);
 
     let shouldSkip = startSegment === endSegment && startX > endX === !invert;
-    for (
-      let i = startSegment;
-      ;
-      i = (((invert ? i - 1 : i + 1) % length) + length) % length
-    ) {
+    for (let i = startSegment; ; i = modulo(invert ? i - 1 : i + 1, length)) {
       if (i === 0) continue;
 
       const [, lastPoint] = this.controls[i - 1];
@@ -958,7 +964,7 @@ export class Path {
       } else if (type === "arc" && nextType === "lineTo") {
         [p0, p1, nr1] = offsetArc(lp, p, r1, s1, offset);
         [p2, p3] = offsetSegment(p, np, offset);
-        result.controls[i][1] = intersectLineAndArc(p2, p3, p0, p1, nr1, s1);
+        result.controls[i][1] = intersectLineAndArc(p2, p3, p0, p1, nr1, s1, true);
         result.controls[i][2] = nr1;
       } else if (type === "arc" && nextType === "arc") {
         [p0, p1, nr1] = offsetArc(lp, p, r1, s1, offset);

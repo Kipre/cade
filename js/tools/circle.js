@@ -2,6 +2,7 @@
 /** @import * as types from './types' */
 
 import { minus, mult, norm, placeAlong, plus, rotatePoint } from "./2d.js";
+import { Path } from "./path.js";
 import { debugGeometry } from "./svg.js";
 import { modulo } from "./utils.js";
 
@@ -44,15 +45,23 @@ export function getCircleCenter(p1, p2, radius, sweep) {
  * @param {types.Point} end
  * @param {number} radius
  * @param {number} sweep
+ * @param {boolean} softSelection
  * @returns {types.Point}
  */
-export function intersectLineAndArc(p1, p2, start, end, radius, sweep) {
+export function intersectLineAndArc(p1, p2, start, end, radius, sweep, softSelection = false) {
   const center = getCircleCenter(start, end, radius, sweep);
   const roots = intersectLineAndCircle(p1, p2, center, radius);
   if (roots.length === 1) return roots[0];
 
+  if (softSelection) {
+    const middle = evaluateArc(0.5, start, end, radius, sweep);
+    return norm(middle, roots[0]) < norm(middle, roots[1]) ? roots[0] : roots[1];
+  }
+
   for (const root of roots)
     if (isInPieSlice(root, start, end, radius, sweep)) return root;
+
+  // debugGeometry([start, end], [p1, p2], Path.makeCircle(radius).translate(center));
   throw new Error("failed");
 }
 
@@ -64,13 +73,17 @@ export function intersectLineAndArc(p1, p2, start, end, radius, sweep) {
  * @returns {types.Point[]}
  */
 export function intersectLineAndCircle(p1, p2, center, radius) {
+  const eps = 1e-4;
+
   const l1 = minus(p1, center);
   const l2 = minus(p2, center);
   const [dx, dy] = minus(l2, l1);
   const dr = norm([dx, dy]);
   const D = l1[0] * l2[1] - l2[0] * l1[1];
 
-  const delta = radius ** 2 * dr ** 2 - D ** 2;
+  let delta = radius ** 2 * dr ** 2 - D ** 2;
+  // delta might be close to zero but negative
+  if (delta < 0 && -eps < delta) delta = 0;
 
   const sgn = dy > 0 ? 1 : -1;
   const roots = [];
@@ -223,4 +236,22 @@ export function arcTangentAt(x, start, end, radius, sweep) {
   const t2 = rotatePoint(point, center, ((1 - 2 * sweep) * Math.PI) / 2);
   const t1 = rotatePoint(point, center, ((2 * sweep - 1) * Math.PI) / 2);
   return [t1, t2];
+}
+
+/**
+ * @param {types.Point} from1
+ * @param {types.Point} to1
+ * @param {number} r1
+ * @param {number} s1
+ * @param {types.Point} from2
+ * @param {types.Point} to2
+ * @param {number} r2
+ * @param {number} s2
+ */
+export function areOnSameCircle(from1, to1, r1, s1, from2, to2, r2, s2) {
+  if (Math.abs(r1 - r2) > eps) return false;
+  const center1 = getCircleCenter(from1, to1, r1, s1);
+  const center2 = getCircleCenter(from2, to2, r2, s2);
+
+  return norm(center1, center2) < eps;
 }
