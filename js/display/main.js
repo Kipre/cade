@@ -1,14 +1,15 @@
-// @ts-chack
+// @ts-check
 
 import { parseObjFile } from "./obj.js";
 import { Camera } from "./camera.js";
-import { invariant, createBuffer, toRadians } from "./utils.js";
-import { vec3, mat4 } from "wgpu-matrix";
+import { invariant, createBuffer } from "./utils.js";
+import { vec3, mat4, utils } from "wgpu-matrix";
 import { FlatPart } from "../bridge.js";
 import { Path } from "../tools/path.js";
 import { vertexShader, fragmentShader } from "./shaders.js";
 
 const canvas = document.querySelector("canvas");
+if (!canvas) throw new Error();
 
 export const context = canvas.getContext("webgpu");
 invariant(context, "WebGPU is not supported in this browser.");
@@ -40,9 +41,19 @@ invariant(entry, "WebGPU is not supported in this browser.");
 
   const buffer = [];
   for (const face of obj.faces) {
+    let recomputedN;
+    if (Number.isNaN(face.vertices[0].normalIndex)) {
+      const [p0, p1, p2] = face.vertices.map(
+        (x) => obj.vertices[x.vertexIndex],
+      );
+      const e1 = vec3.sub(p1, p0);
+      const e2 = vec3.sub(p2, p0);
+      recomputedN = vec3.normalize(vec3.cross(e2, e1));
+    }
+
     for (const faceVertex of face.vertices) {
       const position = obj.vertices[faceVertex.vertexIndex];
-      const normal = obj.normals[faceVertex.normalIndex] ?? [0, 0, 0];
+      const normal = obj.normals[faceVertex.normalIndex] ?? recomputedN;
       const uv = obj.uvs[faceVertex.uvIndex] ?? [0, 0];
       buffer.push(...position, ...normal, ...uv);
     }
@@ -70,23 +81,11 @@ invariant(entry, "WebGPU is not supported in this browser.");
       {
         attributes: [
           // Position
-          {
-            shaderLocation: 0,
-            offset: 0,
-            format: "float32x3",
-          },
+          { shaderLocation: 0, offset: 0, format: "float32x3" },
           // Normal
-          {
-            shaderLocation: 1,
-            offset: 12,
-            format: "float32x3",
-          },
+          { shaderLocation: 1, offset: 12, format: "float32x3" },
           // UV
-          {
-            shaderLocation: 2,
-            offset: 24,
-            format: "float32x2",
-          },
+          { shaderLocation: 2, offset: 24, format: "float32x2" },
         ],
         arrayStride: (3 + 3 + 2) * 4,
         stepMode: "vertex",
@@ -128,7 +127,7 @@ invariant(entry, "WebGPU is not supported in this browser.");
   });
   const depthTextureView = depthTexture.createView();
 
-  const camera = new Camera(toRadians(50), toRadians(10));
+  const camera = new Camera(utils.degToRad(50), utils.degToRad(10));
 
   function render() {
     const colorTexture = context.getCurrentTexture();
@@ -167,13 +166,13 @@ invariant(entry, "WebGPU is not supported in this browser.");
     passEncoder.end();
 
     let model = mat4.translation(vec3.create(0, 0, 0));
-    model = mat4.rotateZ(model, toRadians(-10));
+    model = mat4.rotateZ(model, utils.degToRad(-10));
     model = mat4.scale(model, vec3.create(1.1, 1.1, 1.1));
 
     const view = mat4.invert(camera.getView());
 
     const projection = mat4.perspective(
-      toRadians(45),
+      utils.degToRad(45),
       canvas.width / canvas.height,
       1,
       1000,
@@ -182,7 +181,7 @@ invariant(entry, "WebGPU is not supported in this browser.");
     const mvp = mat4.multiply(projection, mat4.multiply(view, model));
 
     const cameraPosition = camera.getPosition();
-    const lightPosition = vec3.create(5, 5, 5);
+    const lightPosition = vec3.create(50, 50, 50);
     const lightColor = vec3.create(1, 1, 1);
 
     const bufferData = [
