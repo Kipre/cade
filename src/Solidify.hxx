@@ -5,3 +5,4 @@ struct PathSegment {
     float radius;
     char sweep;
 };
+

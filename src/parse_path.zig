@@ -20,6 +20,7 @@ pub const ParseError = error{
     InvalidCommand,
     InvalidNumber,
     EndOfPath,
+    NonClosedPath,
 };
 
 // This function advances the string view past whitespace and commas.
@@ -57,12 +58,10 @@ fn parseNumber(
 
 // Main parsing function. It iterates through the path string and
 // yields each path segment.
-pub fn parsePath(
-    allocator: std.mem.Allocator,
+pub fn parsePathAndAppend(
+    segments: *std.ArrayList(PathSegment),
     path: []const u8,
-) !std.ArrayList(PathSegment) {
-    var segments = std.ArrayList(PathSegment).init(allocator);
-
+) !void {
     var remaining_path = path;
 
     while (remaining_path.len > 0) {
@@ -125,6 +124,17 @@ pub fn parsePath(
             }
         }
     }
+
+    if (segments.getLast().command != 'Z')
+        return ParseError.NonClosedPath;
+}
+
+pub fn parsePath(
+    allocator: std.mem.Allocator,
+    path: []const u8,
+) !std.ArrayList(PathSegment) {
+    var segments = std.ArrayList(PathSegment).init(allocator);
+    try parsePathAndAppend(&segments, path);
     return segments;
 }
 
