@@ -129,6 +129,7 @@ pub fn main() !void {
     try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKBool");
     try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKShHealing");
     try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKBO");
+    try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKMesh");
     try generateSourceLists(allocator, "OCCT/src/DataExchange/TKDESTEP");
     try generateSourceLists(allocator, "OCCT/src/DataExchange/TKXSBase");
 }
@@ -195,7 +196,7 @@ fn generateSourceLists(allocator: std.mem.Allocator, dir_path: []const u8) !void
         if (endsWith(u8, source, "pxx")) continue;
         if (endsWith(u8, source, "lxx")) continue;
         if (endsWith(u8, source, "gxx")) continue;
-        if (!endsWith(u8, source, ".c") and !endsWith(u8, source, ".cxx")) continue;
+        if (!endsWith(u8, source, ".c") and !endsWith(u8, source, ".cxx") and !endsWith(u8, source, ".cpp")) continue;
         try file.writer().print("    \"{s}\",\n", .{source});
     }
     try file.writeAll("};\n");

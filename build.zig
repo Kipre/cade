@@ -16,6 +16,7 @@ const sources_TKDESTEP = @import("TKDESTEP_generated-build-config.zig").sources;
 const sources_TKXSBase = @import("TKXSBase_generated-build-config.zig").sources;
 const sources_TKShHealing = @import("TKShHealing_generated-build-config.zig").sources;
 const sources_TKBO = @import("TKBO_generated-build-config.zig").sources;
+const sources_TKMesh = @import("TKMesh_generated-build-config.zig").sources;
 
 fn addOCCTModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, name: []const u8, sources: []const []const u8) *std.Build.Step.Compile {
     const module = b.addStaticLibrary(.{
@@ -94,6 +95,7 @@ pub fn build(b: *std.Build) void {
     exe.linkLibrary(addOCCTModule(b, target, optimize, "TKXSBase", &sources_TKXSBase));
     exe.linkLibrary(addOCCTModule(b, target, optimize, "TKShHealing", &sources_TKShHealing));
     exe.linkLibrary(addOCCTModule(b, target, optimize, "TKBO", &sources_TKBO));
+    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKMesh", &sources_TKMesh));
 
     b.installArtifact(exe);
 }

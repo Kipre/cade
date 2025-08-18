@@ -15,7 +15,7 @@ const bridgeTop = openArea.z + bridgeTopThickness;
 const joinOffset = 10;
 const bridgeJoinWidth = 100 - 2 * woodThickness;
 
-class FlatPart {
+export class FlatPart {
   /**
    * @param {Path} outside
    * @param {Path[]} [insides]
@@ -56,6 +56,13 @@ class FlatPart {
     }
 
     svg.setAttribute("viewBox", bbox.toViewBox());
+  }
+
+  toJson() {
+    const result = {};
+    result.outside = this.outside.toString();
+    result.insides = this.insides.map((p) => p.toString());
+    return JSON.stringify(result);
   }
 }
 
@@ -181,6 +188,10 @@ const join2 = addSimpleReinforcingJoin(
   bridgeJoinWidth,
   woodThickness,
 );
+
+const testPart = new FlatPart(Path.makeCircle(100));
+
+fetch("/occ/thicken", { method: "POST", body: testPart.toJson() });
 
 part1.display();
 // part2.display();

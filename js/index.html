@@ -6,22 +6,35 @@
     <script type="importmap">
       {
         "imports": {
-          "antlr4": "https://cdn.jsdelivr.net/npm/antlr4@4.13.2/+esm",
-          "d3-path": "https://cdn.jsdelivr.net/npm/d3-path@3/+esm"
+          "wgpu-matrix": "https://cdn.jsdelivr.net/npm/wgpu-matrix@3.4.0/+esm"
         }
       }
     </script>
-    <title>what ?</title>
+    <title>cade</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        background: #1a1a1a;
+        color: white;
+      }
+      canvas {
+        border: 2px solid #333;
+        display: block;
+        margin: 20px auto;
+        background: #000;
+      }
+    </style>
   </head>
   <body>
     <script type="module">
       import "./main.js";
+      import "./display/main.js";
     </script>
     <nav>
       <a href="/">Home</a>
     </nav>
-    <div class="">
-      hello
-    </div>
+    <canvas id="canvas" width="800" height="600"></canvas>
   </body>
 </html>

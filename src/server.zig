@@ -5,6 +5,8 @@ const print = std.debug.print;
 const fs = std.fs;
 const mem = std.mem;
 
+const handlePostRequest = @import("services.zig").handlePostRequest;
+
 const MIME_TYPES = std.StaticStringMap([]const u8).initComptime(.{
     .{ ".html", "text/html" },
     .{ ".htm", "text/html" },
@@ -23,10 +25,7 @@ const MIME_TYPES = std.StaticStringMap([]const u8).initComptime(.{
     .{ ".wasm", "application/wasm" },
 });
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn serve(allocator: std.mem.Allocator) !void {
 
     const serve_dir = "./";
     const port = 8111;
@@ -80,8 +79,8 @@ fn handleRequest(req: *http.Server.Request, allocator: std.mem.Allocator, serve_
 
     print("Request: {s} {s}\n", .{ @tagName(method), target });
 
-    // Only handle GET requests
-    if (method != .GET) {
+
+    if (method != .GET and method != .POST) {
         try sendError(req, .method_not_allowed, allocator, "Method not allowed");
         return;
     }
@@ -94,6 +93,11 @@ fn handleRequest(req: *http.Server.Request, allocator: std.mem.Allocator, serve_
 
     // Remove query parameters
     const path = if (mem.indexOf(u8, decoded_path, "?")) |idx| decoded_path[0..idx] else decoded_path;
+
+    if (method == .POST) {
+        try handlePostRequest(req, allocator, path);
+        return;
+    }
 
     // Serve the file or directory
     try serveFileOrDirectory(req, allocator, serve_dir, path);
