@@ -24,13 +24,6 @@ export function createBuffer(
 }
 
 /**
- * Converts degrees to radians.
- */
-export function toRadians(degrees) {
-  return (degrees * Math.PI) / 180;
-}
-
-/**
  * Makes sure that the given value is within the given range using combination
  * of min() and max().
  */
