@@ -1,13 +1,11 @@
 // @ts-check
 
 import { mat4, utils, vec3 } from "wgpu-matrix";
-import { FlatPart } from "../bridge.js";
-import { Path } from "../tools/path.js";
+import { BBox } from "../tools/svg.js";
 import { Camera } from "./camera.js";
 import { parseObjFile } from "./obj.js";
 import { fragmentShader, vertexShader } from "./shaders.js";
 import { createBuffer, invariant } from "./utils.js";
-import { BBox } from "../tools/svg.js";
 
 const canvas = document.querySelector("canvas");
 if (canvas == null) throw new Error();
@@ -18,20 +16,17 @@ invariant(context, "WebGPU is not supported in this browser.");
 const entry = navigator.gpu;
 invariant(entry, "WebGPU is not supported in this browser.");
 
-(async () => {
+/**
+ * @param {string} fileContents
+ */
+export async function displayOBJItem(fileContents) {
   const adapter = await entry.requestAdapter();
   invariant(adapter, "No GPU found on this system.");
 
   const device = await adapter.requestDevice();
   const queue = device.queue;
 
-  const testPart = new FlatPart(Path.makeCircle(50));
-  const r = await fetch("/occ/thicken", {
-    method: "POST",
-    body: testPart.toJson(),
-  });
-  const file = await r.text();
-  const obj = parseObjFile(file);
+  const obj = parseObjFile(fileContents);
 
   const bbox = new BBox();
 
@@ -208,4 +203,4 @@ invariant(entry, "WebGPU is not supported in this browser.");
   }
 
   render();
-})();
+}
