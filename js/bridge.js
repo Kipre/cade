@@ -6,6 +6,7 @@ import {
   xRailSupportWidth,
   woodThickness,
 } from "./dimensions.js";
+import { displayOBJItem } from "./display/main.js";
 import { norm, placeAlong } from "./tools/2d.js";
 import { Path } from "./tools/path.js";
 import { BBox, debugGeometry, w3svg } from "./tools/svg.js";
@@ -191,7 +192,13 @@ const join2 = addSimpleReinforcingJoin(
 
 const testPart = new FlatPart(Path.makeCircle(100));
 
-fetch("/occ/thicken", { method: "POST", body: testPart.toJson() });
+const r = await fetch("/occ/thicken", {
+  method: "POST",
+  body: testPart.toJson(),
+});
+const file = await r.text();
+
+displayOBJItem(file);
 
 part1.display();
 // part2.display();

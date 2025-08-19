@@ -58,7 +58,7 @@
 /**
  * @brief Meshes a given solid shape and writes the mesh data to an OBJ file.
  * @param aShape The solid shape to be meshed.
- * @param filename The name of the OBJ file to write to.
+ * @param buffer The buffer to write to.
  */
 int writeSolidToObj(const TopoDS_Shape &aShape, char *buffer) {
   std::ostringstream oss;
@@ -87,7 +87,12 @@ int writeSolidToObj(const TopoDS_Shape &aShape, char *buffer) {
     if (!aTriangulation.IsNull()) {
       const auto nb_nodes = aTriangulation->NbNodes();
       for (int i = 1; i <= nb_nodes; ++i) {
-        const gp_Pnt &node = aTriangulation->Node(i);
+        gp_Pnt node = aTriangulation->Node(i);
+
+        if (!aLocation.IsIdentity()) {
+            node.Transform(aLocation.Transformation());
+        }
+
         oss << "v " << node.X() << " " << node.Y() << " " << node.Z()
             << std::endl;
       }
@@ -97,6 +102,7 @@ int writeSolidToObj(const TopoDS_Shape &aShape, char *buffer) {
   // This loop is separate to ensure all vertices are defined before the faces.
   int currentVertexOffset = 1;
   anExpFace.Init(aShape, TopAbs_FACE);
+
   for (; anExpFace.More(); anExpFace.Next()) {
     const TopoDS_Face &aFace = TopoDS::Face(anExpFace.Current());
     TopLoc_Location aLocation;
