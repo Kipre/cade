@@ -1,5 +1,5 @@
 // @ts-check
-/** @import * as types from '../types' */
+/** @import * as types from './types' */
 
 import { Path } from "./path.js";
 
@@ -10,16 +10,36 @@ export class BBox {
   constructor(marginPercents = defaultMarginPercents) {
     this.xMin = Number.POSITIVE_INFINITY;
     this.yMin = Number.POSITIVE_INFINITY;
+    this.zMin = Number.POSITIVE_INFINITY;
     this.xMax = Number.NEGATIVE_INFINITY;
     this.yMax = Number.NEGATIVE_INFINITY;
+    this.zMax = Number.NEGATIVE_INFINITY;
     this.marginPercents = marginPercents;
   }
 
+  /**
+   * @param {types.Point | [number, number, number] } point
+   */
   include(point) {
     this.xMin = Math.min(this.xMin, point[0]);
-    this.yMin = Math.min(this.yMin, point[1]);
     this.xMax = Math.max(this.xMax, point[0]);
+    this.yMin = Math.min(this.yMin, point[1]);
     this.yMax = Math.max(this.yMax, point[1]);
+
+    if (point[2] != null) {
+      this.zMin = Math.min(this.zMin, point[2]);
+      this.zMax = Math.max(this.zMax, point[2]);
+    }
+  }
+
+  size() {
+    const xSize = this.xMax - this.xMin;
+    const ySize = this.yMax - this.yMin;
+    const zSize = Object.is(Number.POSITIVE_INFINITY, this.zMin)
+      ? 0
+      : this.zMax - this.zMin;
+
+    return Math.max(xSize, ySize, zSize);
   }
 
   toViewBoxArray = (maybeMargin) => {
@@ -50,8 +70,10 @@ export class BBox {
 
   static fromDataset(element) {
     const self = new BBox();
-    self.xMin = Number.parseFloat(element.dataset.xMin) || Number.POSITIVE_INFINITY ;
-    self.yMin = Number.parseFloat(element.dataset.yMin) || Number.POSITIVE_INFINITY ;
+    self.xMin =
+      Number.parseFloat(element.dataset.xMin) || Number.POSITIVE_INFINITY;
+    self.yMin =
+      Number.parseFloat(element.dataset.yMin) || Number.POSITIVE_INFINITY;
     self.xMax = Number.parseFloat(element.dataset.xMax) || 0;
     self.yMax = Number.parseFloat(element.dataset.yMax) || 0;
     return self;
@@ -206,7 +228,7 @@ export function debugGeometry(...shapes) {
 
   bbox.toDataset(svg);
   svg.setAttribute("viewBox", bbox.toViewBox());
-  const size = Math.max(bbox.xMax - bbox.xMin, bbox.yMax - bbox.yMin);
+  const size = bbox.size();
 
   const mgn = size / 20;
 
