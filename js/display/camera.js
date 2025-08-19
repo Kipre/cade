@@ -1,25 +1,25 @@
+import { mat4, vec3 } from "wgpu-matrix";
 import { clamp } from "./utils.js";
-import { vec3, mat4 } from "wgpu-matrix";
 
 export class Camera {
   target = vec3.create(0, 0, 0);
-  distance = 100;
-
   scrollDirection = 0;
-
   wheelTimeout = null;
+  lastX = 0;
+  lastY = 0;
+  isDragging = false;
 
-   lastX = 0;
-   lastY = 0;
-   isDragging = false;
-
-  constructor( pitch, yaw) {
+  constructor(pitch, yaw, size) {
     document.addEventListener("mousedown", this.handleMouseDown);
     document.addEventListener("mousemove", this.handleMouseMove);
     document.addEventListener("mouseup", this.handleMouseUp);
-    document.querySelector("canvas").addEventListener("wheel", this.handleMouseWheel);
+    document
+      .querySelector("canvas")
+      .addEventListener("wheel", this.handleMouseWheel);
     this.pitch = pitch;
     this.yaw = yaw;
+    this.size = size;
+    this.distance = this.size * 2;
   }
 
   handleMouseDown = (event) => {
@@ -43,7 +43,7 @@ export class Camera {
     this.yaw += dx * 0.01;
   };
 
-  handleMouseUp = (event) => {
+  handleMouseUp = () => {
     this.isDragging = false;
   };
 
@@ -51,23 +51,22 @@ export class Camera {
     event.preventDefault();
     const scaleFactor = 0.04;
     this.distance += event.deltaY * scaleFactor;
-    this.distance = clamp(this.distance, 10, 200);
+    this.distance = clamp(this.distance, 0.3 * this.size, 3 * this.size);
   };
 
   getPosition() {
     let result = vec3.create(
       Math.cos(this.pitch) * Math.cos(this.yaw),
       Math.sin(this.pitch),
-      Math.cos(this.pitch) * Math.sin(this.yaw)
-    )
-    result = vec3.scale(result, this.distance)
+      Math.cos(this.pitch) * Math.sin(this.yaw),
+    );
+    result = vec3.scale(result, this.distance);
     result = vec3.add(result, this.target);
     return result;
   }
 
   getView() {
     const position = this.getPosition();
-    // return mat4.transpose(mat4.lookAt(position, this.target, vec3.create(0, 1, 0)));
-    return mat4.cameraAim(position, this.target, vec3.create(0, 1, 0));
+    return mat4.lookAt(position, this.target, vec3.create(0, 1, 0));
   }
 }
