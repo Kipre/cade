@@ -1,15 +1,16 @@
 // @ts-check
 
-import { parseObjFile } from "./obj.js";
-import { Camera } from "./camera.js";
-import { invariant, createBuffer } from "./utils.js";
-import { vec3, mat4, utils } from "wgpu-matrix";
+import { mat4, utils, vec3 } from "wgpu-matrix";
 import { FlatPart } from "../bridge.js";
 import { Path } from "../tools/path.js";
-import { vertexShader, fragmentShader } from "./shaders.js";
+import { Camera } from "./camera.js";
+import { parseObjFile } from "./obj.js";
+import { fragmentShader, vertexShader } from "./shaders.js";
+import { createBuffer, invariant } from "./utils.js";
+import { BBox } from "../tools/svg.js";
 
 const canvas = document.querySelector("canvas");
-if (!canvas) throw new Error();
+if (canvas == null) throw new Error();
 
 export const context = canvas.getContext("webgpu");
 invariant(context, "WebGPU is not supported in this browser.");
@@ -32,12 +33,7 @@ invariant(entry, "WebGPU is not supported in this browser.");
   const file = await r.text();
   const obj = parseObjFile(file);
 
-  context.configure({
-    device,
-    format: "bgra8unorm",
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
-    alphaMode: "opaque",
-  });
+  const bbox = new BBox();
 
   const buffer = [];
   for (const face of obj.faces) {
@@ -53,11 +49,20 @@ invariant(entry, "WebGPU is not supported in this browser.");
 
     for (const faceVertex of face.vertices) {
       const position = obj.vertices[faceVertex.vertexIndex];
+      bbox.include(position);
+
       const normal = obj.normals[faceVertex.normalIndex] ?? recomputedN;
       const uv = obj.uvs[faceVertex.uvIndex] ?? [0, 0];
       buffer.push(...position, ...normal, ...uv);
     }
   }
+
+  context.configure({
+    device,
+    format: "bgra8unorm",
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+    alphaMode: "opaque",
+  });
 
   const positionBuffer = createBuffer(
     device,
@@ -127,7 +132,8 @@ invariant(entry, "WebGPU is not supported in this browser.");
   });
   const depthTextureView = depthTexture.createView();
 
-  const camera = new Camera(utils.degToRad(50), utils.degToRad(10));
+  const objectSize = bbox.size();
+  const camera = new Camera(utils.degToRad(50), utils.degToRad(10), objectSize);
 
   function render() {
     const colorTexture = context.getCurrentTexture();
@@ -169,7 +175,7 @@ invariant(entry, "WebGPU is not supported in this browser.");
     model = mat4.rotateZ(model, utils.degToRad(-10));
     model = mat4.scale(model, vec3.create(1.1, 1.1, 1.1));
 
-    const view = mat4.invert(camera.getView());
+    const view = camera.getView();
 
     const projection = mat4.perspective(
       utils.degToRad(45),
@@ -181,7 +187,7 @@ invariant(entry, "WebGPU is not supported in this browser.");
     const mvp = mat4.multiply(projection, mat4.multiply(view, model));
 
     const cameraPosition = camera.getPosition();
-    const lightPosition = vec3.create(50, 50, 50);
+    const lightPosition = vec3.mulScalar(vec3.create(1, 1, 1), objectSize);
     const lightColor = vec3.create(1, 1, 1);
 
     const bufferData = [

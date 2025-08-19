@@ -38,7 +38,7 @@ export class FlatPart {
     svg.id = this._id;
     document.body.appendChild(svg);
 
-    const bbox = BBox.fromDataset(svg);
+    const bbox = new BBox();
 
     for (const shape of [this.outside, ...this.insides]) {
       const path = document.createElementNS(w3svg, "path");
