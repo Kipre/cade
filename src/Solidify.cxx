@@ -55,6 +55,40 @@
 
 #include "Solidify.hxx"
 
+std::string segmentsToPathString(const PathSegment *segments, size_t length) {
+  std::ostringstream oss;
+
+  for (size_t i = 0; i < length; i++) {
+    const auto segment = segments[i];
+
+    switch (segment.command) {
+    case 'M':
+    case 'L': {
+      oss << segment.command << " " << segment.x << " " << segment.y;
+      break;
+    }
+    case 'A': {
+      oss << "A " << segment.radius << " " << segment.radius << " 0 0 "
+          << ((segment.sweep == 0) ? '0' : '1') << " " << segment.x << " "
+          << segment.y;
+      break;
+    }
+    case 'Z':
+    case 'z': {
+      oss << "Z";
+      continue;
+    }
+    default:
+      std::cerr << "Warning: Unhandled command '" << segment.command
+                << "' for wire creation." << std::endl;
+      continue;
+    }
+    oss << " ";
+  }
+
+  return oss.str();
+}
+
 /**
  * @brief Meshes a given solid shape and writes the mesh data to an OBJ file.
  * @param aShape The solid shape to be meshed.
@@ -90,7 +124,7 @@ int writeSolidToObj(const TopoDS_Shape &aShape, char *buffer) {
         gp_Pnt node = aTriangulation->Node(i);
 
         if (!aLocation.IsIdentity()) {
-            node.Transform(aLocation.Transformation());
+          node.Transform(aLocation.Transformation());
         }
 
         oss << "v " << node.X() << " " << node.Y() << " " << node.Z()
@@ -130,8 +164,9 @@ int writeSolidToObj(const TopoDS_Shape &aShape, char *buffer) {
   std::string str = oss.str();
   const auto length = str.size();
 
+  std::cout << "Attempting to write " << length << " bytes to buffer" << std::endl;
   str.copy(buffer, length);
-  std::cout << "Successfully wrote mesh buffer " << std::endl;
+  std::cout << "Successfully wrote mesh to buffer " << std::endl;
   return length;
 }
 
@@ -185,7 +220,8 @@ gp_Pnt2d getCircleCenter(const gp_Pnt2d &startPoint, const gp_Pnt2d &endPoint,
   double d = startPoint.Distance(endPoint);
 
   // Handle invalid input conditions
-  if (d > 2 * radius || radius <= 0) {
+  if (d > (2 * radius + 1e-3) || radius <= 0) {
+    std::cerr << "d = " << d << " and 2 * radius = " << 2 * radius << std::endl;
     std::cerr << "Error: Invalid radius. Radius must be positive and at least "
                  "half the distance between points."
               << std::endl;
@@ -196,6 +232,9 @@ gp_Pnt2d getCircleCenter(const gp_Pnt2d &startPoint, const gp_Pnt2d &endPoint,
                     (startPoint.Y() + endPoint.Y()) / 2.0);
 
   double distanceToCenter = sqrt(radius * radius - (d / 2.0) * (d / 2.0));
+
+  // if arc is precisely a half-circle
+  if (std::isnan(distanceToCenter)) distanceToCenter = 0;
 
   gp_Vec2d startEndVec(startPoint, endPoint);
   gp_Vec2d perpendicularVec(-startEndVec.Y(), startEndVec.X());
@@ -228,30 +267,26 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment *segments,
 
   for (size_t i = 0; i < size; i++) {
     const auto segment = segments[i];
-    // std::cout << "segment: " << segment.command << " at index " << i <<
-    // std::endl;
 
     TopoDS_Edge edge;
     gp_Pnt2d currentPoint(segment.x, segment.y);
 
     switch (segment.command) {
-    case 'M': // Moveto
-    {
+    case 'M': {
       if (firstMove) {
         startPoint = currentPoint; // Set start point for the first subpath
         firstMove = false;
       }
       break;
     }
-    case 'L': // Lineto
-    {
+    case 'L': {
       edge = BRepBuilderAPI_MakeEdge(promote(lastPoint), promote(currentPoint));
       break;
     }
-    case 'A': // Arc
-    {
+    case 'A': {
       const gp_Pnt2d center = getCircleCenter(lastPoint, currentPoint,
                                               segment.radius, segment.sweep);
+      // std::cout << "center " << center.X() << " " << center.Y() << std::endl;
 
       Handle(Geom_TrimmedCurve) arc = GC_MakeArcOfCircle(
           (new GC_MakeCircle(promote(center), segment.sweep ? z3 : nz3,
@@ -263,19 +298,22 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment *segments,
       edge = BRepBuilderAPI_MakeEdge(arc);
       break;
     }
-    case 'Z': // Closepath
+    case 'Z':
     case 'z': {
       // If the last point is not the start point, create a line segment to
       // close the path
       if (!lastPoint.IsEqual(startPoint, Precision::Confusion())) {
+        std::cout << "creating closing edge because " << lastPoint.X() << " "
+                  << lastPoint.X() << " != " << startPoint.X() << " "
+                  << startPoint.X() << std::endl;
         edge = BRepBuilderAPI_MakeEdge(promote(startPoint), promote(lastPoint));
       }
-      break;
+      continue;
     }
     default:
       std::cerr << "Warning: Unhandled command '" << segment.command
                 << "' for wire creation." << std::endl;
-      continue; // Skip this segment
+      continue;
     }
     lastPoint = currentPoint;
 
@@ -284,13 +322,13 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment *segments,
     }
   }
 
-  if (makeWire.IsDone()) {
-    return makeWire.Wire();
-  } else {
+  if (!makeWire.IsDone()) {
     std::cerr << "Error: Failed to create TopoDS_Wire. Reason: "
               << makeWire.Error() << std::endl;
     return TopoDS_Wire(); // Return a null wire
   }
+
+  return makeWire.Wire();
 }
 
 extern "C" int pathToSolid(const PathSegment *segments, size_t size,
@@ -308,14 +346,14 @@ extern "C" int pathToSolid(const PathSegment *segments, size_t size,
     while (segments[lastEnd + currentSize].command != 'Z')
       currentSize++;
 
-    // std::cout << "extracting wire from: " << lastEnd << " plus " <<
-    // currentSize << std::endl;
-
     TopoDS_Wire wire =
         createWireFromPathSegments(segments + lastEnd, ++currentSize);
 
     if (wire.IsNull()) {
-      std::cerr << "\nFailed to create OpenCASCADE TopoDS_Wire." << std::endl;
+      std::cerr << "\nFailed to create TopoDS_Wire nb " << wires.size() + 1
+                << std::endl;
+      const auto path = segmentsToPathString(segments + lastEnd, currentSize);
+      std::cerr << path << std::endl;
       return 1;
     }
 

@@ -1,15 +1,23 @@
+// @ts-check
+
 import { mat4, vec3 } from "wgpu-matrix";
 import { clamp } from "./utils.js";
 
 export class Camera {
-  target = vec3.create(0, 0, 0);
   scrollDirection = 0;
   wheelTimeout = null;
   lastX = 0;
   lastY = 0;
   isDragging = false;
+  isPanning = false;
 
-  constructor(pitch, yaw, size) {
+  /**
+   * @param {any} pitch
+   * @param {any} yaw
+   * @param {number} size
+   * @param {[number, number, number] | null} target
+   */
+  constructor(pitch, yaw, size, target = null) {
     document.addEventListener("mousedown", this.handleMouseDown);
     document.addEventListener("mousemove", this.handleMouseMove);
     document.addEventListener("mouseup", this.handleMouseUp);
@@ -20,31 +28,39 @@ export class Camera {
     this.yaw = yaw;
     this.size = size;
     this.distance = this.size * 2;
+    this.target = vec3.create(...(target ?? [0, 0, 0]));
   }
 
   handleMouseDown = (event) => {
-    this.isDragging = true;
     this.lastX = event.clientX;
     this.lastY = event.clientY;
+
+    if (event.button === 2) {
+      this.isPanning = true;
+    } else {
+      this.isDragging = true;
+    }
   };
 
   handleMouseMove = (event) => {
-    if (!this.isDragging) {
-      return;
-    }
-
     const dx = event.clientX - this.lastX;
     const dy = event.clientY - this.lastY;
 
     this.lastX = event.clientX;
     this.lastY = event.clientY;
 
-    this.pitch -= dy * 0.01;
-    this.yaw += dx * 0.01;
+    if (this.isDragging) {
+      this.pitch -= dy * 0.01;
+      this.yaw += dx * 0.01;
+    } else if (this.isPanning) {
+      this.pan(dx, dy);
+    }
   };
 
-  handleMouseUp = () => {
+  handleMouseUp = (event) => {
+    if (this.isPanning) event.preventDefault();
     this.isDragging = false;
+    this.isPanning = false;
   };
 
   handleMouseWheel = (event) => {
@@ -53,6 +69,27 @@ export class Camera {
     this.distance += event.deltaY * scaleFactor;
     this.distance = clamp(this.distance, 0.3 * this.size, 3 * this.size);
   };
+
+  /**
+   * @param {number} mouseDeltaX
+   * @param {number} mouseDeltaY
+   */
+  pan(mouseDeltaX, mouseDeltaY, sensitivity = 0.01) {
+    let view = this.getView();
+    view = mat4.transpose(view);
+    const right = vec3.create(view[0], view[1], view[2]);
+    const up = vec3.create(view[4], view[5], view[6]);
+
+    const distance = vec3.distance(this.target, this.getPosition());
+    const panScale = distance * sensitivity;
+
+    const panOffset = vec3.add(
+      vec3.mulScalar(right, -mouseDeltaX * panScale),
+      vec3.mulScalar(up, mouseDeltaY * panScale),
+    );
+
+    this.target = vec3.add(this.target, panOffset);
+  }
 
   getPosition() {
     let result = vec3.create(

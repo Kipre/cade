@@ -128,7 +128,13 @@ export async function displayOBJItem(fileContents) {
   const depthTextureView = depthTexture.createView();
 
   const objectSize = bbox.size();
-  const camera = new Camera(utils.degToRad(50), utils.degToRad(10), objectSize);
+  const center = vec3.create(...bbox.center());
+  const camera = new Camera(
+    utils.degToRad(50),
+    utils.degToRad(10),
+    objectSize,
+    center,
+  );
 
   function render() {
     const colorTexture = context.getCurrentTexture();
@@ -166,9 +172,10 @@ export async function displayOBJItem(fileContents) {
     passEncoder.draw(obj.faces.length * 3);
     passEncoder.end();
 
-    let model = mat4.translation(vec3.create(0, 0, 0));
-    model = mat4.rotateZ(model, utils.degToRad(-10));
-    model = mat4.scale(model, vec3.create(1.1, 1.1, 1.1));
+    const model = mat4.translation(vec3.create(0, 0, 0));
+    // this was done for some reason
+    // model = mat4.rotateZ(model, utils.degToRad(-10));
+    // model = mat4.scale(model, vec3.create(1.1, 1.1, 1.1));
 
     const view = camera.getView();
 

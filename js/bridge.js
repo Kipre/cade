@@ -1,15 +1,15 @@
 // @ts-check
 
 import {
-  zAxisTravel,
   openArea,
-  xRailSupportWidth,
   woodThickness,
+  xRailSupportWidth,
+  zAxisTravel,
 } from "./dimensions.js";
 import { displayOBJItem } from "./display/main.js";
 import { norm, placeAlong } from "./tools/2d.js";
 import { Path } from "./tools/path.js";
-import { BBox, debugGeometry, w3svg } from "./tools/svg.js";
+import { BBox, w3svg } from "./tools/svg.js";
 
 const bridgeTopThickness = zAxisTravel;
 const bridgeTop = openArea.z + bridgeTopThickness;
@@ -198,9 +198,9 @@ const r = await fetch("/occ/thicken", {
 });
 const file = await r.text();
 
-displayOBJItem(file);
-
 part1.display();
 // part2.display();
 join.display();
 join2.display();
+
+displayOBJItem(file);
