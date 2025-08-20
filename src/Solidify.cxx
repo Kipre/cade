@@ -47,11 +47,9 @@
 #include <Message_Algorithm.hxx>
 #include <Message_Messenger.hxx>
 #include <Message_MsgFile.hxx>
-#include <Poly_Triangulation.hxx>
-#include <TopExp_Explorer.hxx>
-#include <TopoDS.hxx>
-#include <TopoDS_Shape.hxx>
-#include <iostream>
+
+#include <BRepAlgoAPI_Check.hxx>
+#include <BRepTools.hxx>
 
 #include "Solidify.hxx"
 
@@ -307,11 +305,11 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment *segments,
       // close the path
       if (!lastPoint.IsEqual(startPoint, Precision::Confusion())) {
         std::cout << "creating closing edge because " << lastPoint.X() << " "
-                  << lastPoint.X() << " != " << startPoint.X() << " "
-                  << startPoint.X() << std::endl;
+                  << lastPoint.Y() << " != " << startPoint.X() << " "
+                  << startPoint.Y() << std::endl;
         edge = BRepBuilderAPI_MakeEdge(promote(startPoint), promote(lastPoint));
       }
-      continue;
+      break;
     }
     default:
       std::cerr << "Warning: Unhandled command '" << segment.command
@@ -331,7 +329,13 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment *segments,
     return TopoDS_Wire(); // Return a null wire
   }
 
-  return makeWire.Wire();
+  auto result = makeWire.Wire();
+
+  if (!BRep_Tool::IsClosed(result)) {
+    std::cerr << "Error: Created wire is not closed." << std::endl;
+  }
+
+  return result;
 }
 
 extern "C" int pathToSolid(const PathSegment *segments, size_t size,
@@ -376,6 +380,8 @@ extern "C" int pathToSolid(const PathSegment *segments, size_t size,
     outer.Reverse();
   }
 
+  BRepTools::Dump(outer, std::cout);
+
   BRepBuilderAPI_MakeFace makeFace(wires[0]);
   if (!makeFace.IsDone()) {
     std::cerr << "Warning: Could not create a face from the wire. It might not "
@@ -406,25 +412,32 @@ extern "C" int pathToSolid(const PathSegment *segments, size_t size,
   gp_Vec aVector(0, 0, 15);
 
   BRepPrimAPI_MakePrism aPrismMaker(makeFace, aVector);
-  TopoDS_Shape aSolid = aPrismMaker.Shape();
+  TopoDS_Shape aShape = aPrismMaker.Shape();
   std::cout << "Successfully created a TopoDS_Solid from the face."
             << std::endl;
 
-  const auto out_length = writeSolidToObj(aSolid, output_buffer);
+  TopoDS_Compound aRes;
+  BRep_Builder aBuilder;
+  aBuilder.MakeCompound(aRes);
+  aBuilder.Add(aRes, aShape);
 
-  // TopoDS_Compound aRes;
-  // BRep_Builder aBuilder;
-  // aBuilder.MakeCompound (aRes);
-  // aBuilder.Add (aRes, aSolid);
-  //
-  // std::string stepContent;
-  // if (WriteCompoundToSTEPString2(aRes, stepContent)) {
-  //     // Output to stdout (stdin in your terminology, but I assume you mean stdout)
-  //     // std::cout << stepContent << std::endl;
-  // } else {
-  //     std::cerr << "Failed to convert compound to STEP format" << std::endl;
-  //     // return 1;
-  // }
+  std::string stepContent;
+  if (WriteCompoundToSTEPString2(aRes, stepContent)) {
+    // Output to stdout (stdin in your terminology, but I assume you mean
+    // stdout) std::cout << stepContent << std::endl;
+  } else {
+    std::cerr << "Failed to convert compound to STEP format" << std::endl;
+    // return 1;
+  }
+
+  BRepAlgoAPI_Check check(aShape);
+  if (!check.IsValid()) {
+    std::cerr << "Error: Solid doesn't seem to be valid." << std::endl;
+    return 0;
+  }
+
+  const auto out_length = writeSolidToObj(aShape, output_buffer);
+  // int out_length = 0;
 
   return out_length;
 }

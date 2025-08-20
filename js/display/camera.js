@@ -65,7 +65,7 @@ export class Camera {
 
   handleMouseWheel = (event) => {
     event.preventDefault();
-    const scaleFactor = 0.04;
+    const scaleFactor = 1e-3 * this.distance;
     this.distance += event.deltaY * scaleFactor;
     this.distance = clamp(this.distance, 0.3 * this.size, 3 * this.size);
   };

@@ -183,7 +183,7 @@ export async function displayOBJItem(fileContents) {
       utils.degToRad(45),
       canvas.width / canvas.height,
       1,
-      1000,
+      camera.distance + 3 * bbox.size(),
     );
 
     const mvp = mat4.multiply(projection, mat4.multiply(view, model));
