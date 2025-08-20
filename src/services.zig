@@ -32,7 +32,7 @@ fn thicken(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     };
     defer input.deinit();
 
-    var output_buffer: [1024 * 16]u8 = undefined;
+    var output_buffer: [1024 * 128]u8 = undefined;
     const obj_size = try api.flatPartToOBJ(allocator, &input.value, &output_buffer);
 
     const response_body = output_buffer[0..obj_size];
