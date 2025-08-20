@@ -190,10 +190,11 @@ const join2 = addSimpleReinforcingJoin(
   woodThickness,
 );
 
-const testPart = new FlatPart(Path.makeCircle(100));
+const testPart = new FlatPart(Path.makeCircle(100), [Path.makeCircle(20)]);
 
 const r = await fetch("/occ/thicken", {
   method: "POST",
+  // body: join.toJson(),
   body: testPart.toJson(),
 });
 const file = await r.text();
