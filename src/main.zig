@@ -2,10 +2,6 @@ const std = @import("std");
 const parse = @import("parse_path.zig");
 const server = @import("server.zig");
 
-const bottle = @cImport({
-    @cInclude("MakeBottle.h");
-});
-
 const solidify = @cImport({
     @cInclude("Solidify.h");
 });

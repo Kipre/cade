@@ -102,6 +102,7 @@ int writeSolidToObj(const TopoDS_Shape &aShape, char *buffer) {
     return -1;
   }
 
+  buffer[1024 * 16 + 10] = '4';
   // Use a sensible deflection value (e.g., 0.1) for a good balance of detail
   // and file size.
   BRepMesh_IncrementalMesh aMesh(aShape, 1, false, 0.5);
@@ -164,7 +165,8 @@ int writeSolidToObj(const TopoDS_Shape &aShape, char *buffer) {
   std::string str = oss.str();
   const auto length = str.size();
 
-  std::cout << "Attempting to write " << length << " bytes to buffer" << std::endl;
+  std::cout << "Attempting to write " << length << " bytes to buffer"
+            << std::endl;
   str.copy(buffer, length);
   std::cout << "Successfully wrote mesh to buffer " << std::endl;
   return length;
@@ -234,7 +236,8 @@ gp_Pnt2d getCircleCenter(const gp_Pnt2d &startPoint, const gp_Pnt2d &endPoint,
   double distanceToCenter = sqrt(radius * radius - (d / 2.0) * (d / 2.0));
 
   // if arc is precisely a half-circle
-  if (std::isnan(distanceToCenter)) distanceToCenter = 0;
+  if (std::isnan(distanceToCenter))
+    distanceToCenter = 0;
 
   gp_Vec2d startEndVec(startPoint, endPoint);
   gp_Vec2d perpendicularVec(-startEndVec.Y(), startEndVec.X());
@@ -367,7 +370,12 @@ extern "C" int pathToSolid(const PathSegment *segments, size_t size,
   // such as creating a face, performing boolean operations, or exporting to a
   // file.
 
-  // Example: Create a face from the wire (if it's closed)
+  TopoDS_Wire outer = wires[0];
+
+  if (outer.Orientation() != TopAbs_FORWARD) {
+    outer.Reverse();
+  }
+
   BRepBuilderAPI_MakeFace makeFace(wires[0]);
   if (!makeFace.IsDone()) {
     std::cerr << "Warning: Could not create a face from the wire. It might not "
@@ -376,7 +384,7 @@ extern "C" int pathToSolid(const PathSegment *segments, size_t size,
   }
 
   bool first = true;
-  for (TopoDS_Wire wire : wires) {
+  for (TopoDS_Wire &wire : wires) {
 
     // skip first
     if (first) {
@@ -384,29 +392,34 @@ extern "C" int pathToSolid(const PathSegment *segments, size_t size,
       continue;
     }
 
+    if (wire.Orientation() != TopAbs_REVERSED) {
+      wire.Reverse();
+    }
+
     makeFace.Add(wire);
   }
 
   // Further operations with 'face'
   TopoDS_Face face = makeFace.Face();
-  std::cout << "Successfully created OpenCASCADE TopoDS_Face from the wire."
-            << std::endl;
+  std::cout << "Successfully created TopoDS_Face from the wire." << std::endl;
 
   gp_Vec aVector(0, 0, 15);
 
   BRepPrimAPI_MakePrism aPrismMaker(makeFace, aVector);
   TopoDS_Shape aSolid = aPrismMaker.Shape();
+  std::cout << "Successfully created a TopoDS_Solid from the face."
+            << std::endl;
+
+  const auto out_length = writeSolidToObj(aSolid, output_buffer);
+
   // TopoDS_Compound aRes;
   // BRep_Builder aBuilder;
   // aBuilder.MakeCompound (aRes);
   // aBuilder.Add (aRes, aSolid);
-
-  const auto out_length = writeSolidToObj(aSolid, output_buffer);
-
+  //
   // std::string stepContent;
   // if (WriteCompoundToSTEPString2(aRes, stepContent)) {
-  //     // Output to stdout (stdin in your terminology, but I assume you mean
-  //     stdout)
+  //     // Output to stdout (stdin in your terminology, but I assume you mean stdout)
   //     // std::cout << stepContent << std::endl;
   // } else {
   //     std::cerr << "Failed to convert compound to STEP format" << std::endl;

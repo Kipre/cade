@@ -1,12 +1,7 @@
 const std = @import("std");
 const http = std.http;
 const parse = @import("parse_path.zig");
-
-const solidify = @cImport({
-    @cInclude("Solidify.h");
-});
-
-const PathSegment = solidify.PathSegment;
+const api = @import("api.zig");
 
 const ServerAction = enum {
     thicken,
@@ -17,10 +12,6 @@ const actions_map = std.StaticStringMap(ServerAction).initComptime(.{
     .{ "/occ/thicken", .thicken },
 });
 
-const RawFlatPart = struct {
-    outside: []const u8,
-    insides: [][]const u8,
-};
 
 fn thicken(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     const body = readRequestBody(req, allocator, 2048 * 2) catch |err| {
@@ -32,7 +23,7 @@ fn thicken(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     std.debug.print("Received body: {s}\n", .{body});
 
     // Parse JSON into our struct
-    var input = std.json.parseFromSlice(RawFlatPart, allocator, body, .{
+    var input = std.json.parseFromSlice(api.RawFlatPart, allocator, body, .{
         .ignore_unknown_fields = true, // Ignore extra fields
     }) catch |err| {
         std.debug.print("JSON parse error: {any}\n", .{err});
@@ -41,27 +32,12 @@ fn thicken(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     };
     defer input.deinit();
 
-    var segments = std.ArrayList(PathSegment).init(allocator);
-
-    try parse.parsePathAndAppend(&segments, input.value.outside);
-
-    for (input.value.insides) |path| {
-        try parse.parsePathAndAppend(&segments, path);
-    }
-
     var output_buffer: [1024 * 16]u8 = undefined;
-
-    const size = segments.items.len;
-    const array = try segments.toOwnedSlice();
-    const obj_size: usize = @intCast(solidify.pathToSolid(array.ptr, size, &output_buffer));
-
-    std.debug.print("Received obj of length: {d}\n", .{obj_size});
-    // std.debug.print("Received obj of length: {s}\n", .{output_buffer[0..obj_size]});
+    const obj_size = try api.flatPartToOBJ(allocator, &input.value, &output_buffer);
 
     const response_body = output_buffer[0..obj_size];
     try req.respond(response_body, .{ .status = .ok, .extra_headers = &[_]std.http.Header{
         .{ .name = "content-type", .value = "application/text" },
-        // .{ .name = "content-length", .value = try std.fmt.allocPrint(allocator, "{d}", .{obj_length}) },
     } });
 }
 

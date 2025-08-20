@@ -58,6 +58,33 @@ pub fn build(b: *std.Build) void {
 
     if (only_gen_tool) return;
 
+    // libraries
+    const lib_TKernel = addOCCTModule(b, target, optimize, "TKernel", &sources_TKernel);
+    const lib_TKMath = addOCCTModule(b, target, optimize, "TKMath", &sources_TKMath);
+    const lib_TKG2d = addOCCTModule(b, target, optimize, "TKG2d", &sources_TKG2d);
+    const lib_TKG3d = addOCCTModule(b, target, optimize, "TKG3d", &sources_TKG3d);
+    const lib_TKGeomBase = addOCCTModule(b, target, optimize, "TKGeomBase", &sources_TKGeomBase);
+    const lib_TKBRep = addOCCTModule(b, target, optimize, "TKBRep", &sources_TKBRep);
+    const lib_TKGeomAlgo = addOCCTModule(b, target, optimize, "TKGeomAlgo", &sources_TKGeomAlgo);
+    const lib_TKTopAlgo = addOCCTModule(b, target, optimize, "TKTopAlgo", &sources_TKTopAlgo);
+    const lib_TKPrim = addOCCTModule(b, target, optimize, "TKPrim", &sources_TKPrim);
+    const lib_TKFillet = addOCCTModule(b, target, optimize, "TKFillet", &sources_TKFillet);
+    const lib_TKOffset = addOCCTModule(b, target, optimize, "TKOffset", &sources_TKOffset);
+    const lib_TKFeat = addOCCTModule(b, target, optimize, "TKFeat", &sources_TKFeat);
+    const lib_TKBool = addOCCTModule(b, target, optimize, "TKBool", &sources_TKBool);
+    const lib_TKDESTEP = addOCCTModule(b, target, optimize, "TKDESTEP", &sources_TKDESTEP);
+    const lib_TKXSBase = addOCCTModule(b, target, optimize, "TKXSBase", &sources_TKXSBase);
+    const lib_TKShHealing = addOCCTModule(b, target, optimize, "TKShHealing", &sources_TKShHealing);
+    const lib_TKBO = addOCCTModule(b, target, optimize, "TKBO", &sources_TKBO);
+    const lib_TKMesh = addOCCTModule(b, target, optimize, "TKMesh", &sources_TKMesh);
+
+    const occt_libs = [_]*std.Build.Step.Compile{
+        lib_TKernel,     lib_TKMath,     lib_TKG2d,     lib_TKG3d,    lib_TKGeomBase,
+        lib_TKBRep,      lib_TKGeomAlgo, lib_TKTopAlgo, lib_TKPrim,   lib_TKFillet,
+        lib_TKOffset,    lib_TKFeat,     lib_TKBool,    lib_TKDESTEP, lib_TKXSBase,
+        lib_TKShHealing, lib_TKBO,       lib_TKMesh,
+    };
+
     // main module
     const mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
@@ -75,27 +102,53 @@ pub fn build(b: *std.Build) void {
     exe.linkLibCpp();
     exe.addIncludePath(b.path("src"));
     exe.addIncludePath(b.path("inc"));
-    exe.addCSourceFile(.{ .file = b.path("src/MakeBottle.cxx") });
     exe.addCSourceFile(.{ .file = b.path("src/Solidify.cxx") });
 
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKernel", &sources_TKernel));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKMath", &sources_TKMath));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKG2d", &sources_TKG2d));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKG3d", &sources_TKG3d));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKGeomBase", &sources_TKGeomBase));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKBRep", &sources_TKBRep));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKGeomAlgo", &sources_TKGeomAlgo));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKTopAlgo", &sources_TKTopAlgo));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKPrim", &sources_TKPrim));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKFillet", &sources_TKFillet));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKOffset", &sources_TKOffset));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKFeat", &sources_TKFeat));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKBool", &sources_TKBool));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKDESTEP", &sources_TKDESTEP));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKXSBase", &sources_TKXSBase));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKShHealing", &sources_TKShHealing));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKBO", &sources_TKBO));
-    exe.linkLibrary(addOCCTModule(b, target, optimize, "TKMesh", &sources_TKMesh));
+    for (occt_libs) |lib| {
+        exe.linkLibrary(lib);
+    }
 
     b.installArtifact(exe);
+
+    // tests
+    // const test_exe = b.addTest(.{
+    //     .root_source_file = b.path("src/main.zig"),
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    //
+    // test_exe.linkSystemLibrary("Ws2_32");
+    // test_exe.linkLibCpp();
+    // test_exe.addIncludePath(b.path("src"));
+    // test_exe.addIncludePath(b.path("inc"));
+    // test_exe.addCSourceFile(.{ .file = b.path("src/Solidify.cxx") });
+    //
+    // for (occt_libs) |lib| {
+    //     test_exe.linkLibrary(lib);
+    // }
+    //
+    // const test_step = b.step("test", "Run unit tests");
+    // const run_tests = b.addRunArtifact(test_exe);
+    // test_step.dependOn(&run_tests.step);
+
+    // specific test
+    const specific_test = b.addTest(.{
+        .root_source_file = b.path("src/api.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    specific_test.linkSystemLibrary("Ws2_32");
+    specific_test.linkLibCpp();
+    specific_test.addIncludePath(b.path("src"));
+    specific_test.addIncludePath(b.path("inc"));
+    specific_test.addCSourceFile(.{ .file = b.path("src/Solidify.cxx") });
+
+    for (occt_libs) |lib| {
+        specific_test.linkLibrary(lib);
+    }
+
+    const specific_test_step = b.step("test-specific", "Run specific tests");
+    const run_specific = b.addRunArtifact(specific_test);
+    specific_test_step.dependOn(&run_specific.step);
 }

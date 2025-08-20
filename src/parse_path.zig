@@ -156,9 +156,8 @@ test "SVG path parsing" {
     try testing.expect(segments.items[2].command == 'A');
     try testing.expect(segments.items[2].radius == 50.0);
     try testing.expect(segments.items[2].sweep == 0);
-    try testing.expect(segments.items[2].x == 60.0);
     try testing.expect(segments.items[2].y == 70.0);
+    try testing.expect(segments.items[2].x == 60.0);
 
-    // Z
     try testing.expect(segments.items[3].command == 'Z');
 }
