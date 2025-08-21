@@ -189,19 +189,43 @@ const join2 = addSimpleReinforcingJoin(
   bridgeJoinWidth,
   woodThickness,
 );
+let path = "";
+path += "M 105.00000000000009 150 ";
+// path += "A 30 30 0 0 1 75 120 ";
+path += "L 75 -1 ";
 
-const testPart = new FlatPart(Path.makeCircle(100), [Path.makeCircle(20)]);
+path += "L 0 0 ";
+path += "L 0 193.93398282201787 ";
+
+path += "L 106.06601717798213 300 ";
+path += "L 1043.933982822018 300.00000000000017 ";
+path += "L 1150 193.93398282201815 ";
+path += "L 1149.9999999999998 -7.04171909509728e-14 ";
+path += "L 1075 -1.749191776789837e-13 ";
+path += "L 1075 120.00000000000006 ";
+// path += "A 30 30 0 0 1 1045 150 ";
+path += "L 575 150 ";
+path += "Z";
+
+// const testPart = new FlatPart(Path.makeCircle(100), [Path.makeCircle(20)]);
+const testPart = {
+  outside: path,
+  insides: [],
+};
+
+debugGeometry(testPart.outside);
+
+part1.insides = [];
 
 const r = await fetch("/occ/thicken", {
   method: "POST",
-  // body: join.toJson(),
-  body: testPart.toJson(),
+  // body: part1.toJson(),
+  body: JSON.stringify(testPart),
 });
 const file = await r.text();
+displayOBJItem(file);
 
 part1.display();
 // part2.display();
 join.display();
 join2.display();
-
-displayOBJItem(file);
