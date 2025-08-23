@@ -110,27 +110,38 @@ fn serveFileOrDirectory(req: *http.Server.Request, allocator: std.mem.Allocator,
     defer allocator.free(full_path);
 
     // Check if path exists and get file info
-    _ = fs.cwd().statFile(full_path) catch |err| switch (err) {
+    const stat = fs.cwd().statFile(full_path) catch |err| switch (err) {
         error.FileNotFound => {
             try sendError(req, .not_found, allocator, "File not found");
             return;
         },
-        error.IsDir => {
-            if (!std.mem.endsWith(u8, full_path, "/")) {
-                const with_trailing_slash = try std.fmt.allocPrint(allocator, "{s}/", .{full_path});
-                defer allocator.free(with_trailing_slash);
-
-                try sendRedirect(req, with_trailing_slash[1..]);
-                return;
-            }
-            try serveDirectory(req, allocator, full_path);
-            return;
+        // windows throws error
+        error.IsDir => fs.File.Stat{
+            .kind = .directory,
+            .inode = 0,
+            .size = 0,
+            .mode = 0,
+            .atime = 0,
+            .mtime = 0,
+            .ctime = 0,
         },
         else => {
             try sendError(req, .internal_server_error, allocator, "Internal server error");
             return err;
         },
     };
+
+    if (stat.kind == .directory) {
+        if (!std.mem.endsWith(u8, full_path, "/")) {
+            const with_trailing_slash = try std.fmt.allocPrint(allocator, "{s}/", .{full_path});
+            defer allocator.free(with_trailing_slash);
+
+            try sendRedirect(req, with_trailing_slash[1..]);
+            return;
+        }
+        try serveDirectory(req, allocator, full_path);
+        return;
+    }
 
     try serveFile(req, allocator, full_path);
 }

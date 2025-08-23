@@ -1,4 +1,5 @@
 const std = @import("std");
+
 const sources_TKernel = @import("TKernel_generated-build-config.zig").sources;
 const sources_TKMath = @import("TKMath_generated-build-config.zig").sources;
 const sources_TKG2d = @import("TKG2d_generated-build-config.zig").sources;
@@ -25,7 +26,7 @@ fn addOCCTModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
         .optimize = optimize,
     });
 
-    module.addCSourceFiles(.{ .files = sources });
+    module.addCSourceFiles(.{ .files = sources, .flags = &.{ "-fno-sanitize=undefined" } });
     module.addIncludePath(b.path("inc"));
     module.linkLibCpp();
     b.installArtifact(module);
@@ -97,39 +98,21 @@ pub fn build(b: *std.Build) void {
         .root_module = mod,
     });
 
+    if (target.result.os.tag == .windows) {
+        exe.linkSystemLibrary("Ws2_32");
+    }
+
     // link with the standard library libcpp
-    exe.linkSystemLibrary("Ws2_32");
     exe.linkLibCpp();
     exe.addIncludePath(b.path("src"));
     exe.addIncludePath(b.path("inc"));
-    exe.addCSourceFile(.{ .file = b.path("src/Solidify.cxx") });
+    exe.addCSourceFile(.{ .file = b.path("src/Solidify.cxx"), .flags = &.{ "-fno-sanitize=undefined" } });
 
     for (occt_libs) |lib| {
         exe.linkLibrary(lib);
     }
 
     b.installArtifact(exe);
-
-    // tests
-    // const test_exe = b.addTest(.{
-    //     .root_source_file = b.path("src/main.zig"),
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-    //
-    // test_exe.linkSystemLibrary("Ws2_32");
-    // test_exe.linkLibCpp();
-    // test_exe.addIncludePath(b.path("src"));
-    // test_exe.addIncludePath(b.path("inc"));
-    // test_exe.addCSourceFile(.{ .file = b.path("src/Solidify.cxx") });
-    //
-    // for (occt_libs) |lib| {
-    //     test_exe.linkLibrary(lib);
-    // }
-    //
-    // const test_step = b.step("test", "Run unit tests");
-    // const run_tests = b.addRunArtifact(test_exe);
-    // test_step.dependOn(&run_tests.step);
 
     // specific test
     const specific_test = b.addTest(.{
@@ -138,17 +121,19 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    specific_test.linkSystemLibrary("Ws2_32");
+    if (target.result.os.tag == .windows) {
+        exe.linkSystemLibrary("Ws2_32");
+    }
     specific_test.linkLibCpp();
     specific_test.addIncludePath(b.path("src"));
     specific_test.addIncludePath(b.path("inc"));
-    specific_test.addCSourceFile(.{ .file = b.path("src/Solidify.cxx") });
+    specific_test.addCSourceFile(.{ .file = b.path("src/Solidify.cxx"), .flags = &.{ "-fno-sanitize=undefined" } });
 
     for (occt_libs) |lib| {
         specific_test.linkLibrary(lib);
     }
 
-    const specific_test_step = b.step("test-specific", "Run specific tests");
+    const specific_test_step = b.step("test", "Run tests");
     const run_specific = b.addRunArtifact(specific_test);
     specific_test_step.dependOn(&run_specific.step);
 }

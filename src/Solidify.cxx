@@ -307,7 +307,7 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment *segments,
         std::cout << "creating closing edge because " << lastPoint.X() << " "
                   << lastPoint.Y() << " != " << startPoint.X() << " "
                   << startPoint.Y() << std::endl;
-        edge = BRepBuilderAPI_MakeEdge(promote(startPoint), promote(lastPoint));
+        edge = BRepBuilderAPI_MakeEdge(promote(lastPoint), promote(startPoint));
       }
       break;
     }
@@ -380,7 +380,6 @@ extern "C" int pathToSolid(const PathSegment *segments, size_t size,
     outer.Reverse();
   }
 
-  BRepTools::Dump(outer, std::cout);
 
   BRepBuilderAPI_MakeFace makeFace(wires[0]);
   if (!makeFace.IsDone()) {
