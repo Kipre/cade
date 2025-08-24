@@ -7,65 +7,14 @@ import {
   zAxisTravel,
 } from "./dimensions.js";
 import { displayOBJItem } from "./display/main.js";
+import { Assembly, FlatPart } from "./lib.js";
 import { norm, placeAlong } from "./tools/2d.js";
 import { Path } from "./tools/path.js";
-import { BBox, w3svg, debugGeometry } from "./tools/svg.js";
 
 const bridgeTopThickness = zAxisTravel;
 const bridgeTop = openArea.z + bridgeTopThickness;
 const joinOffset = 10;
 const bridgeJoinWidth = 100 - 2 * woodThickness;
-
-export class FlatPart {
-  /**
-   * @param {Path} outside
-   * @param {Path[]} [insides]
-   */
-  constructor(outside, insides = []) {
-    this.outside = outside;
-    this.insides = insides;
-    this._id = Math.random().toString().slice(2);
-  }
-
-  /**
-   * @param {Path[]} insides
-   */
-  addInsides(...insides) {
-    this.insides.push(...insides);
-  }
-
-  display() {
-    const svg = document.createElementNS(w3svg, "svg");
-    svg.id = this._id;
-    document.body.appendChild(svg);
-
-    const bbox = new BBox();
-
-    for (const shape of [this.outside, ...this.insides]) {
-      const path = document.createElementNS(w3svg, "path");
-      path.setAttribute("d", shape.toString());
-      path.setAttribute("stroke", "blue");
-      path.setAttribute("style", "opacity: 0.8");
-      path.setAttribute("fill", "none");
-
-      const totalLength = path.getTotalLength();
-      for (let i = 0; i < 1; i += 0.01) {
-        const p = path.getPointAtLength(totalLength * i);
-        bbox.include([p.x, p.y]);
-      }
-      svg.appendChild(path);
-    }
-
-    svg.setAttribute("viewBox", bbox.toViewBox());
-  }
-
-  toJson() {
-    const result = {};
-    result.outside = this.outside.toString();
-    result.insides = this.insides.map((p) => p.toString());
-    return JSON.stringify(result);
-  }
-}
 
 const p = new Path();
 
@@ -201,3 +150,10 @@ part1.display();
 // part2.display();
 join.display();
 join2.display();
+
+export const woodenBase = new Assembly("wooden frame");
+woodenBase.addChild(part1);
+woodenBase.addChild(part2);
+woodenBase.addChild(join);
+woodenBase.addChild(join2);
+
