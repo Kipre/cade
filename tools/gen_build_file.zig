@@ -1,7 +1,6 @@
 const std = @import("std");
 const fs = std.fs;
 const endsWith = std.mem.endsWith;
-const ArrayList = std.ArrayList;
 const process = std.process;
 const mem = std.mem;
 
@@ -20,7 +19,7 @@ fn replacePlaceholders(
     content: []const u8,
     replacements: *std.StringHashMap([]const u8),
 ) ![]u8 {
-    var builder = std.ArrayList(u8).init(allocator);
+    var builder = std.array_list.Managed(u8).init(allocator);
     defer builder.deinit();
 
     var current_index: usize = 0;
@@ -93,6 +92,7 @@ pub fn main() !void {
     std.debug.print("Successfully processed '{s}' and wrote to '{s}'.\n", .{ input_file_path, output_file_path });
 
     const args = try process.argsAlloc(allocator);
+    defer process.argsFree(allocator, args);
 
     var skip_headers = false;
     {
@@ -140,7 +140,7 @@ pub fn fatal(comptime format: []const u8, args: anytype) noreturn {
 }
 
 fn copyHeaderFiles(allocator: std.mem.Allocator) !void {
-    var headers = std.ArrayList([]const u8).init(allocator);
+    var headers = std.array_list.Managed([]const u8).init(allocator);
     defer {
         for (headers.items) |path| {
             allocator.free(path);
@@ -167,7 +167,7 @@ fn copyHeaderFiles(allocator: std.mem.Allocator) !void {
 }
 
 fn generateSourceLists(allocator: std.mem.Allocator, dir_path: []const u8) !void {
-    var sources = std.ArrayList([]const u8).init(allocator);
+    var sources = std.array_list.Managed([]const u8).init(allocator);
     defer {
         // Free all collected paths
         for (sources.items) |path| {
@@ -182,14 +182,17 @@ fn generateSourceLists(allocator: std.mem.Allocator, dir_path: []const u8) !void
     });
     defer allocator.free(sources_file_name);
 
-    std.debug.print("Collecting source files\n", .{});
     try collectFilesOneDeep(allocator, dir_path, &sources);
 
     // Generate sources.zig file
     const file = try std.fs.cwd().createFile(sources_file_name, .{});
     defer file.close();
 
-    try file.writeAll("pub const sources = [_][]const u8{\n");
+    var write_buffer: [1024 * 4]u8 = undefined;
+    var writer = file.writer(&write_buffer);
+    const out = &writer.interface;
+
+    _ = try out.write("pub const sources = [_][]const u8{\n");
     for (sources.items) |source| {
         if (std.mem.indexOf(u8, source, "GTests") != null) continue;
         if (endsWith(u8, source, "hxx")) continue;
@@ -197,18 +200,20 @@ fn generateSourceLists(allocator: std.mem.Allocator, dir_path: []const u8) !void
         if (endsWith(u8, source, "lxx")) continue;
         if (endsWith(u8, source, "gxx")) continue;
         if (!endsWith(u8, source, ".c") and !endsWith(u8, source, ".cxx") and !endsWith(u8, source, ".cpp")) continue;
-        try file.writer().print("    \"{s}\",\n", .{source});
+        try out.print("    \"{s}\",\n", .{source});
     }
-    try file.writeAll("};\n");
-    std.debug.print("Wrote build file\n", .{});
+    _ = try out.write("};\n");
+    try out.flush();
+
+    std.debug.print("Collected sources for {s}\n", .{module});
 }
 
-fn collectFilesOneDeep(allocator: std.mem.Allocator, root_path: []const u8, file_list: *ArrayList([]const u8)) !void {
+fn collectFilesOneDeep(allocator: std.mem.Allocator, root_path: []const u8, file_list: *std.array_list.Managed([]const u8)) !void {
     // Collect files from root directory
     try collectFilesFromDirectory(allocator, root_path, file_list);
 
     // Get all subdirectories
-    var subdirs = ArrayList([]const u8).init(allocator);
+    var subdirs = std.array_list.Managed([]const u8).init(allocator);
     defer {
         for (subdirs.items) |subdir| {
             allocator.free(subdir);
@@ -237,12 +242,12 @@ fn collectFilesOneDeep(allocator: std.mem.Allocator, root_path: []const u8, file
     }
 }
 
-fn collectFilesDeep(allocator: std.mem.Allocator, root_path: []const u8, file_list: *ArrayList([]const u8)) !void {
+fn collectFilesDeep(allocator: std.mem.Allocator, root_path: []const u8, file_list: *std.array_list.Managed([]const u8)) !void {
     // Collect files from root directory
     try collectFilesFromDirectory(allocator, root_path, file_list);
 
     // Get all subdirectories
-    var subdirs = ArrayList([]const u8).init(allocator);
+    var subdirs = std.array_list.Managed([]const u8).init(allocator);
     defer {
         for (subdirs.items) |subdir| {
             allocator.free(subdir);
@@ -271,7 +276,7 @@ fn collectFilesDeep(allocator: std.mem.Allocator, root_path: []const u8, file_li
     }
 }
 
-fn collectFilesFromDirectory(allocator: std.mem.Allocator, path: []const u8, file_list: *ArrayList([]const u8)) !void {
+fn collectFilesFromDirectory(allocator: std.mem.Allocator, path: []const u8, file_list: *std.array_list.Managed([]const u8)) !void {
     var dir = fs.cwd().openDir(path, .{ .iterate = true }) catch |err| switch (err) {
         error.FileNotFound, error.AccessDenied => return,
         else => return err,

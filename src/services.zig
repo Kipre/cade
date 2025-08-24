@@ -12,7 +12,6 @@ const actions_map = std.StaticStringMap(ServerAction).initComptime(.{
     .{ "/occ/thicken", .thicken },
 });
 
-
 fn thicken(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     const body = readRequestBody(req, allocator, 2048 * 2) catch |err| {
         try sendJsonError(req, "Failed to read request body", 400);
@@ -36,7 +35,7 @@ fn thicken(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     const obj_size = try api.flatPartToOBJ(allocator, &input.value, &output_buffer);
 
     const response_body = output_buffer[0..obj_size];
-    try req.respond(response_body, .{ .status = .ok, .extra_headers = &[_]std.http.Header{
+    try req.respond(response_body, .{ .extra_headers = &.{
         .{ .name = "content-type", .value = "application/text" },
     } });
 }
@@ -55,7 +54,6 @@ pub fn handlePostRequest(req: *http.Server.Request, allocator: std.mem.Allocator
 }
 
 fn readRequestBody(req: *std.http.Server.Request, allocator: std.mem.Allocator, max_size: usize) ![]u8 {
-    const reader = req.reader() catch return error.ReaderError;
 
     // Check Content-Length header
     const content_length = blk: {
@@ -75,18 +73,16 @@ fn readRequestBody(req: *std.http.Server.Request, allocator: std.mem.Allocator, 
         return error.ContentTooLarge;
     }
 
-    const body = allocator.alloc(u8, content_length) catch return error.AllocationFailed;
-    const bytes_read = reader.readAll(body) catch {
-        allocator.free(body);
-        return error.ReadError;
-    };
+    var transfer_buffer: [64]u8 = undefined;
+    const body_reader = req.server.reader.bodyReader(&transfer_buffer, .none, content_length);
+    const req_body = try body_reader.allocRemaining(allocator, @enumFromInt(max_size));
 
-    if (bytes_read != content_length) {
-        allocator.free(body);
+    if (req_body.len != content_length) {
+        allocator.free(req_body);
         return error.IncompleteRead;
     }
 
-    return body;
+    return req_body;
 }
 
 fn sendJsonError(req: *std.http.Server.Request, message: []const u8, status_code: u16) !void {
