@@ -304,9 +304,6 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment *segments,
       // If the last point is not the start point, create a line segment to
       // close the path
       if (!lastPoint.IsEqual(startPoint, Precision::Confusion())) {
-        std::cout << "creating closing edge because " << lastPoint.X() << " "
-                  << lastPoint.Y() << " != " << startPoint.X() << " "
-                  << startPoint.Y() << std::endl;
         edge = BRepBuilderAPI_MakeEdge(promote(lastPoint), promote(startPoint));
       }
       break;
@@ -380,7 +377,6 @@ extern "C" int pathToSolid(const PathSegment *segments, size_t size,
     outer.Reverse();
   }
 
-
   BRepBuilderAPI_MakeFace makeFace(wires[0]);
   if (!makeFace.IsDone()) {
     std::cerr << "Warning: Could not create a face from the wire. It might not "
@@ -415,19 +411,19 @@ extern "C" int pathToSolid(const PathSegment *segments, size_t size,
   std::cout << "Successfully created a TopoDS_Solid from the face."
             << std::endl;
 
-  TopoDS_Compound aRes;
-  BRep_Builder aBuilder;
-  aBuilder.MakeCompound(aRes);
-  aBuilder.Add(aRes, aShape);
-
-  std::string stepContent;
-  if (WriteCompoundToSTEPString2(aRes, stepContent)) {
-    // Output to stdout (stdin in your terminology, but I assume you mean
-    // stdout) std::cout << stepContent << std::endl;
-  } else {
-    std::cerr << "Failed to convert compound to STEP format" << std::endl;
-    // return 1;
-  }
+  // TopoDS_Compound aRes;
+  // BRep_Builder aBuilder;
+  // aBuilder.MakeCompound(aRes);
+  // aBuilder.Add(aRes, aShape);
+  //
+  // std::string stepContent;
+  // if (WriteCompoundToSTEPString2(aRes, stepContent)) {
+  //   // Output to stdout (stdin in your terminology, but I assume you mean
+  //   // stdout) std::cout << stepContent << std::endl;
+  // } else {
+  //   std::cerr << "Failed to convert compound to STEP format" << std::endl;
+  //   // return 1;
+  // }
 
   BRepAlgoAPI_Check check(aShape);
   if (!check.IsValid()) {
