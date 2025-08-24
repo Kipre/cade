@@ -1,35 +1,35 @@
 const std = @import("std");
 const parse = @import("parse_path.zig");
+const solidify = @import("solidify.zig");
+const Allocator = std.mem.Allocator;
 
 const expect = std.testing.expect;
-
-const solidify = @cImport({
-    @cInclude("Solidify.h");
-});
-
-pub const PathSegment = solidify.PathSegment;
+const PathSegment = solidify.PathSegment;
 
 pub const RawFlatPart = struct {
     outside: []const u8,
     insides: [][]const u8,
 };
 
-pub fn parseFlatPart(part: *const RawFlatPart, segmentsArray: *std.ArrayList(PathSegment)) !void {
-    try parse.parsePathAndAppend(segmentsArray, part.outside);
-
-    for (part.insides) |path| {
-        try parse.parsePathAndAppend(segmentsArray, path);
+pub fn parsePath(allocator: Allocator, segmentsArray: *std.ArrayList(PathSegment), path: []const u8) !void {
+    var iterator = parse.SVGPathIterator.init(path);
+    while (try iterator.next()) |val| {
+        try segmentsArray.append(allocator, val);
     }
 }
 
 pub fn flatPartToOBJ(allocator: std.mem.Allocator, part: *RawFlatPart, output_buffer: [*c]u8) !usize {
-    var segments = std.ArrayList(PathSegment).init(allocator);
+    var segments: std.ArrayList(PathSegment) = .empty;
     // defer allocator.free(segments);
 
-    try parseFlatPart(part, &segments);
+    try parsePath(allocator, &segments, part.outside);
+
+    for (part.insides) |path| {
+        try parsePath(allocator, &segments, path);
+    }
 
     const size = segments.items.len;
-    const array = try segments.toOwnedSlice();
+    const array = try segments.toOwnedSlice(allocator);
     const cint_obj_size = solidify.pathToSolid(array.ptr, size, output_buffer);
     const obj_size: usize = @intCast(cint_obj_size);
     return obj_size;

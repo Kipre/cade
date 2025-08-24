@@ -1,9 +1,14 @@
+const builtin = @import("builtin");
 const std = @import("std");
+const mem = std.mem;
+const io = std.io;
+const Allocator = std.mem.Allocator;
+const assert = std.debug.assert;
+const Cache = std.Build.Cache;
 const http = std.http;
 const net = std.net;
 const print = std.debug.print;
 const fs = std.fs;
-const mem = std.mem;
 
 const handlePostRequest = @import("services.zig").handlePostRequest;
 
@@ -25,88 +30,79 @@ const MIME_TYPES = std.StaticStringMap([]const u8).initComptime(.{
     .{ ".wasm", "application/wasm" },
 });
 
-pub fn serve(allocator: std.mem.Allocator) !void {
+const Context = struct {
+    gpa: Allocator,
+};
 
-    const serve_dir = "./";
-    const port = 8111;
+const serve_dir = "./";
 
-    // Create the address to listen on
-    const addr = std.net.Address.parseIp4("127.0.0.1", port) catch |err| {
-        std.debug.print("error parsing address {any}\n", .{err});
-        return;
+pub fn serve(allocator: Allocator) !void {
+    const listen_port = 8111;
+
+    const address = std.net.Address.parseIp("127.0.0.1", listen_port) catch unreachable;
+    var http_server = try address.listen(.{ .reuse_address = true });
+    print("server started at 127.0.0.1:{d}\n", .{listen_port});
+
+    var context: Context = .{
+        .gpa = allocator,
     };
-
-    // Create a base server that listens for connections
-    var server_base = addr.listen(.{}) catch |err| {
-        std.debug.print("error listening on address {any}\n", .{err});
-        return;
-    };
-    defer server_base.deinit();
-
-    std.debug.print("Server started on port {d}...\n", .{port});
 
     while (true) {
-        // Accept a connection
-        var conn = server_base.accept() catch |err| {
-            std.debug.print("error accept {any}\n", .{err});
+        const connection = try http_server.accept();
+        _ = std.Thread.spawn(.{}, accept, .{ &context, connection }) catch |err| {
+            std.log.err("unable to accept connection: {s}", .{@errorName(err)});
+            connection.stream.close();
             continue;
         };
-        defer conn.stream.close();
+    }
+}
 
-        // This is the read buffer for HTTP headers
-        var header_buf: [4096]u8 = undefined;
+fn accept(context: *Context, connection: std.net.Server.Connection) void {
+    defer connection.stream.close();
 
-        // Initialize the HTTP server with the connection and header buffer
-        var server = std.http.Server.init(conn, &header_buf);
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
 
-        // Receive and handle the request
-        var req = server.receiveHead() catch |err| {
-            std.debug.print("error receiving head {any}\n", .{err});
-            continue;
+    var recv_buffer: [4000]u8 = undefined;
+    var send_buffer: [4000]u8 = undefined;
+    var conn_reader = connection.stream.reader(&recv_buffer);
+    var conn_writer = connection.stream.writer(&send_buffer);
+    var server = std.http.Server.init(conn_reader.interface(), &conn_writer.interface);
+
+    while (server.reader.state == .ready) {
+        var request = server.receiveHead() catch |err| switch (err) {
+            error.HttpConnectionClosing => return,
+            else => {
+                std.log.err("closing http connection: {s}", .{@errorName(err)});
+
+                return;
+            },
         };
+
+        const method = request.head.method;
+        const target = request.head.target;
+
+        print("Request: {s} {s}\n", .{ @tagName(method), target });
+
+        const decoded_path = std.Uri.percentDecodeBackwards(&path_buf, target);
+
+        // Remove query parameters
+        const path = if (mem.indexOf(u8, decoded_path, "?")) |idx| decoded_path[0..idx] else decoded_path;
 
         // Handle the request
-        handleRequest(&req, allocator, serve_dir) catch |err| {
-            print("Error handling request: {}\n", .{err});
+        _ = switch (method) {
+            .GET => serveFileOrDirectory(&request, context.gpa, path),
+            .POST => handlePostRequest(&request, context.gpa, path),
+            else => sendError(&request, .method_not_allowed, context.gpa, "Method not allowed"),
+        } catch |err| {
+            std.log.err("unable to accept connection: {s}", .{@errorName(err)});
         };
     }
 }
 
-fn handleRequest(req: *http.Server.Request, allocator: std.mem.Allocator, serve_dir: []const u8) !void {
-    // Get request details
-    const method = req.head.method;
-    const target = req.head.target;
-
-    print("Request: {s} {s}\n", .{ @tagName(method), target });
-
-
-    if (method != .GET and method != .POST) {
-        try sendError(req, .method_not_allowed, allocator, "Method not allowed");
-        return;
-    }
-
-    // Decode URL and remove query parameters
-    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
-    @memcpy(path_buf[0..target.len], target);
-
-    const decoded_path = std.Uri.percentDecodeInPlace(path_buf[0..target.len]);
-
-    // Remove query parameters
-    const path = if (mem.indexOf(u8, decoded_path, "?")) |idx| decoded_path[0..idx] else decoded_path;
-
-    if (method == .POST) {
-        try handlePostRequest(req, allocator, path);
-        return;
-    }
-
-    // Serve the file or directory
-    try serveFileOrDirectory(req, allocator, serve_dir, path);
-}
-
-fn serveFileOrDirectory(req: *http.Server.Request, allocator: std.mem.Allocator, serve_dir: []const u8, path: []const u8) !void {
+fn serveFileOrDirectory(req: *http.Server.Request, allocator: std.mem.Allocator, path: []const u8) !void {
 
     // Construct full path
-    const full_path = try fs.path.join(allocator, &[_][]const u8{ serve_dir, path });
+    const full_path = try fs.path.join(allocator, &.{ serve_dir, path });
     defer allocator.free(full_path);
 
     // Check if path exists and get file info
@@ -147,26 +143,14 @@ fn serveFileOrDirectory(req: *http.Server.Request, allocator: std.mem.Allocator,
 }
 
 fn serveFile(req: *http.Server.Request, allocator: std.mem.Allocator, file_path: []const u8) !void {
-    // Open and read file
-    const file = fs.cwd().openFile(file_path, .{}) catch {
-        try sendError(req, .internal_server_error, allocator, "Cannot read file");
-        return;
-    };
-    defer file.close();
-
-    const file_size = try file.getEndPos();
-    const content = try allocator.alloc(u8, file_size);
+    const content = try fs.cwd().readFileAlloc(allocator, file_path, 10 * 1024 * 1024);
     defer allocator.free(content);
-
-    _ = try file.readAll(content);
 
     // Determine content type
     const content_type = getMimeType(file_path);
 
-    try req.respond(content, .{ .status = .ok, .extra_headers = &[_]std.http.Header{
+    try req.respond(content, .{ .extra_headers = &.{
         .{ .name = "content-type", .value = content_type },
-        .{ .name = "content-length", .value = try std.fmt.allocPrint(allocator, "{d}", .{content.len}) },
-        .{ .name = "connection", .value = "close" },
     } });
 }
 
@@ -196,20 +180,15 @@ fn sendError(req: *http.Server.Request, status: http.Status, allocator: std.mem.
     , .{ @intFromEnum(status), @intFromEnum(status), message });
     defer allocator.free(error_html);
 
-    req.respond(error_html, .{ .status = status, .extra_headers = &[_]std.http.Header{
+    try req.respond(error_html, .{ .status = status, .extra_headers = &.{
         .{ .name = "content-type", .value = "text/html" },
-        .{ .name = "connection", .value = "close" },
-        .{ .name = "server", .value = "my-zig-server" },
-    } }) catch |err| {
-        std.debug.print("error responding {any}\n", .{err});
-        return;
-    };
+    } });
 }
 
 fn sendRedirect(req: *http.Server.Request, location: []const u8) !void {
     try req.respond("", .{
         .status = .found, // 302 redirect
-        .extra_headers = &[_]std.http.Header{
+        .extra_headers = &.{
             .{ .name = "location", .value = location },
         }
     });

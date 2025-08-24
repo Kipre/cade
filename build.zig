@@ -20,17 +20,19 @@ const sources_TKBO = @import("TKBO_generated-build-config.zig").sources;
 const sources_TKMesh = @import("TKMesh_generated-build-config.zig").sources;
 
 fn addOCCTModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, name: []const u8, sources: []const []const u8) *std.Build.Step.Compile {
-    const module = b.addStaticLibrary(.{
+    const lib = b.addLibrary(.{
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
         .name = name,
-        .target = target,
-        .optimize = optimize,
     });
 
-    module.addCSourceFiles(.{ .files = sources, .flags = &.{ "-fno-sanitize=undefined" } });
-    module.addIncludePath(b.path("inc"));
-    module.linkLibCpp();
-    b.installArtifact(module);
-    return module;
+    lib.addCSourceFiles(.{ .files = sources, .flags = &.{"-fno-sanitize=undefined"} });
+    lib.addIncludePath(b.path("inc"));
+    lib.linkLibCpp();
+    b.installArtifact(lib);
+    return lib;
 }
 
 pub fn build(b: *std.Build) void {
@@ -106,7 +108,7 @@ pub fn build(b: *std.Build) void {
     exe.linkLibCpp();
     exe.addIncludePath(b.path("src"));
     exe.addIncludePath(b.path("inc"));
-    exe.addCSourceFile(.{ .file = b.path("src/Solidify.cxx"), .flags = &.{ "-fno-sanitize=undefined" } });
+    exe.addCSourceFile(.{ .file = b.path("src/Solidify.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
 
     for (occt_libs) |lib| {
         exe.linkLibrary(lib);
@@ -116,9 +118,8 @@ pub fn build(b: *std.Build) void {
 
     // specific test
     const specific_test = b.addTest(.{
-        .root_source_file = b.path("src/api.zig"),
-        .target = target,
-        .optimize = optimize,
+        .name = "test",
+        .root_module = mod,
     });
 
     if (target.result.os.tag == .windows) {
@@ -127,7 +128,7 @@ pub fn build(b: *std.Build) void {
     specific_test.linkLibCpp();
     specific_test.addIncludePath(b.path("src"));
     specific_test.addIncludePath(b.path("inc"));
-    specific_test.addCSourceFile(.{ .file = b.path("src/Solidify.cxx"), .flags = &.{ "-fno-sanitize=undefined" } });
+    specific_test.addCSourceFile(.{ .file = b.path("src/Solidify.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
 
     for (occt_libs) |lib| {
         specific_test.linkLibrary(lib);
