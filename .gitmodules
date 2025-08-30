@@ -2,5 +2,5 @@
 	path = OCCT
 	url = https://github.com/Open-Cascade-SAS/OCCT.git
 [submodule "test/brotest"]
-	path = js/tools/test/brotest
+	path = tools/test/brotest
 	url = https://github.com/Kipre/brotest.git

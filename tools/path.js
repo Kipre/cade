@@ -4,7 +4,6 @@
 import {
   areOnSameLine,
   computeAngleBetween,
-  computeVectorAngle,
   intersectLines,
   isToTheLeft,
   minus,
@@ -29,11 +28,9 @@ import {
   intersectLineAndCircle,
   intersectTwoArcs,
   intersectTwoCircles,
-  isInPieSlice,
+  normalizeAngle,
   pointCoordinateOnArc,
 } from "./circle.js";
-import { normalizeAngle } from "./circle.js";
-import { debugGeometry } from "./svg.js";
 import { modulo } from "./utils.js";
 
 const eps = 1e-5;
@@ -859,6 +856,7 @@ export class Path {
       const result = [...control];
       if (!result[1]) return result;
       result[1] = [result[1][0] * x, result[1][1] * y];
+      if (result[3] != null && x * y < 0) result[3] = result[3] === 0 ? 1 : 0;
       return result;
     });
     return result;
@@ -964,7 +962,15 @@ export class Path {
       } else if (type === "arc" && nextType === "lineTo") {
         [p0, p1, nr1] = offsetArc(lp, p, r1, s1, offset);
         [p2, p3] = offsetSegment(p, np, offset);
-        result.controls[i][1] = intersectLineAndArc(p2, p3, p0, p1, nr1, s1, true);
+        result.controls[i][1] = intersectLineAndArc(
+          p2,
+          p3,
+          p0,
+          p1,
+          nr1,
+          s1,
+          true,
+        );
         result.controls[i][2] = nr1;
       } else if (type === "arc" && nextType === "arc") {
         [p0, p1, nr1] = offsetArc(lp, p, r1, s1, offset);
@@ -1076,14 +1082,25 @@ export class Path {
 
   /**
    * @param {number} offset
+   * @param {boolean} roundStart
+   * @param {boolean} roundEnd
    */
-  thickenAndClose(offset) {
+  thickenAndClose(offset, roundStart = false, roundEnd = false) {
     const result = this.clone();
     let end = this.invert();
     end = end.offset(offset);
-    result.lineTo(end.controls[0][1]);
+
+    const sweep = offset > 0 ? 0 : 1;
+    const diameter = Math.abs(offset) / 2;
+    if (roundEnd) result.arc(end.controls[0][1], diameter, sweep);
+    else result.lineTo(end.controls[0][1]);
+
     result.merge(end);
+
+    if (roundStart) result.arc(result.controls[0][1], dimater, sweep);
+
     result.close();
+    result.simplify();
 
     return result;
   }

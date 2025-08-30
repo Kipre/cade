@@ -306,6 +306,36 @@ bro.test("simple line thicken", () => {
     .toBe("M 0 400 L 500 400 L 500 300 L 0 300 Z");
 });
 
+bro.test("thicken with rounding", () => {
+  const doorSpace = new Path();
+  doorSpace.moveTo([0, 400]);
+  doorSpace.lineTo([500, 400]);
+  const thicknened = doorSpace.thickenAndClose(100, true, true);
+  const thicknened2 = doorSpace.invert().thickenAndClose(-100, false, true);
+  bro
+    .expect(thicknened.toString())
+    .toBe("M 500 400 A 50 50 0 0 0 500 300 L 0 300 A 50 50 0 0 0 0 400 Z");
+
+  bro
+    .expect(thicknened2.toString())
+    .toBe(
+      "M 500 400 L 0 400 A -50 -50 0 0 1 6.123233995736766e-15 300 L 500 300 Z",
+    );
+});
+
+bro.test("thicken with rounding & scale", () => {
+  let wallOutline = new Path();
+  wallOutline.moveTo([0, 0]);
+  wallOutline.lineTo([0, 300]);
+  wallOutline = wallOutline.thickenAndClose(-50, false, true);
+  wallOutline.scale(1, -1);
+  bro
+    .expect(wallOutline.toString())
+    .toBe(
+      "M 0 0 L 0 300 A -25 -25 0 0 1 -50 300 L -50 0 Z",
+    );
+});
+
 bro.test("issue with corners", () => {
   const radius = 5;
   const bigRadius = 15;
