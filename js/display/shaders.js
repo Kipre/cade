@@ -14,15 +14,18 @@ struct Uniforms {
 }
 
 @group(0) @binding(0) var<uniform> uni: Uniforms;
+@group(1) @binding(0) var<storage, read> instances : array<mat4x4<f32>>;
 
 @vertex
 fn main(
   @location(0) inPosition: vec3f,
   @location(1) inNormal: vec3f,
+  @builtin(instance_index) idx : u32
 ) -> VSOut {
     var vsOut: VSOut;
-    vsOut.Position = uni.mvp * vec4f(inPosition, 1);
-    vsOut.fragmentPosition = (uni.model * vec4f(inPosition, 1)).xyz;
+    let transformed = instances[idx] * vec4f(inPosition, 1);
+    vsOut.Position = uni.mvp * transformed;
+    vsOut.fragmentPosition = (uni.model * transformed).xyz;
     vsOut.normal = inNormal;
     return vsOut;
 }
@@ -38,6 +41,7 @@ struct Uniforms {
 }
 
 @group(0) @binding(0) var<uniform> uni: Uniforms;
+@group(1) @binding(0) var<storage, read> instances : array<mat4x4<f32>>;
 
 @fragment
 fn main(

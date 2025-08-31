@@ -16,19 +16,14 @@ invariant(context, "WebGPU is not supported in this browser.");
 const entry = navigator.gpu;
 invariant(entry, "WebGPU is not supported in this browser.");
 
+/** @typedef {{obj: string, instances: DOMMatrix[]}} ObjInstances */
+
 /**
- * @param {string} fileContents
+ * @param {string} objString
+ * @param {BBox | null} bbox
  */
-export async function displayOBJItem(fileContents) {
-  const adapter = await entry.requestAdapter();
-  invariant(adapter, "No GPU found on this system.");
-
-  const device = await adapter.requestDevice();
-  const queue = device.queue;
-
-  const obj = parseObjFile(fileContents);
-
-  const bbox = new BBox();
+function parseObjAndRecomputeNormals(objString, bbox = null) {
+  const obj = parseObjFile(objString);
 
   const buffer = [];
   for (const face of obj.faces) {
@@ -44,10 +39,51 @@ export async function displayOBJItem(fileContents) {
 
     for (const faceVertex of face.vertices) {
       const position = obj.vertices[faceVertex.vertexIndex];
-      bbox.include(position);
+      if (bbox) bbox.include(position);
       const normal = obj.normals[faceVertex.normalIndex] ?? recomputedN;
       buffer.push(...position, ...normal);
     }
+  }
+
+  return buffer;
+}
+
+/**
+ * @param {ObjInstances[]} items
+ */
+export async function displayScene(items) {
+  const adapter = await entry.requestAdapter();
+  invariant(adapter, "No GPU found on this system.");
+
+  const device = await adapter.requestDevice();
+  const queue = device.queue;
+
+  const bbox = new BBox();
+
+  const geometryBuffers = [];
+  const allInstances = [];
+  let totalNbInstances = 0;
+  const lengths = [0];
+
+  // float32 -> 4 bytes * mat4 -> 16 floats
+  const instanceStride = 4 * 16;
+
+  for (const { obj, instances } of items) {
+    const buffer = parseObjAndRecomputeNormals(obj, bbox);
+    geometryBuffers.push(
+      createBuffer(device, new Float32Array(buffer), GPUBufferUsage.VERTEX),
+    );
+    allInstances.push(...instances.flatMap((mat) => [...mat.toFloat32Array()]));
+    totalNbInstances += instances.length;
+    const alignement = (totalNbInstances * instanceStride) % 256;
+    if (alignement !== 0) {
+      const requiredEmptyMatrixes = (256 - alignement) / instanceStride; // four for float
+      allInstances.push(
+        ...Array.from({ length: requiredEmptyMatrixes * 16 }, () => 0),
+      );
+      totalNbInstances += requiredEmptyMatrixes;
+    }
+    lengths.push(totalNbInstances);
   }
 
   context.configure({
@@ -57,15 +93,16 @@ export async function displayOBJItem(fileContents) {
     alphaMode: "opaque",
   });
 
-  const positionBuffer = createBuffer(
-    device,
-    new Float32Array(buffer),
-    GPUBufferUsage.VERTEX,
-  );
-
   const uniformBuffer = device.createBuffer({
     size: 4 * 16 + 4 * 16 + 3 * 4 * 4, // mat4x4f + mat4x4f + 3 * vec3f
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
+  const instanceBuffer = device.createBuffer({
+    label: "instanceBuffer",
+    size: totalNbInstances * instanceStride,
+    // size: 1 * instanceStride,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
 
   const vertModule = device.createShaderModule({ code: vertexShader });
@@ -95,10 +132,37 @@ export async function displayOBJItem(fileContents) {
     targets: [{ format: "bgra8unorm" }],
   };
 
+  const bindGroupLayout = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        buffer: {
+          type: "uniform",
+        },
+      },
+    ],
+  });
+  const instanceBindGroupLayout = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: {
+          type: "read-only-storage",
+          hasDynamicOffset: true,
+          // minBindingSize: 256,
+        },
+      },
+    ],
+  });
+
   const pipeline = device.createRenderPipeline({
     vertex,
     fragment,
-    layout: "auto",
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [bindGroupLayout, instanceBindGroupLayout],
+    }),
     primitive: {
       frontFace: "cw",
       cullMode: "none",
@@ -116,6 +180,17 @@ export async function displayOBJItem(fileContents) {
     entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
   });
 
+  const instanceBindGroup = device.createBindGroup({
+    label: "instanceBindGroup",
+    layout: pipeline.getBindGroupLayout(1),
+    entries: [
+      {
+        binding: 0,
+        resource: { buffer: instanceBuffer, size: instanceStride },
+      },
+    ],
+  });
+
   const depthTexture = device.createTexture({
     size: [context.canvas.width, context.canvas.height],
     format: "depth24plus-stencil8",
@@ -131,6 +206,10 @@ export async function displayOBJItem(fileContents) {
     objectSize,
     center,
   );
+
+  const lightPosition = vec3.mulScalar(vec3.create(1, 1, 1), objectSize);
+  const lightColor = vec3.create(1, 1, 1);
+  const instanceBufferArray = new Float32Array(allInstances);
 
   function render() {
     const colorTexture = context.getCurrentTexture();
@@ -161,18 +240,24 @@ export async function displayOBJItem(fileContents) {
       depthStencilAttachment: depthAttachment,
     });
     passEncoder.setPipeline(pipeline);
-    passEncoder.setBindGroup(0, bindGroup);
     passEncoder.setViewport(0, 0, canvas.width, canvas.height, 0, 1);
     passEncoder.setScissorRect(0, 0, canvas.width, canvas.height);
-    passEncoder.setVertexBuffer(0, positionBuffer);
-    passEncoder.draw(obj.faces.length * 3);
+    passEncoder.setBindGroup(0, bindGroup);
+
+    for (let i = 0; i < items.length; i++) {
+      const nbInstances = lengths[i + 1] - lengths[i];
+      passEncoder.setBindGroup(1, instanceBindGroup, [
+        lengths[i] * instanceStride,
+      ]);
+      const geomBuffer = geometryBuffers[i];
+      passEncoder.setVertexBuffer(0, geomBuffer);
+      passEncoder.draw(geomBuffer.size / (2 * 3 * 4), nbInstances);
+    }
     passEncoder.end();
 
-    const model = mat4.translation(vec3.create(0, 0, 0));
-    // this was done for some reason
-    // model = mat4.rotateZ(model, utils.degToRad(-10));
-    // model = mat4.scale(model, vec3.create(1.1, 1.1, 1.1));
+    queue.writeBuffer(instanceBuffer, 0, instanceBufferArray);
 
+    const model = mat4.translation(vec3.create(0, 0, 0));
     const view = camera.getView();
 
     const projection = mat4.perspective(
@@ -183,10 +268,7 @@ export async function displayOBJItem(fileContents) {
     );
 
     const mvp = mat4.multiply(projection, mat4.multiply(view, model));
-
     const cameraPosition = camera.getPosition();
-    const lightPosition = vec3.mulScalar(vec3.create(1, 1, 1), objectSize);
-    const lightColor = vec3.create(1, 1, 1);
 
     const bufferData = [
       ...mvp,
@@ -198,8 +280,9 @@ export async function displayOBJItem(fileContents) {
       ...lightColor,
       0,
     ];
+    const uniformArray = new Float32Array(bufferData);
+    queue.writeBuffer(uniformBuffer, 0, uniformArray);
 
-    queue.writeBuffer(uniformBuffer, 0, new Float32Array(bufferData));
     queue.submit([commandEncoder.finish()]);
 
     requestAnimationFrame(render);

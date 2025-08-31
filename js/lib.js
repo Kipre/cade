@@ -1,5 +1,6 @@
 import { Path } from "./tools/path.js";
 import { BBox, debugGeometry, w3svg } from "./tools/svg.js";
+import { displayScene } from "./display/main.js";
 
 export class Part {
   constructor(name) {
@@ -8,6 +9,7 @@ export class Part {
   }
 
   async loadMesh() { }
+  geometries() { }
 }
 
 export class Assembly extends Part {
@@ -24,11 +26,30 @@ export class Assembly extends Part {
     }
     await Promise.all(result);
   }
+
+  geometries() {
+    console.log(this);
+    const result = {};
+    for (const { child, placement } of this.children) {
+      const geoms = child.geometries();
+      mergeGeometries(result, geoms, placement);
+    }
+    return result;
+  }
+}
+
+function mergeGeometries(acc, other, placement) {
+  for (const [key, { obj, instances }] of Object.entries(other)) {
+    if (!(key in acc)) acc[key] = { obj, instances: [] };
+    acc[key].instances.push(...instances.map((mat) => mat.multiply(placement)));
+  }
 }
 
 export class Model extends Assembly {
-  watch() {
+  async watch() {
     console.log(this);
+    const geometries = this.geometries();
+    await displayScene(Object.values(geometries));
   }
 
   toJson() { }
@@ -52,6 +73,10 @@ export class FlatPart extends Part {
     const file = await r.text();
     this.mesh = file;
     // displayOBJItem(file);
+  }
+
+  geometries() {
+    return { [this._id]: { obj: this.mesh, instances: [new DOMMatrix()] } };
   }
 
   /**
