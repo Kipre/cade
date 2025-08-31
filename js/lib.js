@@ -4,7 +4,10 @@ import { BBox, debugGeometry, w3svg } from "./tools/svg.js";
 export class Part {
   constructor(name) {
     this.name = name;
+    this.mesh = null;
   }
+
+  async loadMesh() { }
 }
 
 export class Assembly extends Part {
@@ -13,6 +16,14 @@ export class Assembly extends Part {
   addChild(child, placement) {
     this.children.push({ child, placement });
   }
+
+  async loadMesh() {
+    const result = [];
+    for (const { child, placement } of this.children) {
+      result.push(child.loadMesh());
+    }
+    await Promise.all(result);
+  }
 }
 
 export class Model extends Assembly {
@@ -20,10 +31,7 @@ export class Model extends Assembly {
     console.log(this);
   }
 
-  toJson() { 
-    const parts = [];
-
-  }
+  toJson() { }
 }
 
 export class FlatPart extends Part {
@@ -36,6 +44,14 @@ export class FlatPart extends Part {
     this.outside = outside;
     this.insides = insides;
     this._id = Math.random().toString().slice(2);
+  }
+
+  async loadMesh() {
+    const body = this.toJson();
+    const r = await fetch("/occ/thicken", { method: "POST", body });
+    const file = await r.text();
+    this.mesh = file;
+    // displayOBJItem(file);
   }
 
   /**
