@@ -45,10 +45,8 @@ export async function displayOBJItem(fileContents) {
     for (const faceVertex of face.vertices) {
       const position = obj.vertices[faceVertex.vertexIndex];
       bbox.include(position);
-
       const normal = obj.normals[faceVertex.normalIndex] ?? recomputedN;
-      const uv = obj.uvs[faceVertex.uvIndex] ?? [0, 0];
-      buffer.push(...position, ...normal, ...uv);
+      buffer.push(...position, ...normal);
     }
   }
 
@@ -84,10 +82,8 @@ export async function displayOBJItem(fileContents) {
           { shaderLocation: 0, offset: 0, format: "float32x3" },
           // Normal
           { shaderLocation: 1, offset: 12, format: "float32x3" },
-          // UV
-          { shaderLocation: 2, offset: 24, format: "float32x2" },
         ],
-        arrayStride: (3 + 3 + 2) * 4,
+        arrayStride: (3 + 3) * 4,
         stepMode: "vertex",
       },
     ],

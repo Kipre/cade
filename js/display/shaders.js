@@ -3,7 +3,6 @@ struct VSOut {
   @builtin(position) Position: vec4f,
   @location(0) fragmentPosition: vec3f,
   @location(1) normal: vec3f,
-  @location(2) uv: vec2f,
 };
 
 struct Uniforms {
@@ -20,13 +19,11 @@ struct Uniforms {
 fn main(
   @location(0) inPosition: vec3f,
   @location(1) inNormal: vec3f,
-  @location(2) inUV: vec2f,
 ) -> VSOut {
     var vsOut: VSOut;
     vsOut.Position = uni.mvp * vec4f(inPosition, 1);
     vsOut.fragmentPosition = (uni.model * vec4f(inPosition, 1)).xyz;
     vsOut.normal = inNormal;
-    vsOut.uv = inUV;
     return vsOut;
 }
 `
@@ -46,7 +43,6 @@ struct Uniforms {
 fn main(
   @location(0) fragmentPosition: vec3f,
   @location(1) normal: vec3f,
-  @location(2) uv: vec2f
 ) -> @location(0) vec4f {
   let ambientStrength = 0.1;
   let ambient = uni.lightColor * ambientStrength;
