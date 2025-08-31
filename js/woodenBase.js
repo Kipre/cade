@@ -6,7 +6,6 @@ import {
   xRailSupportWidth,
   zAxisTravel,
 } from "./dimensions.js";
-import { displayOBJItem } from "./display/main.js";
 import { Assembly, FlatPart } from "./lib.js";
 import { norm, placeAlong } from "./tools/2d.js";
 import { Path } from "./tools/path.js";
@@ -105,7 +104,14 @@ function addSimpleReinforcingJoin(part1, part2, l1, l2, width, thickness) {
 
   const joinPart = new FlatPart(joinPartPath, joinCutouts);
 
-  return joinPart;
+  const transform = new DOMMatrix();
+  transform.translateSelf(l1[0], l1[1] + thickness / 2, width / 2 + thickness);
+  transform.rotateSelf(90, 0, 0);
+
+  const part2Transform = new DOMMatrix();
+  part2Transform.translateSelf(0, 0, width + thickness);
+
+  return [joinPart, transform, part2Transform];
 }
 
 const zJoin = bridgeTop - joinOffset - woodThickness / 2;
@@ -121,7 +127,7 @@ const [from2, to2] = p
   )
   .map((int) => int.point);
 
-const join = addSimpleReinforcingJoin(
+const [join, joinTransform] = addSimpleReinforcingJoin(
   part1,
   part2,
   from,
@@ -130,7 +136,7 @@ const join = addSimpleReinforcingJoin(
   woodThickness,
 );
 
-const join2 = addSimpleReinforcingJoin(
+const [join2, join2Transform, part2Transform] = addSimpleReinforcingJoin(
   part1,
   part2,
   from2,
@@ -139,13 +145,6 @@ const join2 = addSimpleReinforcingJoin(
   woodThickness,
 );
 
-const r = await fetch("/occ/thicken", {
-  method: "POST",
-  body: part1.toJson(),
-});
-const file = await r.text();
-displayOBJItem(file);
-
 part1.display();
 // part2.display();
 join.display();
@@ -153,7 +152,6 @@ join2.display();
 
 export const woodenBase = new Assembly("wooden frame");
 woodenBase.addChild(part1);
-woodenBase.addChild(part2);
-woodenBase.addChild(join);
-woodenBase.addChild(join2);
-
+woodenBase.addChild(part2, part2Transform);
+woodenBase.addChild(join, joinTransform);
+woodenBase.addChild(join2, join2Transform);

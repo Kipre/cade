@@ -6,5 +6,5 @@ export default 1;
 const model = new Model("cnc");
 model.addChild(base);
 
-model.loadMesh();
-model.watch();
+await model.loadMesh();
+await model.watch();
