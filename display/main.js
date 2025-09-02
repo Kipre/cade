@@ -7,14 +7,23 @@ import { parseObjFile } from "./obj.js";
 import { fragmentShader, vertexShader } from "./shaders.js";
 import { createBuffer, invariant } from "./utils.js";
 
-const canvas = document.querySelector("canvas");
-if (canvas == null) throw new Error();
+let context;
+let canvas;
+let entry;
 
-export const context = canvas.getContext("webgpu");
-invariant(context, "WebGPU is not supported in this browser.");
+function setup() {
+  canvas = document.querySelector("canvas");
+  if (canvas == null) throw new Error();
 
-const entry = navigator.gpu;
-invariant(entry, "WebGPU is not supported in this browser.");
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  context = canvas.getContext("webgpu");
+  invariant(context, "WebGPU is not supported in this browser.");
+
+  entry = navigator.gpu;
+  invariant(entry, "WebGPU is not supported in this browser.");
+}
 
 /** @typedef {{obj: string, instances: DOMMatrix[]}} ObjInstances */
 
@@ -52,6 +61,7 @@ function parseObjAndRecomputeNormals(objString, bbox = null) {
  * @param {ObjInstances[]} items
  */
 export async function displayScene(items) {
+  setup();
   const adapter = await entry.requestAdapter();
   invariant(adapter, "No GPU found on this system.");
 

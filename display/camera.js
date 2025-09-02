@@ -94,8 +94,8 @@ export class Camera {
   getPosition() {
     let result = vec3.create(
       Math.cos(this.pitch) * Math.cos(this.yaw),
-      Math.sin(this.pitch),
       Math.cos(this.pitch) * Math.sin(this.yaw),
+      Math.sin(this.pitch),
     );
     result = vec3.scale(result, this.distance);
     result = vec3.add(result, this.target);
@@ -104,6 +104,6 @@ export class Camera {
 
   getView() {
     const position = this.getPosition();
-    return mat4.lookAt(position, this.target, vec3.create(0, 1, 0));
+    return mat4.lookAt(position, this.target, vec3.create(0, 0, 1));
   }
 }

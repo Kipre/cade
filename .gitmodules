@@ -1,5 +1,5 @@
 [submodule "js/tools"]
-	path = js/tools
+	path = tools
 	url = https://github.com/Kipre/tools.git
 [submodule "OCCT"]
 	path = OCCT
