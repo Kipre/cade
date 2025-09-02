@@ -1,7 +1,8 @@
 // @ts-check
 /** @import * as types from './types' */
 
-import { DOMPoint, DOMMatrix } from "./dom.js";
+import { cross, normalize3 } from "./3d.js";
+// import { DOMMatrix, DOMPoint } from "./dom.js";
 import { w3svg } from "./svg.js";
 
 export function parseTransformFunction(transform) {
@@ -34,4 +35,40 @@ export function makeTransformFunction(svgElement) {
     matrix.a * x + matrix.c * y + matrix.e,
     matrix.b * x + matrix.d * y + matrix.f,
   ];
+}
+
+/**
+ * @param {DOMMatrix} m
+ */
+export function matrixToAxes(m) {
+  const location = [m[12], m[13], m[14]];
+  const up = [m[8], m[9], m[10]];
+  const dir = [m[0], m[1], m[2]];
+  return [location, up, dir];
+}
+
+/**
+ * Stands for axes to matrix
+ * @param {types.Point3?} maybeOrigin
+ * @param {types.Point3?} maybeUp
+ * @param {types.Point3?} maybeDir
+ */
+export function a2m(maybeOrigin = null, maybeUp = null, maybeDir = null) {
+  const origin = maybeOrigin ?? [0, 0, 0];
+  const dir = maybeDir ?? [1, 0, 0];
+  const up = maybeUp ?? [0, 0, 1];
+
+  const z = normalize3(up);
+  const y = normalize3(cross(z, dir));
+  const x = cross(y, z);
+
+  // prettier-ignore
+  const transform = new DOMMatrix([
+    x[0], x[1], x[2], 0,
+    y[0], y[1], y[2], 0,
+    z[0], z[1], z[2], 0,
+    origin[0], origin[1], origin[2], 1,
+  ]);
+
+  return transform;
 }
