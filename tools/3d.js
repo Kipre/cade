@@ -22,3 +22,68 @@ export function cross(a, b) {
     a[0] * b[1] - a[1] * b[0],
   ];
 }
+
+/**
+ * @param {types.Point3} p1
+ * @param {types.Point3} p2
+ * @returns {types.Point3}
+ */
+export function minus3(p1, p2) {
+  return [p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2]];
+}
+
+/**
+ * @param {types.Point3} p1
+ * @param {types.Point3} p2
+ * @returns {types.Point3}
+ */
+export function plus3(p1, p2) {
+  return [p1[0] + p2[0], p1[1] + p2[1], p1[2] + p2[2]];
+}
+
+/**
+ * @param {types.Point3} p
+ * @param {number} x
+ * @returns {types.Point3}
+ */
+export function mult3(p, x) {
+  return [p[0] * x, p[1] * x, p[2] * x];
+}
+
+/**
+ * @param {types.Point3} p1
+ * @param {types.Point3} p2
+ * @returns {number}
+ */
+export function dot3(p1, p2) {
+  return p1[0] * p2[0] + p1[1] * p2[1] + (p1[2] ?? 0) * (p2[2] ?? 0);
+}
+
+/**
+ * @param {types.Point3} p
+ * @returns {number}
+ */
+export function norm3(p) {
+  return Math.sqrt(p[0] ** 2 + p[1] ** 2 + p[2] ** 2);
+}
+
+/**
+ * @param {types.Point3} p1
+ * @param {types.Point3} p2
+ * @returns {types.Point3}
+ */
+export function placeAlong3(p1, p2, param) {
+  let fraction = 0;
+  const total = norm3(minus3(p1, p2));
+  if ("distance" in param && param.distance != null) {
+    if (param.distance < 0) fraction = (total + param.distance) / total;
+    else fraction = param.distance / total;
+  } else if ("fromStart" in param && param.fromStart != null) {
+    fraction = param.fromStart / total;
+  } else if ("fromEnd" in param && param.fromEnd != null) {
+    fraction = (total + param.fromEnd) / total;
+  } else if ("fraction" in param) fraction = param.fraction;
+  else throw new TypeError();
+
+  return plus3(mult3(p1, 1 - fraction), mult3(p2, fraction));
+}
