@@ -792,6 +792,18 @@ export class Path {
   }
 
   /**
+   * @param {types.Point[]} polyline
+   */
+  static fromPolyline(polyline) {
+    const result = new Path();
+    const [first, ...rest] = polyline;
+    result.moveTo(first);
+    for (const p of rest) result.lineTo(p);
+    result.close();
+    return result;
+  }
+
+  /**
    * @param {number} x
    */
   evaluateAnywhere(x) {
