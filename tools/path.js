@@ -249,6 +249,10 @@ export class Path {
     }
   }
 
+  /**
+   * @param {types.Point?} l1
+   * @param {types.Point?} l2
+   */
   mirror(l1 = null, l2 = null) {
     const [[first, firstPoint]] = this.controls;
     const [last, lastPoint] = this.controls.at(-1);
@@ -664,8 +668,7 @@ export class Path {
       return;
     }
 
-    if (this.controls.at(-1)[0] === "close")
-      throw new Error("cannot merge to a closed path");
+    if (this.isClosed()) throw new Error("cannot merge to a closed path");
 
     if (norm(other.controls[0][1], this.controls.at(-1)[1]) > 1e-1) {
       this.lineTo(other.controls[0][1]);
@@ -673,6 +676,27 @@ export class Path {
     } else this.controls.push(...other.controls.slice(1));
 
     if (norm(this.controls[0][1], other.controls.at(-1)[1]) < eps) this.close();
+  }
+
+  /**
+   * Inserts open subpath into self. No safety checks
+   * @param {number} idx
+   * @param {Path} other
+   */
+  insert(idx, other) {
+    if (this.controls.length === 0) {
+      this.controls.push(...other.controls);
+      return;
+    }
+
+    if (other.isClosed()) throw new Error("cannot insert a closed path");
+    const [firstControl, ...rest] = other.controls;
+
+    if (firstControl[0] !== "moveTo") throw new Error();
+
+    firstControl[0] = "lineTo";
+
+    this.controls.splice(idx, 0, firstControl, ...rest);
   }
 
   invert() {
@@ -734,13 +758,14 @@ export class Path {
       maybeSweep,
     ] of this.iterateOverSegments()) {
       const before = result;
+      let length = 0;
       switch (type) {
         case "lineTo": {
-          result += norm(lp, p);
+          length = norm(lp, p);
           break;
         }
         case "arc": {
-          result +=
+          length =
             Math.abs(getArcAngularLength(lp, p, maybeRadius, maybeSweep)) *
             maybeRadius;
           break;
@@ -748,7 +773,8 @@ export class Path {
         default:
           throw new Error();
       }
-      mapping.push([before, result]);
+      result += length;
+      mapping.push({ startsAt: before, endsAt: result, length });
     }
     return { length: result, info: mapping };
   }
@@ -774,12 +800,12 @@ export class Path {
     const { length, info } = this.getLengthInfo();
     const pos = length * x;
 
-    const i = info.findIndex(([from, to]) => to >= pos);
-    const [from, to] = info[i];
+    const i = info.findIndex(({ endsAt }) => endsAt >= pos);
+    const { startsAt, endsAt } = info[i];
 
-    if (to === from) throw new Error("problem");
+    if (endsAt === startsAt) throw new Error("problem");
 
-    const localPos = (pos - from) / (to - from);
+    const localPos = (pos - startsAt) / (endsAt - startsAt);
     return this.evaluate(i + 1, localPos);
   }
 
@@ -1002,6 +1028,20 @@ export class Path {
   }
 
   /**
+   * @param {types.Point} l1
+   * @param {types.Point} l2
+   */
+  findSegmentsOnLine(l1, l2) {
+    const result = [];
+    for (const [i, lp, type, p] of this.iterateOverSegments()) {
+      if (type !== "lineTo") continue;
+      if (!areOnSameLine(l1, l2, lp) || !areOnSameLine(l1, l2, p)) continue;
+      result.push(i);
+    }
+    return result;
+  }
+
+  /**
    * @param {number} rawIndex
    */
   getSegmentAt(rawIndex) {
@@ -1097,7 +1137,7 @@ export class Path {
 
     result.merge(end);
 
-    if (roundStart) result.arc(result.controls[0][1], dimater, sweep);
+    if (roundStart) result.arc(result.controls[0][1], diameter, sweep);
 
     result.close();
     result.simplify();

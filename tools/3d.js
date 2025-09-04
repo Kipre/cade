@@ -68,6 +68,14 @@ export function norm3(p) {
 }
 
 /**
+ * @param {types.Point3} p
+ * @returns {types.Point}
+ */
+export function proj2d(p) {
+  return [p[0], p[1]];
+}
+
+/**
  * @param {types.Point3} p1
  * @param {types.Point3} p2
  * @returns {types.Point3}
@@ -86,4 +94,18 @@ export function placeAlong3(p1, p2, param) {
   else throw new TypeError();
 
   return plus3(mult3(p1, 1 - fraction), mult3(p2, fraction));
+}
+
+/**
+ * @param {types.Point3} p
+ * @param {types.Point3} origin
+ * @param {types.Point3} anyNormal
+ * @returns {types.Point3}
+ */
+export function projectToPlane(p, origin, anyNormal) {
+  const normal = normalize3(anyNormal);
+
+  const toOrigin = minus3(origin, p);
+  const distanceFromPlane = dot3(normal, toOrigin);
+  return plus3(p, mult3(normal, distanceFromPlane));
 }

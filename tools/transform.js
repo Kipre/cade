@@ -23,7 +23,12 @@ export function applyTransformMatrix(m, p) {
   return [p2.x, p2.y];
 }
 
-export function applyTransformMatrix3(m, p) {
+/**
+ * @param {DOMMatrix} m
+ * @param {types.Point3} p
+ * @returns {types.Point3}
+ */
+export function transformPoint3(m, p) {
   const domp = new DOMPoint(p[0], p[1], p[2]);
   const p2 = m.transformPoint(domp);
   return [p2.x, p2.y, p2.z];

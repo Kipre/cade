@@ -319,7 +319,7 @@ bro.test("thicken with rounding", () => {
   bro
     .expect(thicknened2.toString())
     .toBe(
-      "M 500 400 L 0 400 A -50 -50 0 0 1 6.123233995736766e-15 300 L 500 300 Z",
+      "M 500 400 L 0 400 A 50 50 0 0 1 6.123233995736766e-15 300 L 500 300 Z",
     );
 });
 
@@ -332,7 +332,7 @@ bro.test("thicken with rounding & scale", () => {
   bro
     .expect(wallOutline.toString())
     .toBe(
-      "M 0 0 L 0 300 A -25 -25 0 0 1 -50 300 L -50 0 Z",
+      "M 0 0 L 0 300 A 25 25 0 0 1 -50 300 L -50 0 Z",
     );
 });
 
