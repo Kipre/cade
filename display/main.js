@@ -74,6 +74,7 @@ export async function displayScene(items) {
   const allInstances = [];
   let totalNbInstances = 0;
   const lengths = [0];
+  const nbInstancesPerItem = [];
 
   // float32 -> 4 bytes * mat4 -> 16 floats
   const instanceStride = 4 * 16;
@@ -85,6 +86,7 @@ export async function displayScene(items) {
     );
     allInstances.push(...instances.flatMap((mat) => [...mat.toFloat32Array()]));
     totalNbInstances += instances.length;
+    nbInstancesPerItem.push(instances.length);
     const alignement = (totalNbInstances * instanceStride) % 256;
     if (alignement !== 0) {
       const requiredEmptyMatrixes = (256 - alignement) / instanceStride; // four for float
@@ -211,7 +213,7 @@ export async function displayScene(items) {
   const objectSize = bbox.size();
   const center = vec3.create(...bbox.center());
   const camera = new Camera(
-    utils.degToRad(50),
+    utils.degToRad(-40),
     utils.degToRad(10),
     objectSize,
     center,
@@ -255,7 +257,7 @@ export async function displayScene(items) {
     passEncoder.setBindGroup(0, bindGroup);
 
     for (let i = 0; i < items.length; i++) {
-      const nbInstances = lengths[i + 1] - lengths[i];
+      const nbInstances = nbInstancesPerItem[i];
       passEncoder.setBindGroup(1, instanceBindGroup, [
         lengths[i] * instanceStride,
       ]);
