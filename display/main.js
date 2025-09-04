@@ -98,6 +98,8 @@ export async function displayScene(items) {
     lengths.push(totalNbInstances);
   }
 
+  const maxNbInstances = Math.max(...nbInstancesPerItem);
+
   context.configure({
     device,
     format: "bgra8unorm",
@@ -198,7 +200,10 @@ export async function displayScene(items) {
     entries: [
       {
         binding: 0,
-        resource: { buffer: instanceBuffer, size: instanceStride },
+        resource: {
+          buffer: instanceBuffer,
+          size: maxNbInstances * instanceStride,
+        },
       },
     ],
   });
