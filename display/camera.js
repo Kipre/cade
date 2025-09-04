@@ -93,9 +93,9 @@ export class Camera {
 
   getPosition() {
     let result = vec3.create(
-      Math.cos(this.pitch) * Math.cos(this.yaw),
       Math.cos(this.pitch) * Math.sin(this.yaw),
-      Math.sin(this.pitch),
+      Math.cos(this.pitch) * Math.cos(this.yaw),
+      -Math.sin(this.pitch),
     );
     result = vec3.scale(result, this.distance);
     result = vec3.add(result, this.target);
