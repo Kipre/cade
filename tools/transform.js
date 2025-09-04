@@ -72,3 +72,28 @@ export function a2m(maybeOrigin = null, maybeUp = null, maybeDir = null) {
 
   return transform;
 }
+
+export function computeTransformFromPoints(sourcePts, targetPts) {
+  // First create a matrix from the source points
+  const sourceMatrix = new DOMMatrix([
+    sourcePts[1][0] - sourcePts[0][0], // x basis vector x
+    sourcePts[1][1] - sourcePts[0][1], // x basis vector y
+    sourcePts[2][0] - sourcePts[0][0], // y basis vector x
+    sourcePts[2][1] - sourcePts[0][1], // y basis vector y
+    sourcePts[0][0], // translation x
+    sourcePts[0][1], // translation y
+  ]);
+
+  // Then create a matrix from the target points
+  const targetMatrix = new DOMMatrix([
+    targetPts[1][0] - targetPts[0][0],
+    targetPts[1][1] - targetPts[0][1],
+    targetPts[2][0] - targetPts[0][0],
+    targetPts[2][1] - targetPts[0][1],
+    targetPts[0][0],
+    targetPts[0][1],
+  ]);
+
+  // The transformation matrix is target * inverse(source)
+  return targetMatrix.multiply(sourceMatrix.inverse());
+}
