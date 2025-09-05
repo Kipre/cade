@@ -31,6 +31,7 @@ import {
   normalizeAngle,
   pointCoordinateOnArc,
 } from "./circle.js";
+import { debugGeometry } from "./svg.js";
 import { modulo } from "./utils.js";
 
 const eps = 1e-5;
@@ -165,7 +166,7 @@ export class Path {
     for (let i = 0; i < this.controls.length; i++) {
       try {
         this.roundFillet(radius, i + 1);
-      } catch (e) { }
+      } catch (e) {}
     }
   }
 
@@ -524,16 +525,12 @@ export class Path {
   /**
    * @param {Path} other
    */
-  booleanIntersection(other) {
-    if (
-      this.controls.at(-1)[0] !== "close" ||
-      other.controls.at(-1)[0] !== "close"
-    )
+  #findIntersectionLoops(other) {
+    if (!this.isClosed() || !other.isClosed())
       throw new Error("boolean intersections require closed shapes");
 
     const rawIntersections = this.findPathIntersections(other);
 
-    // determine intersection loops
     const loops = [];
 
     function sortIntersections(left, right, forSide) {
@@ -545,6 +542,7 @@ export class Path {
     const length = rawIntersections.length;
 
     const intersections = [];
+
     for (let i = 0; i < length; i++) {
       const int = rawIntersections[i];
       intersections.push({ ...int, index: i });
@@ -570,14 +568,12 @@ export class Path {
       }
     }
 
-    const exploredPaths = {};
-    let intersectionLoop = null;
-
     const rotation = {
       other: other.rotatesClockwise(),
       self: this.rotatesClockwise(),
     };
 
+    // walk loops
     for (let idx = 0; idx < length; idx++) {
       for (let side of ["self", "other"]) {
         const loop = [];
@@ -588,14 +584,6 @@ export class Path {
 
         do {
           const path = [i, side, !crossesFromTheRight];
-
-          const key = path.toString();
-          if (exploredPaths[key] !== undefined) {
-            intersectionLoop = loops[exploredPaths[key]];
-            break;
-          }
-          exploredPaths[key] = loops.length;
-
           loop.push(path);
 
           const info = intersections[i][side];
@@ -607,48 +595,54 @@ export class Path {
           counter++;
         } while (i !== idx && counter < 10);
         if (counter === 10) throw new Error("failed to find loop");
-
-        if (intersectionLoop) break;
         if (loop.length) loops.push(loop);
       }
-      if (intersectionLoop) break;
     }
 
-    const loop = intersectionLoop;
-    const result = [];
-    // for (const loop of loops) {
-    if (loop == null) throw new Error();
-    const path = new Path();
+    return { loops, intersections };
+  }
 
-    for (let i = 1; i <= loop.length; i++) {
-      const idx = i % loop.length;
-      const [from, side, invert] = loop[i - 1];
-      const [to] = loop[idx];
-      const { segment: startSegment, x: startX } = intersections[from][side];
-      const { segment: endSegment, x: endX } = intersections[to][side];
+  /**
+   * @param {Path} other
+   */
+  booleanDifference(other) {
+    const { loops, intersections } = this.#findIntersectionLoops(other);
 
-      const sub = (side === "self" ? this : other).subpath(
-        startSegment,
-        startX,
-        endSegment,
-        endX,
-        invert,
-      );
-      path.merge(sub);
+    if (loops.length === 0) throw new Error();
+    // TODO: fix this bs
+    let loop = loops[2];
+
+    return this.fromIntersectionLoop(other, loop, intersections);
+  }
+
+  /**
+   * @param {Path} other
+   */
+  booleanIntersection(other) {
+    const { loops, intersections } = this.#findIntersectionLoops(other);
+
+    const exploredPaths = {};
+
+    // find intersection loop:
+    // using an indexed loop because for legacy testing reasons we want to
+    // return the first loop
+    let loop;
+
+    for (let i = 0; i < loops.length; i++) {
+      loop = loops[i];
+      for (const crossing of loop) {
+        const key = crossing.toString();
+        if (key in exploredPaths) {
+          loop = loops[exploredPaths[key]];
+          break;
+        }
+        exploredPaths[key] = i;
+      }
     }
-    //   result.push(path);
-    // }
 
-    // console.log(intersections);
-    // console.log(loops);
-    // debugGeometry(
-    //   this,
-    //   other,
-    //   ...result.slice(0, 1),
-    //   intersections.map((int) => int.point),
-    // );
-    path.simplify();
-    return path;
+    if (loop === loops.at(-1) || loop == null) throw new Error();
+
+    return this.fromIntersectionLoop(other, loop, intersections);
   }
 
   rotatesClockwise() {
@@ -1181,5 +1175,30 @@ export class Path {
       }
     }
     return result;
+  }
+
+  fromIntersectionLoop(other, loop, intersections) {
+    const path = new Path();
+
+    for (let i = 1; i <= loop.length; i++) {
+      const idx = i % loop.length;
+      const [from, side, invert] = loop[i - 1];
+      const [to] = loop[idx];
+      // TODO: change loop datatype
+      const { segment: startSegment, x: startX } = intersections[from][side];
+      const { segment: endSegment, x: endX } = intersections[to][side];
+
+      const sub = (side === "self" ? this : other).subpath(
+        startSegment,
+        startX,
+        endSegment,
+        endX,
+        invert,
+      );
+      path.merge(sub);
+    }
+
+    path.simplify();
+    return path;
   }
 }

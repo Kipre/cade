@@ -181,14 +181,14 @@ bro.test("computes angle", () => {
   bro
     .expect(
       Math.abs(computeVectorAngle([0, -402.3543409078357]) - Math.PI * 1.5) %
-      (2 * Math.PI),
+        (2 * Math.PI),
     )
     .toBeLessThan(1e-10);
 
   bro
     .expect(
       Math.abs(computeVectorAngle([0, 402.3543409078357]) - Math.PI / 2) %
-      (2 * Math.PI),
+        (2 * Math.PI),
     )
     .toBeLessThan(1e-10);
 

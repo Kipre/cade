@@ -55,3 +55,12 @@ bro.test("slightly more complex line intersection", () => {
       "M 1908 1065 L 2020 1065 A 165 165 0 0 0 2056.715954102792 1060.8631055100009",
     );
 });
+
+bro.test("simple difference", () => {
+  const firstPath = Path.fromD("M 0 0 L 0 10 L 10 10 L 10 0 Z");
+  const secondPath = Path.fromD("M 5 5 L 5 20 L 8 20 L 8 5 Z");
+
+  bro
+    .expect(firstPath.booleanDifference(secondPath).toString())
+    .toBe("M 10 10 L 10 0 L 0 0 L 0 10 L 5 10 L 5 5 L 8 5 L 8 10 Z");
+});

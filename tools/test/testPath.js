@@ -331,9 +331,7 @@ bro.test("thicken with rounding & scale", () => {
   wallOutline.scale(1, -1);
   bro
     .expect(wallOutline.toString())
-    .toBe(
-      "M 0 0 L 0 300 A 25 25 0 0 1 -50 300 L -50 0 Z",
-    );
+    .toBe("M 0 0 L 0 300 A 25 25 0 0 1 -50 300 L -50 0 Z");
 });
 
 bro.test("issue with corners", () => {

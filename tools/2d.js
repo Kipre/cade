@@ -254,6 +254,19 @@ export function placeAlong(p1, p2, param) {
 }
 
 /**
+ * @param {types.Point} l1
+ * @param {types.Point} l2
+ * @param {number} x
+ * @returns {[types.Point, types.Point]}
+ */
+export function slideLine(l1, l2, x) {
+  return [
+    placeAlong(l1, l2, { fromStart: x }),
+    placeAlong(l1, l2, { fromEnd: x }),
+  ];
+}
+
+/**
  * @param {types.Point[]} polyline
  * @param {number | number[]} offset
  * @param {boolean} wraps
@@ -329,7 +342,7 @@ export function inflatePolyline(poly, offset) {
 export function isToTheLeft(p, l1, l2) {
   const u = minus(l2, l1);
   const v = minus(p, l1);
-  return (u[0] * v[1] - u[1] * v[0]) > 0; 
+  return u[0] * v[1] - u[1] * v[0] > 0;
 }
 
 /**

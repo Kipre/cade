@@ -51,18 +51,42 @@ class KindaDOMMatrix {
 
   _setIdentity() {
     const m = this.values;
-    m[0] = 1; m[1] = 0; m[2] = 0; m[3] = 0;
-    m[4] = 0; m[5] = 1; m[6] = 0; m[7] = 0;
-    m[8] = 0; m[9] = 0; m[10] = 1; m[11] = 0;
-    m[12] = 0; m[13] = 0; m[14] = 0; m[15] = 1;
+    m[0] = 1;
+    m[1] = 0;
+    m[2] = 0;
+    m[3] = 0;
+    m[4] = 0;
+    m[5] = 1;
+    m[6] = 0;
+    m[7] = 0;
+    m[8] = 0;
+    m[9] = 0;
+    m[10] = 1;
+    m[11] = 0;
+    m[12] = 0;
+    m[13] = 0;
+    m[14] = 0;
+    m[15] = 1;
   }
 
   _setFrom2DArray(arr) {
     const m = this.values;
-    m[0] = arr[0]; m[1] = arr[1]; m[2] = 0; m[3] = 0;
-    m[4] = arr[2]; m[5] = arr[3]; m[6] = 0; m[7] = 0;
-    m[8] = 0; m[9] = 0; m[10] = 1; m[11] = 0;
-    m[12] = arr[4]; m[13] = arr[5]; m[14] = 0; m[15] = 1;
+    m[0] = arr[0];
+    m[1] = arr[1];
+    m[2] = 0;
+    m[3] = 0;
+    m[4] = arr[2];
+    m[5] = arr[3];
+    m[6] = 0;
+    m[7] = 0;
+    m[8] = 0;
+    m[9] = 0;
+    m[10] = 1;
+    m[11] = 0;
+    m[12] = arr[4];
+    m[13] = arr[5];
+    m[14] = 0;
+    m[15] = 1;
   }
 
   _setFrom3DArray(arr) {
@@ -97,9 +121,12 @@ class KindaDOMMatrix {
 
   _inverse2D() {
     const m = this.values;
-    const a = m[0], b = m[1],
-      c = m[4], d = m[5],
-      tx = m[12], ty = m[13];
+    const a = m[0],
+      b = m[1],
+      c = m[4],
+      d = m[5],
+      tx = m[12],
+      ty = m[13];
 
     // Calculate determinant
     const det = a * d - b * c;
@@ -128,10 +155,22 @@ class KindaDOMMatrix {
 
   _inverse3D() {
     const [
-      m00, m01, m02, m03,
-      m10, m11, m12, m13,
-      m20, m21, m22, m23,
-      m30, m31, m32, m33,
+      m00,
+      m01,
+      m02,
+      m03,
+      m10,
+      m11,
+      m12,
+      m13,
+      m20,
+      m21,
+      m22,
+      m23,
+      m30,
+      m31,
+      m32,
+      m33,
     ] = this.values;
 
     // Calculate cofactors
@@ -222,10 +261,22 @@ class KindaDOMMatrix {
     // Calculate inverse by dividing adjugate by determinant
     const invDet = 1.0 / det;
     return new KindaDOMMatrix([
-      c00 * invDet, c10 * invDet, c20 * invDet, c30 * invDet,
-      c01 * invDet, c11 * invDet, c21 * invDet, c31 * invDet,
-      c02 * invDet, c12 * invDet, c22 * invDet, c32 * invDet,
-      c03 * invDet, c13 * invDet, c23 * invDet, c33 * invDet,
+      c00 * invDet,
+      c10 * invDet,
+      c20 * invDet,
+      c30 * invDet,
+      c01 * invDet,
+      c11 * invDet,
+      c21 * invDet,
+      c31 * invDet,
+      c02 * invDet,
+      c12 * invDet,
+      c22 * invDet,
+      c32 * invDet,
+      c03 * invDet,
+      c13 * invDet,
+      c23 * invDet,
+      c33 * invDet,
     ]);
   }
 

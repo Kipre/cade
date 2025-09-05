@@ -241,11 +241,17 @@ export function debugGeometry(...shapes) {
 
   for (const el of svg.querySelectorAll(".axes")) el.remove();
   svg.innerHTML = `
-  <line class="axes" x1="${bbox.xMin - mgn / 2}" x2=${bbox.xMax + mgn / 2} stroke="black" marker-end="url(#arrow)"/>
-  <line class="axes" y1="${bbox.yMin - mgn / 2}" y2=${bbox.yMax + mgn / 2} stroke="black" marker-end="url(#arrow)"/>
+  <line class="axes" x1="${bbox.xMin - mgn / 2}" x2=${
+    bbox.xMax + mgn / 2
+  } stroke="black" marker-end="url(#arrow)"/>
+  <line class="axes" y1="${bbox.yMin - mgn / 2}" y2=${
+    bbox.yMax + mgn / 2
+  } stroke="black" marker-end="url(#arrow)"/>
    ${svg.innerHTML}`;
   svg.setAttribute(
     "style",
-    `font-size: ${size / 100}; stroke-width: 0.2em; transform: scale(1, -1); max-height: 100vh;`,
+    `font-size: ${
+      size / 100
+    }; stroke-width: 0.2em; transform: scale(1, -1); max-height: 100vh;`,
   );
 }

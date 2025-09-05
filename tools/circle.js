@@ -48,14 +48,24 @@ export function getCircleCenter(p1, p2, radius, sweep) {
  * @param {boolean} softSelection
  * @returns {types.Point}
  */
-export function intersectLineAndArc(p1, p2, start, end, radius, sweep, softSelection = false) {
+export function intersectLineAndArc(
+  p1,
+  p2,
+  start,
+  end,
+  radius,
+  sweep,
+  softSelection = false,
+) {
   const center = getCircleCenter(start, end, radius, sweep);
   const roots = intersectLineAndCircle(p1, p2, center, radius);
   if (roots.length === 1) return roots[0];
 
   if (softSelection) {
     const middle = evaluateArc(0.5, start, end, radius, sweep);
-    return norm(middle, roots[0]) < norm(middle, roots[1]) ? roots[0] : roots[1];
+    return norm(middle, roots[0]) < norm(middle, roots[1])
+      ? roots[0]
+      : roots[1];
   }
 
   for (const root of roots)
