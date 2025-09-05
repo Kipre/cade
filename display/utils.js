@@ -1,11 +1,7 @@
 /**
  * Helper function to create a GPUBuffer from an array.
  */
-export function createBuffer(
-  device,
-  array ,
-  usage
-) {
+export function createBuffer(device, array, usage) {
   // Align to 4 bytes.
   const desc = {
     size: (array.byteLength + 3) & ~3,
@@ -31,9 +27,8 @@ export function clamp(value, min, max) {
   return Math.max(Math.min(value, max), min);
 }
 
-export function invariant(value, message ) {
+export function invariant(value, message) {
   if (!value) {
     throw new Error(message);
   }
 }
-

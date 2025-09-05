@@ -1,4 +1,4 @@
-export const vertexShader =  `
+export const vertexShader = `
 struct VSOut {
   @builtin(position) Position: vec4f,
   @location(0) fragmentPosition: vec3f,
@@ -29,9 +29,9 @@ fn main(
     vsOut.normal = inNormal;
     return vsOut;
 }
-`
+`;
 
-export const fragmentShader =  `
+export const fragmentShader = `
 struct Uniforms {
   mvp: mat4x4f,
   model: mat4x4f,
@@ -67,5 +67,4 @@ fn main(
 
   return vec4f(result, 1);
 }
-`
-
+`;
