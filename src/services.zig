@@ -34,6 +34,12 @@ fn thicken(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     var output_buffer: [1024 * 128]u8 = undefined;
     const obj_size = try api.flatPartToOBJ(allocator, &input.value, &output_buffer);
 
+    if (obj_size == 0) {
+        std.debug.print("Failed to thicken part\n", .{});
+        try sendJsonError(req, "Part defninition did not yield a valid solid", 400);
+        return;
+    }
+
     const response_body = output_buffer[0..obj_size];
     try req.respond(response_body, .{ .extra_headers = &.{
         .{ .name = "content-type", .value = "application/text" },
