@@ -1,4 +1,5 @@
 #include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -247,7 +248,19 @@ gp_Pnt2d getCircleCenter(const gp_Pnt2d &startPoint, const gp_Pnt2d &endPoint,
   return center;
 }
 
+gp_Pnt2d getCircleCenter(const gp_Pnt &startPoint, const gp_Pnt &endPoint,
+                         double radius, int sweepFlag) {
+  const gp_Pnt2d start(startPoint.X(), startPoint.Y());
+  const gp_Pnt2d end(endPoint.X(), endPoint.Y());
+  return getCircleCenter(start, end, radius, sweepFlag);
+}
+
 gp_Pnt promote(gp_Pnt2d p) { return gp_Pnt(p.X(), p.Y(), 0.0); }
+
+void printPoint(gp_Pnt pnt) {
+  std::cout << std::setprecision(15) << "Vertex: " << pnt.X() << ", " << pnt.Y()
+            << ", " << pnt.Z() << std::endl;
+}
 
 /**
  * @brief Creates an OpenCASCADE TopoDS_Wire from parsed SVG path segments.
@@ -259,8 +272,9 @@ gp_Pnt promote(gp_Pnt2d p) { return gp_Pnt(p.X(), p.Y(), 0.0); }
 TopoDS_Wire createWireFromPathSegments(const PathSegment *segments,
                                        size_t size) {
   BRepBuilderAPI_MakeWire makeWire;
-  gp_Pnt2d lastPoint;  // Track the last point for segment continuity
-  gp_Pnt2d startPoint; // Track the start point of the current subpath for 'Z'
+  gp_Pnt lastPoint;
+  gp_Pnt startPoint;
+
   gp_Dir z3(0, 0, 1);
   gp_Dir nz3(0, 0, -1);
 
@@ -270,7 +284,7 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment *segments,
     const auto segment = segments[i];
 
     TopoDS_Edge edge;
-    gp_Pnt2d currentPoint(segment.x, segment.y);
+    gp_Pnt currentPoint(segment.x, segment.y, 0);
 
     switch (segment.command) {
     case 'M': {
@@ -281,20 +295,24 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment *segments,
       break;
     }
     case 'L': {
-      edge = BRepBuilderAPI_MakeEdge(promote(lastPoint), promote(currentPoint));
+      edge = BRepBuilderAPI_MakeEdge(lastPoint, currentPoint);
       break;
     }
     case 'A': {
-      const gp_Pnt2d center = getCircleCenter(lastPoint, currentPoint,
-                                              segment.radius, segment.sweep);
-      // std::cout << "center " << center.X() << " " << center.Y() << std::endl;
+      const gp_Pnt center = promote(getCircleCenter(
+          lastPoint, currentPoint, segment.radius, segment.sweep));
 
-      Handle(Geom_TrimmedCurve) arc = GC_MakeArcOfCircle(
-          (new GC_MakeCircle(promote(center), segment.sweep ? z3 : nz3,
-                             segment.radius))
-              ->Value()
-              ->Circ(),
-          promote(lastPoint), promote(currentPoint), true);
+      const auto v1 = gp_Vec(center, lastPoint);
+      const auto v2 = gp_Vec(center, currentPoint);
+      const auto angle = v1.Angle(v2);
+
+      const auto v05 =
+          v1.Rotated(gp_Ax1(), (segment.sweep ? 1 : -1) * angle / 2);
+
+      const auto midPoint = gp_Pnt(v05.XYZ().Added(center.XYZ()));
+
+      Handle(Geom_TrimmedCurve) arc =
+          GC_MakeArcOfCircle(lastPoint, midPoint, currentPoint);
 
       edge = BRepBuilderAPI_MakeEdge(arc);
       break;
@@ -304,7 +322,7 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment *segments,
       // If the last point is not the start point, create a line segment to
       // close the path
       if (!lastPoint.IsEqual(startPoint, Precision::Confusion())) {
-        edge = BRepBuilderAPI_MakeEdge(promote(lastPoint), promote(startPoint));
+        edge = BRepBuilderAPI_MakeEdge(lastPoint, startPoint);
       }
       break;
     }
@@ -313,10 +331,16 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment *segments,
                 << "' for wire creation." << std::endl;
       continue;
     }
+
     lastPoint = currentPoint;
 
     if (!edge.IsNull()) {
       makeWire.Add(edge);
+
+      if (makeWire.Error()) {
+        std::cout << "make wire error at segment nb " << i << makeWire.Error()
+                  << std::endl;
+      }
     }
   }
 

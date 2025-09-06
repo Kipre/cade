@@ -46,7 +46,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const exe_mod = b.createModule(.{
-        .root_source_file = b.path("tools/gen_build_file.zig"),
+        .root_source_file = b.path("src/gen_build_file.zig"),
         .target = target,
         .optimize = optimize,
     });
