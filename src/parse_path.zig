@@ -1,10 +1,10 @@
 const std = @import("std");
 const testing = std.testing;
 const tokenize = std.ascii;
-const solidify = @import("solidify.zig");
+const occ = @import("occ.zig");
 const Allocator = std.mem.Allocator;
 
-const PathSegment = solidify.PathSegment;
+const PathSegment = occ.PathSegment;
 
 // const PathSegment = extern struct {
 //     command: u8,

@@ -108,7 +108,7 @@ pub fn build(b: *std.Build) void {
     exe.linkLibCpp();
     exe.addIncludePath(b.path("src"));
     exe.addIncludePath(b.path("inc"));
-    exe.addCSourceFile(.{ .file = b.path("src/Solidify.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
+    exe.addCSourceFile(.{ .file = b.path("src/occ.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
 
     for (occt_libs) |lib| {
         exe.linkLibrary(lib);
@@ -128,7 +128,7 @@ pub fn build(b: *std.Build) void {
     specific_test.linkLibCpp();
     specific_test.addIncludePath(b.path("src"));
     specific_test.addIncludePath(b.path("inc"));
-    specific_test.addCSourceFile(.{ .file = b.path("src/Solidify.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
+    specific_test.addCSourceFile(.{ .file = b.path("src/occ.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
 
     for (occt_libs) |lib| {
         specific_test.linkLibrary(lib);

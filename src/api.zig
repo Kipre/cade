@@ -1,14 +1,25 @@
 const std = @import("std");
 const parse = @import("parse_path.zig");
-const solidify = @import("solidify.zig");
+const occ = @import("occ.zig");
 const Allocator = std.mem.Allocator;
 
 const expect = std.testing.expect;
-const PathSegment = solidify.PathSegment;
+const PathSegment = occ.PathSegment;
 
 pub const RawFlatPart = struct {
     outside: []const u8,
     insides: [][]const u8,
+};
+
+pub const Transform = [16]f64;
+
+pub const InstancedGeometry = struct {
+    part: RawFlatPart,
+    instances: []Transform,
+};
+
+pub const CompactPartDefinition = struct {
+    geometries: []InstancedGeometry,
 };
 
 pub fn parsePath(allocator: Allocator, segmentsArray: *std.ArrayList(PathSegment), path: []const u8) !void {
@@ -18,7 +29,7 @@ pub fn parsePath(allocator: Allocator, segmentsArray: *std.ArrayList(PathSegment
     }
 }
 
-pub fn flatPartToOBJ(allocator: std.mem.Allocator, part: *RawFlatPart, output_buffer: [*c]u8) !usize {
+fn parseRawFlatPart(allocator: std.mem.Allocator, part: *const RawFlatPart) !std.ArrayList(PathSegment) {
     var segments: std.ArrayList(PathSegment) = .empty;
     // defer allocator.free(segments);
 
@@ -28,11 +39,43 @@ pub fn flatPartToOBJ(allocator: std.mem.Allocator, part: *RawFlatPart, output_bu
         try parsePath(allocator, &segments, path);
     }
 
+    return segments;
+}
+
+pub fn flatPartToOBJ(allocator: std.mem.Allocator, part: *RawFlatPart, output_buffer: [*c]u8) !usize {
+    var segments = try parseRawFlatPart(allocator, part);
+    // defer allocator.free(segments);
     const size = segments.items.len;
     const array = try segments.toOwnedSlice(allocator);
-    const cint_obj_size = solidify.pathToSolid(array.ptr, size, output_buffer);
+
+    const shape = occ.pathsToShape(array.ptr, size, 15);
+    defer occ.freeShape(shape);
+
+    const cint_obj_size = occ.writeToOBJ(shape, output_buffer);
+
     const obj_size: usize = @intCast(cint_obj_size);
     return obj_size;
+}
+
+pub fn exportAsSTEP(allocator: std.mem.Allocator, definition: *CompactPartDefinition) !void {
+    const compound = occ.makeCompound();
+    defer occ.freeCompound(compound);
+
+    for (definition.geometries) |geom| {
+        var segments = try parseRawFlatPart(allocator, &geom.part);
+        const size = segments.items.len;
+        const array = try segments.toOwnedSlice(allocator);
+
+        for (geom.instances) |instance| {
+            const shape = occ.pathsToShape(array.ptr, size, 15);
+            var mat: [16]f64 = instance;
+            const transform = occ.makeTransform(&mat[0]);
+            occ.addShapeToCompound(compound, shape, transform);
+        }
+    }
+
+    var filepath = "C:/Users/kipr/Downloads/test.step";
+    occ.saveToSTEP(compound, &filepath[0]);
 }
 
 test "simple case" {
