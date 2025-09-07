@@ -5,12 +5,40 @@ const api = @import("api.zig");
 
 const ServerAction = enum {
     thicken,
+    export_step,
     unknown,
 };
 
 const actions_map = std.StaticStringMap(ServerAction).initComptime(.{
     .{ "/occ/thicken", .thicken },
+    .{ "/occ/export", .export_step },
 });
+
+fn export_step(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
+    const body = readRequestBody(req, allocator, 2048 * 8) catch |err| {
+        try sendJsonError(req, "Failed to read request body", 400);
+        return err;
+    };
+    defer allocator.free(body);
+
+    std.debug.print("Received body: {s}\n", .{body});
+
+    // Parse JSON into our struct
+    var input = std.json.parseFromSlice(api.CompactPartDefinition, allocator, body, .{
+        .ignore_unknown_fields = true, // Ignore extra fields
+    }) catch |err| {
+        std.debug.print("JSON parse error: {any}\n", .{err});
+        try sendJsonError(req, "Invalid JSON format", 400);
+        return;
+    };
+    defer input.deinit();
+
+    try api.exportAsSTEP(allocator, &input.value);
+
+    try req.respond("wrote successfully", .{ .extra_headers = &.{
+        .{ .name = "content-type", .value = "application/text" },
+    } });
+}
 
 fn thicken(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     const body = readRequestBody(req, allocator, 2048 * 2) catch |err| {
@@ -51,6 +79,7 @@ pub fn handlePostRequest(req: *http.Server.Request, allocator: std.mem.Allocator
 
     switch (action) {
         .thicken => try thicken(req, allocator),
+        .export_step => try export_step(req, allocator),
         .unknown => {
             std.debug.print("Failed to understand request: {s}\n", .{path});
             try sendJsonError(req, "Action not found", 404);

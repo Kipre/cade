@@ -52,7 +52,11 @@
 #include <BRepAlgoAPI_Check.hxx>
 #include <BRepTools.hxx>
 
-#include "Solidify.hxx"
+#include <BRep_Builder.hxx>
+#include <TopLoc_Location.hxx>
+#include <gp_Trsf.hxx>
+
+#include "occ.hxx"
 
 std::string segmentsToPathString(const PathSegment *segments, size_t length) {
   std::ostringstream oss;
@@ -359,12 +363,7 @@ TopoDS_Wire createWireFromPathSegments(const PathSegment *segments,
   return result;
 }
 
-extern "C" int pathToSolid(const PathSegment *segments, size_t size,
-                           char *output_buffer) {
-  // segments is a long list of one outer and several inner paths
-  // std::cout << "Parsing SVG Path" << std::endl;
-  // std::cout << "Size " << size <<  std::endl;
-
+TopoDS_Face makeFaceFromSegments(const PathSegment *segments, size_t size) {
   std::vector<TopoDS_Wire> wires = {};
 
   size_t lastEnd = 0;
@@ -382,7 +381,7 @@ extern "C" int pathToSolid(const PathSegment *segments, size_t size,
                 << std::endl;
       const auto path = segmentsToPathString(segments + lastEnd, currentSize);
       std::cerr << path << std::endl;
-      return 1;
+      return {};
     }
 
     wires.push_back(wire);
@@ -390,10 +389,6 @@ extern "C" int pathToSolid(const PathSegment *segments, size_t size,
   }
 
   std::cout << "\nSuccessfully created OpenCASCADE TopoDS_Wire." << std::endl;
-
-  // You can now use this 'wire' object for further OpenCASCADE operations,
-  // such as creating a face, performing boolean operations, or exporting to a
-  // file.
 
   TopoDS_Wire outer = wires[0];
 
@@ -424,30 +419,39 @@ extern "C" int pathToSolid(const PathSegment *segments, size_t size,
     makeFace.Add(wire);
   }
 
-  // Further operations with 'face'
   TopoDS_Face face = makeFace.Face();
-  std::cout << "Successfully created TopoDS_Face from the wire." << std::endl;
 
-  gp_Vec aVector(0, 0, 15);
+  return face;
+}
 
-  BRepPrimAPI_MakePrism aPrismMaker(makeFace, aVector);
+struct Shape {
+  TopoDS_Shape shape;
+};
+
+struct Compound {
+  TopoDS_Compound compound;
+  BRep_Builder builder;
+  Compound() { builder.MakeCompound(compound); }
+};
+
+struct Transform {
+  gp_Trsf trsf;
+};
+
+extern "C" {
+
+Shape *pathsToShape(const PathSegment *segments, size_t size, float thickness) {
+  TopoDS_Face face = makeFaceFromSegments(segments, size);
+  if (!face.IsNull()) {
+    std::cout << "Successfully created TopoDS_Face from the wire." << std::endl;
+  }
+
+  gp_Vec aVector(0, 0, thickness);
+
+  BRepPrimAPI_MakePrism aPrismMaker(face, aVector);
   TopoDS_Shape aShape = aPrismMaker.Shape();
-  std::cout << "Successfully created a TopoDS_Solid from the face."
+  std::cout << "Successfully created a TopoDS_Shape from the face."
             << std::endl;
-
-  // TopoDS_Compound aRes;
-  // BRep_Builder aBuilder;
-  // aBuilder.MakeCompound(aRes);
-  // aBuilder.Add(aRes, aShape);
-  //
-  // std::string stepContent;
-  // if (WriteCompoundToSTEPString2(aRes, stepContent)) {
-  //   // Output to stdout (stdin in your terminology, but I assume you mean
-  //   // stdout) std::cout << stepContent << std::endl;
-  // } else {
-  //   std::cerr << "Failed to convert compound to STEP format" << std::endl;
-  //   // return 1;
-  // }
 
   BRepAlgoAPI_Check check(aShape);
   if (!check.IsValid()) {
@@ -455,8 +459,61 @@ extern "C" int pathToSolid(const PathSegment *segments, size_t size,
     return 0;
   }
 
-  const auto out_length = writeSolidToObj(aShape, output_buffer);
-  // int out_length = 0;
+  Shape *result = new Shape;
+  result->shape = aShape;
 
+  return result;
+}
+void freeShape(Shape *shape) { delete shape; }
+
+int writeToOBJ(Shape *shape, char *buffer) {
+  const auto out_length = writeSolidToObj(shape->shape, buffer);
   return out_length;
+}
+
+void saveToSTEP(Compound *cmp, const char *filepath) {
+  TopoDS_Compound compound = cmp->compound;
+
+  STEPControl_Writer writer;
+
+  Interface_Static::SetCVal("write.precision.val", "0.001");
+  Interface_Static::SetCVal("write.step.unit", "MM");
+
+  IFSelect_ReturnStatus status = writer.Transfer(compound, STEPControl_AsIs);
+  if (status != IFSelect_RetDone) {
+    std::cerr << "Error: Failed to transfer compound to STEP writer"
+              << std::endl;
+    return;
+  }
+
+  status = writer.Write(filepath);
+  if (status != IFSelect_RetDone) {
+    std::cerr << "Error: Failed to write STEP file" << std::endl;
+    return;
+  }
+}
+
+Compound *makeCompound() { return new Compound; }
+void freeCompound(Compound *cmp) { delete cmp; }
+
+Transform *makeTransform(const double m[16]) {
+  Transform *t = new Transform;
+  gp_Trsf &trsf = t->trsf;
+
+  trsf.SetValues(m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14]); 
+  return t;
+}
+
+void freeTransform(Transform *trsf) { delete trsf; }
+
+void addShapeToCompound(Compound *cmp, Shape *shape, Transform *trsf) {
+  if (!cmp || !shape)
+    return;
+  TopoDS_Shape s = shape->shape;
+  if (trsf) {
+    TopLoc_Location loc(trsf->trsf);
+    s = s.Located(loc);
+  }
+  cmp->builder.Add(cmp->compound, s);
+}
 }
