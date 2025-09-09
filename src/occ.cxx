@@ -517,4 +517,5 @@ void addShapeToCompound(Compound *cmp, Shape *shape, Transform *trsf) {
   }
   cmp->builder.Add(cmp->compound, s);
 }
+
 }
