@@ -573,3 +573,34 @@ bro.test("moves closing segment", () => {
     .expect(p.moveClosingSegment(3).toString())
     .toBe("M 0 10 L 0 0 L 10 0 L 10 10 Z");
 });
+
+bro.test("finds segments on line", () => {
+  const p = new Path();
+  p.moveTo([600, -70]);
+  p.lineTo([3.410456225722713e-15, -70]);
+  p.lineTo([3.410456225722713e-15, 0]);
+  p.lineTo([85, 0]);
+  p.lineTo([85, -29]);
+  p.arc([85, -35], 3, 1);
+  p.lineTo([100, -35]);
+  p.arc([100, -29], 3, 1);
+  p.lineTo([100, 0]);
+  p.lineTo([1100, 9.419888349015425e-14]);
+  p.lineTo([1100, -29.000000000000153]);
+  p.arc([1100, -35.00000000000016], 3, 1);
+  p.lineTo([1115, -34.99999999999972]);
+  p.arc([1115, -28.99999999999939], 3, 1);
+  p.lineTo([1115, 6.830005623920165e-13]);
+  p.lineTo([1200, 5.171598411517421e-13]);
+  p.lineTo([1200, -69.99999999999999]);
+  p.close();
+
+  const segments = p.findSegmentsOnLine(
+    [1000000.0000000001, -1.1641532182693481e-10],
+    [-1000007.5000000001, 1.1641532182693481e-10],
+  );
+
+  bro
+    .expect(segments)
+    .toEqual([3, 9, 15]);
+});

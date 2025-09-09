@@ -36,7 +36,7 @@ export function minus(p1, p2) {
 export function areOnSameLine(p1, p2, p3) {
   const u = minus(p1, p2);
   const v = minus(p1, p3);
-  return Math.abs(u[1] * v[0] - v[1] * u[0]) < 1e-6;
+  return Math.abs(u[1] * v[0] - v[1] * u[0]) < 1e-5;
 }
 
 /**
