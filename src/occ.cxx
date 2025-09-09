@@ -412,6 +412,7 @@ TopoDS_Face makeFaceFromSegments(const PathSegment *segments, size_t size) {
       continue;
     }
 
+    // TODO maybe actually reverse the wire
     if (wire.Orientation() != TopAbs_REVERSED) {
       wire.Reverse();
     }
@@ -456,7 +457,6 @@ Shape *pathsToShape(const PathSegment *segments, size_t size, float thickness) {
   BRepAlgoAPI_Check check(aShape);
   if (!check.IsValid()) {
     std::cerr << "Error: Solid doesn't seem to be valid." << std::endl;
-    return 0;
   }
 
   Shape *result = new Shape;
@@ -500,7 +500,8 @@ Transform *makeTransform(const double m[16]) {
   Transform *t = new Transform;
   gp_Trsf &trsf = t->trsf;
 
-  trsf.SetValues(m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14]); 
+  trsf.SetValues(m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6],
+                 m[10], m[14]);
   return t;
 }
 
