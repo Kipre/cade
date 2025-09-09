@@ -3,6 +3,9 @@ const http = std.http;
 const parse = @import("parse_path.zig");
 const api = @import("api.zig");
 
+const reqBodySize = 1024 * std.math.pow(i32, 2, 6);
+const meshBodySize = 1024 * std.math.pow(i32, 2, 10);
+
 const ServerAction = enum {
     thicken,
     export_step,
@@ -15,7 +18,7 @@ const actions_map = std.StaticStringMap(ServerAction).initComptime(.{
 });
 
 fn export_step(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
-    const body = readRequestBody(req, allocator, 2048 * 8) catch |err| {
+    const body = readRequestBody(req, allocator, reqBodySize) catch |err| {
         try sendJsonError(req, "Failed to read request body", 400);
         return err;
     };
@@ -41,7 +44,7 @@ fn export_step(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
 }
 
 fn thicken(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
-    const body = readRequestBody(req, allocator, 2048 * 2) catch |err| {
+    const body = readRequestBody(req, allocator, reqBodySize) catch |err| {
         try sendJsonError(req, "Failed to read request body", 400);
         return err;
     };
@@ -59,7 +62,7 @@ fn thicken(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     };
     defer input.deinit();
 
-    var output_buffer: [1024 * std.math.pow(i32, 2, 10)]u8 = undefined;
+    var output_buffer: [meshBodySize]u8 = undefined;
     const obj_size = try api.flatPartToOBJ(allocator, &input.value, &output_buffer);
 
     if (obj_size == 0) {
