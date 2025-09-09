@@ -203,7 +203,7 @@ bro.test("more conmplex subpath", () => {
   bro
     .expect(loop.invert().toString())
     .toBe(
-      "M 500 600 L 500.00000000000006 1000 L 0 1000 L 0 0 L 2000 0 L 1900 1000 L 1500.0000000000002 1000 L 1500 600 A 100 100 0 0 0 1500 400 L 500 400 A 100 100 0 0 0 500 600 Z",
+      "M 500.00000000000006 1000 L 0 1000 L 0 0 L 2000 0 L 1900 1000 L 1500.0000000000002 1000 L 1500 600 A 100 100 0 0 0 1500 400 L 500 400 A 100 100 0 0 0 500 600 Z",
     );
 });
 
@@ -555,4 +555,21 @@ bro.test("subpath", () => {
     .toBe(
       "M 719.8062264195162 -813.2232521764884 A 200 200 0 0 0 900 -700 L 2020 -700 A 200 200 0 0 0 2200.193773580484 -986.7767478235116 L 2809.035376609967 -1279.9794107166",
     );
+});
+
+bro.test("moves closing segment", () => {
+  const p = Path.fromD("M 0 0 L 10 0 L 10 10 L 0 10 Z");
+
+  bro
+    .expect(p.moveClosingSegment(0).toString())
+    .toBe("M 0 0 L 10 0 L 10 10 L 0 10 Z");
+  bro
+    .expect(p.moveClosingSegment(1).toString())
+    .toBe("M 10 0 L 10 10 L 0 10 L 0 0 Z");
+  bro
+    .expect(p.moveClosingSegment(2).toString())
+    .toBe("M 10 10 L 0 10 L 0 0 L 10 0 Z");
+  bro
+    .expect(p.moveClosingSegment(3).toString())
+    .toBe("M 0 10 L 0 0 L 10 0 L 10 10 Z");
 });

@@ -30,7 +30,11 @@ export function getCircleCenter(p1, p2, radius, sweep) {
 
   const half = mult(plus(p1, p2), 1 / 2);
   const pToHalf = norm(p1, half);
-  const halfToCenter = Math.sqrt(radius ** 2 - pToHalf ** 2);
+
+  let halfToCenter;
+  if (Math.abs(radius - pToHalf) < eps) halfToCenter = 0;
+  else halfToCenter = Math.sqrt(radius ** 2 - pToHalf ** 2);
+
   const center = placeAlong(half, rotatePoint(half, p2, Math.PI / 2), {
     fromStart: halfToCenter,
   });

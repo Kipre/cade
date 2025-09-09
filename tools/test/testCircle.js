@@ -4,6 +4,7 @@ import { rotatePoint } from "../2d.js";
 import {
   arcTangentAt,
   evaluateArc,
+  getCircleCenter,
   isInPieSlice,
   pointCoordinateOnArc,
 } from "../circle.js";
@@ -151,4 +152,14 @@ bro.test("find tangent", () => {
     ],
     eps,
   );
+});
+
+bro.test("get center limit case", () => {
+  const lastPoint = [1114.9999999999998, 53.999999999999936];
+  const p = [1115, 59.99999999999999];
+  const radius = 3;
+  const sweep = 1;
+  bro
+    .expect(getCircleCenter(lastPoint, p, radius, sweep))
+    .toEqual([1115, 56.999999999999964]);
 });

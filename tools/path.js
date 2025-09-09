@@ -32,6 +32,7 @@ import {
   pointCoordinateOnArc,
 } from "./circle.js";
 import { debugGeometry } from "./svg.js";
+import { applyTransformMatrix } from "./transform.js";
 import { modulo } from "./utils.js";
 
 const eps = 1e-5;
@@ -79,7 +80,8 @@ export class Path {
           const sweep = Number.parseInt(tokens[i++]);
           const x = Number.parseFloat(tokens[i++]);
           const y = Number.parseFloat(tokens[i++]);
-          if (rx !== ry) throw new Error("unsupported command");
+          if (rx !== ry || angle !== 0 || bigArc !== 0)
+            throw new Error("unsupported command");
           result.arc([x, y], rx, sweep);
           break;
         }
@@ -166,7 +168,7 @@ export class Path {
     for (let i = 0; i < this.controls.length; i++) {
       try {
         this.roundFillet(radius, i + 1);
-      } catch (e) {}
+      } catch (e) { }
     }
   }
 
@@ -262,24 +264,28 @@ export class Path {
    */
   mirror(l1 = null, l2 = null) {
     const [[first, firstPoint]] = this.controls;
-    const [last, lastPoint] = this.controls.at(-1);
+
+    let [last, lastPoint] = this.controls.at(-1);
+    if (last === "close") {
+      this.controls.pop();
+      [last, lastPoint] = this.controls.at(-1);
+    }
+    const mirrorLine = [l1 ?? firstPoint, l2 ?? lastPoint];
+
+    if (norm(...mirrorLine) < eps)
+      throw new Error("can't mirror a path when mirror line has no length");
 
     if (first !== "moveTo") throw new Error("path not well formed");
-    if (last === "close") throw new Error("can't mirror a closed path");
 
     let checkedFirstPoint = false;
     for (let i = this.controls.length - 1; i > 0; i--) {
       const [type, point, maybeRadius, maybeSweepFlag] = this.controls[i];
       const [, p] = this.controls[i - 1];
 
-      const mirrored = mirrorPoint(p, l1 ?? firstPoint, l2 ?? lastPoint);
+      const mirrored = mirrorPoint(p, ...mirrorLine);
       if (!checkedFirstPoint) {
         checkedFirstPoint = true;
-        const firstMirrored = mirrorPoint(
-          point,
-          l1 ?? firstPoint,
-          l2 ?? lastPoint,
-        );
+        const firstMirrored = mirrorPoint(point, ...mirrorLine);
         if (norm(point, firstMirrored) > eps) this.lineTo(firstMirrored);
       }
 
@@ -299,6 +305,8 @@ export class Path {
 
     if (norm(this.controls[0][1], this.controls.at(-1)[1]) < eps) this.close();
     this.simplify();
+
+    return mirrorLine;
   }
 
   /**
@@ -591,7 +599,6 @@ export class Path {
         do {
           const path = [i, side, !crossesFromTheRight];
           loop.push(path);
-
           const info = intersections[i][side];
           i = crossesFromTheRight ? info.after : info.before;
 
@@ -616,9 +623,15 @@ export class Path {
 
     if (loops.length === 0) throw new Error();
     // TODO: fix this bs
-    let loop = loops[2];
+    const loop = loops[2];
 
-    return this.fromIntersectionLoop(other, loop, intersections);
+    const result = this.#fromIntersectionLoop(other, loop, intersections);
+
+    // persist closing edge
+    const [, from, , to] = this.getSegmentAt(0);
+    const segment = result.findSegmentsOnLine(from, to);
+    if (segment.length !== 1) throw new Error("couldn't find old closing segment");
+    return result.moveClosingSegment(segment[0]);
   }
 
   /**
@@ -648,7 +661,7 @@ export class Path {
 
     if (loop === loops.at(-1) || loop == null) throw new Error();
 
-    return this.fromIntersectionLoop(other, loop, intersections);
+    return this.#fromIntersectionLoop(other, loop, intersections);
   }
 
   rotatesClockwise() {
@@ -723,7 +736,24 @@ export class Path {
       }
     }
     if (type === "close") path.close();
+    path.simplify();
     return path;
+  }
+
+  /**
+   * @param {number} segment
+   */
+  moveClosingSegment(segment) {
+    if (segment === 0) return this.clone();
+
+    const [, , type] = this.getSegmentAt(segment);
+    if (type !== "lineTo")
+      throw new Error("selected new closing segment is not a line");
+    const head = this.subpath(1, 0, segment, 1);
+    const tail = this.subpath(segment + 1, 0, 1, 0);
+    tail.merge(head);
+    tail.simplify();
+    return tail;
   }
 
   /**
@@ -878,6 +908,28 @@ export class Path {
       const result = [...control];
       if (!result[1]) return result;
       result[1] = plus(result[1], p);
+      return result;
+    });
+    return result;
+  }
+
+  /**
+   * @param {DOMMatrix} mat
+   * @returns {Path}
+   */
+  transform(mat) {
+    const zero = applyTransformMatrix(mat, [0, 0]);
+    const one = applyTransformMatrix(mat, [1, 1]);
+    const transformed = minus(one, zero);
+    const hasMirroring = transformed[0] * transformed[1];
+
+    const result = new Path();
+    result.controls = this.controls.map((control) => {
+      const result = [...control];
+      if (!result[1]) return result;
+      result[1] = applyTransformMatrix(mat, result[1]);
+      if (result[3] != null && hasMirroring)
+        result[3] = result[3] === 0 ? 1 : 0;
       return result;
     });
     return result;
@@ -1183,7 +1235,7 @@ export class Path {
     return result;
   }
 
-  fromIntersectionLoop(other, loop, intersections) {
+  #fromIntersectionLoop(other, loop, intersections) {
     const path = new Path();
 
     for (let i = 1; i <= loop.length; i++) {
