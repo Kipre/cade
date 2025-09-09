@@ -245,8 +245,14 @@ export class Path {
       norm(this.controls[0][1], this.controls.at(-2)[1]) < eps &&
       this.controls[1][0] === "lineTo"
     ) {
-      this.controls.shift();
-      this.controls[0][0] = "moveTo";
+			if (this.controls.at(-2)[0] === "lineTo") {
+				this.controls.pop();
+				this.controls.pop();
+				this.close();
+			} else {
+				this.controls.shift();
+				this.controls[0][0] = "moveTo";
+			}
     }
   }
 

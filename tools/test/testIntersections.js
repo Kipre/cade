@@ -62,5 +62,5 @@ bro.test("simple difference", () => {
 
   bro
     .expect(firstPath.booleanDifference(secondPath).toString())
-    .toBe("M 10 10 L 10 0 L 0 0 L 0 10 L 5 10 L 5 5 L 8 5 L 8 10 Z");
+    .toBe("M 8 10 L 10 10 L 10 0 L 0 0 L 0 10 L 5 10 L 5 5 L 8 5 Z");
 });

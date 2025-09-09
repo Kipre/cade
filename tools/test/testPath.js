@@ -38,7 +38,7 @@ bro.test("mirror", () => {
   bro
     .expect(p.toString())
     .toEqual(
-      "M -1 -1 L 0.8 -1 A 0.2 0.2 0 0 1 1 -0.8 L 1.0000000000000009 0.8 A 0.2 0.2 0 0 1 0.8000000000000002 1 L -0.9999999999999999 1 L -1 0 Z",
+      "M -1 0 L -1 -1 L 0.8 -1 A 0.2 0.2 0 0 1 1 -0.8 L 1.0000000000000009 0.8 A 0.2 0.2 0 0 1 0.8000000000000002 1 L -0.9999999999999999 1 Z",
     );
 });
 
@@ -374,12 +374,12 @@ bro.test("union", () => {
 
   bro
     .expect(path.booleanUnion(path2).toString())
-    .toBe("M 0 0 L 0 10 L 20 10 L 20 0 L 10 0 Z");
+    .toBe("M 10 0 L 0 0 L 0 10 L 20 10 L 20 0 Z");
 
   path2 = path2.invert();
   bro
     .expect(path.booleanUnion(path2).toString())
-    .toBe("M 0 0 L 0 10 L 20 10 L 20 0 L 10 0 Z");
+    .toBe("M 10 0 L 0 0 L 0 10 L 20 10 L 20 0 Z");
 });
 
 bro.test("union 2", () => {
