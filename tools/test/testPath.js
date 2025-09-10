@@ -38,7 +38,7 @@ bro.test("mirror", () => {
   bro
     .expect(p.toString())
     .toEqual(
-      "M -1 0 L -1 -1 L 0.8 -1 A 0.2 0.2 0 0 1 1 -0.8 L 1.0000000000000009 0.8 A 0.2 0.2 0 0 1 0.8000000000000002 1 L -0.9999999999999999 1 Z",
+      "M -1 -1 L 0.8 -1 A 0.2 0.2 0 0 1 1 -0.8 L 1.0000000000000009 0.8 A 0.2 0.2 0 0 1 0.8000000000000002 1 L -0.9999999999999999 1 Z",
     );
 });
 
@@ -374,12 +374,12 @@ bro.test("union", () => {
 
   bro
     .expect(path.booleanUnion(path2).toString())
-    .toBe("M 10 0 L 0 0 L 0 10 L 20 10 L 20 0 Z");
+    .toBe("M 0 0 L 0 10 L 20 10 L 20 0 Z");
 
   path2 = path2.invert();
   bro
     .expect(path.booleanUnion(path2).toString())
-    .toBe("M 10 0 L 0 0 L 0 10 L 20 10 L 20 0 Z");
+    .toBe("M 0 0 L 0 10 L 20 10 L 20 0 Z");
 });
 
 bro.test("union 2", () => {
@@ -535,7 +535,7 @@ bro.test("rounded fillet all", () => {
     );
 });
 
-bro.test("subpath", () => {
+bro.test("subpath with negative start", () => {
   const p = new Path();
   p.moveTo([775.3020396282533, -743.6337035063941]);
   p.arc([900, -700], 200, 0);
@@ -551,7 +551,7 @@ bro.test("subpath", () => {
   p.close();
 
   bro
-    .expect(p.subpath(-2, 0, 4, 1).toString())
+    .expect(p.subpath(-1, 0, 4, 1).toString())
     .toBe(
       "M 719.8062264195162 -813.2232521764884 A 200 200 0 0 0 900 -700 L 2020 -700 A 200 200 0 0 0 2200.193773580484 -986.7767478235116 L 2809.035376609967 -1279.9794107166",
     );
@@ -603,4 +603,37 @@ bro.test("finds segments on line", () => {
   bro
     .expect(segments)
     .toEqual([3, 9, 15]);
+});
+
+bro.test("simplifies a close that that conicides with a line", () => {
+  const p = Path.fromD("M 0 0 L 10 0 L 10 10 L 0 10 L 0 5 Z");
+  p.simplify();
+
+  bro
+    .expect(p.toString())
+    .toBe("M 0 0 L 10 0 L 10 10 L 0 10 Z");
+
+  const p2 = Path.fromD("M 0 5 L 0 0 L 10 0 L 10 10 L 0 10 Z");
+  p2.simplify();
+
+  bro
+    .expect(p2.toString())
+    .toBe("M 0 0 L 10 0 L 10 10 L 0 10 Z");
+
+});
+
+bro.test("inverts a circle", () => {
+  const p = new Path();
+  p.moveTo([1096, 45.85786437626905]);
+  p.arc([1089, 45.85786437626905], 3.5, 1);
+  p.arc([1096, 45.85786437626905], 3.5, 1);
+  p.close();
+
+  bro
+    .expect(p.invert().toString())
+    .toBe("M 1096 45.85786437626905 A 3.5 3.5 0 0 0 1089 45.85786437626905 A 3.5 3.5 0 0 0 1096 45.85786437626905 Z");
+
+  bro
+    .expect(p.invert().invert().toString())
+    .toBe(p.toString());
 });

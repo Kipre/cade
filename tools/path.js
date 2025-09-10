@@ -31,7 +31,6 @@ import {
   normalizeAngle,
   pointCoordinateOnArc,
 } from "./circle.js";
-import { debugGeometry } from "./svg.js";
 import { applyTransformMatrix } from "./transform.js";
 import { modulo } from "./utils.js";
 
@@ -214,31 +213,39 @@ export class Path {
 
   simplify() {
     let nbControlsToCheck = this.controls.length - 1;
-    if (this.isClosed()) nbControlsToCheck--;
 
-    for (let i = 1; i < nbControlsToCheck - 1; i++) {
-      const [[, p0, type1, p1, r1, s1], [index, , type2, p2, r2, s2]] =
+    for (let i = 0; i < nbControlsToCheck; i++) {
+      const [[, p0, type1, p1, r1, s1], [, , type2, p2, r2, s2]] =
         this.getJunctionAt(i);
-
-      if (!index || this.controls[index][0] === "close") break;
 
       if (!type1 || !type2) continue;
 
-      if (norm(p1, p2) < eps) {
+      if (norm(p1, p2) < eps && i !== nbControlsToCheck - 1) {
         this.controls.splice(i + 1, 1);
         i--;
+        nbControlsToCheck--;
         continue;
       }
 
-      if (type1 === "lineTo" && type2 === "lineTo" && areOnSameLine(p0, p1, p2))
+      if (
+        // i !== 0 &&
+        type1 === "lineTo" &&
+        type2 === "lineTo" &&
+        areOnSameLine(p0, p1, p2)
+      ) {
         this.controls.splice(i, 1);
+        nbControlsToCheck--;
+        if (i === 0) this.controls[0][0] = "moveTo";
+      }
 
       if (
         type1 === "arc" &&
         type2 === "arc" &&
         areOnSameCircle(p0, p1, r1, s1, p1, p2, r2, s2)
-      )
+      ) {
         this.controls.splice(i, 1);
+        nbControlsToCheck--;
+      }
     }
 
     // if close is zero length and first segment is a line
@@ -247,14 +254,14 @@ export class Path {
       norm(this.controls[0][1], this.controls.at(-2)[1]) < eps &&
       this.controls[1][0] === "lineTo"
     ) {
-			if (this.controls.at(-2)[0] === "lineTo") {
-				this.controls.pop();
-				this.controls.pop();
-				this.close();
-			} else {
-				this.controls.shift();
-				this.controls[0][0] = "moveTo";
-			}
+      if (this.controls.at(-2)[0] === "lineTo") {
+        this.controls.pop();
+        this.controls.pop();
+        this.close();
+      } else {
+        this.controls.shift();
+        this.controls[0][0] = "moveTo";
+      }
     }
   }
 
@@ -630,7 +637,8 @@ export class Path {
     // persist closing edge
     const [, from, , to] = this.getSegmentAt(0);
     const segment = result.findSegmentsOnLine(from, to);
-    if (segment.length !== 1) throw new Error("couldn't find old closing segment");
+    if (segment.length !== 1)
+      throw new Error("couldn't find old closing segment");
     return result.moveClosingSegment(segment[0]);
   }
 
@@ -714,29 +722,30 @@ export class Path {
 
   invert() {
     const path = new Path();
-    const [type, point] = this.controls.at(-1);
-    path.moveTo(type === "close" ? this.controls[0][1] : point);
+    let length = this.controls.length;
+    if (this.isClosed()) length--;
 
-    const length = this.controls.length;
-
+    let first = true;
     for (let i = length - 1; i > 0; i--) {
-      const [, lastPoint] = this.controls[i - 1];
-      const [type, , maybeRadius, maybeSweep] = this.controls[i];
+      const [, p0, type, p1, maybeRadius, maybeSweep] = this.getSegmentAt(i);
+
+      if (first) {
+        path.moveTo(p1);
+        first = false;
+      }
 
       switch (type) {
-        case "close":
         case "lineTo":
-          path.lineTo(lastPoint);
+          path.lineTo(p0);
           break;
         case "arc":
-          path.arc(lastPoint, maybeRadius, maybeSweep ? 0 : 1);
+          path.arc(p0, maybeRadius, maybeSweep ? 0 : 1);
           break;
         default:
           throw new Error();
       }
     }
-    if (type === "close") path.close();
-    path.simplify();
+    if (this.isClosed()) path.close();
     return path;
   }
 
@@ -745,6 +754,7 @@ export class Path {
    */
   moveClosingSegment(segment) {
     if (segment === 0) return this.clone();
+    segment--;
 
     const [, , type] = this.getSegmentAt(segment);
     if (type !== "lineTo")
@@ -761,8 +771,8 @@ export class Path {
    * @param {number} x
    */
   evaluate(segment, x) {
-    let [[, lastPoint], [type, p, maybeRadius, maybeSweep]] =
-      this.controls.slice(segment - 1);
+    let [, lastPoint, type, p, maybeRadius, maybeSweep] =
+      this.getSegmentAt(segment);
     switch (type) {
       // biome-ignore lint/suspicious/noFallthroughSwitchClause: <explanation>
       case "close":
@@ -853,47 +863,29 @@ export class Path {
 
   /**
    * @param {number} startSegment
-   * @param {number} startX
-   * @param {number} endSegment
-   * @param {number} endX
-   * @returns {Path}
-   *
-   * TODO index at zero
-   */
+  * @param {number} startX
+  * @param {number} endSegment
+  * @param {number} endX
+  * @returns {Path}
+  */
   subpath(startSegment, startX, endSegment, endX, invert = false) {
     const result = new Path();
+
+    if (invert) return this.subpath(endSegment, endX, startSegment, startX).invert();
+
+
+    let length = endSegment - startSegment;
+    if (length < 0 || (length === 0 && startX > endX))
+      length += this.controls.length - 1;
+
     result.moveTo(this.evaluate(startSegment, startX));
 
-    const length = this.controls.length;
-    startSegment = modulo(startSegment, length);
-    endSegment = modulo(endSegment, length);
+    for (let i = 0; i <= length; i++) {
+      const [, , type, p, ...rest] = this.getSegmentAt(i + startSegment);
 
-    let shouldSkip = startSegment === endSegment && startX > endX === !invert;
-    for (let i = startSegment; ; i = modulo(invert ? i - 1 : i + 1, length)) {
-      if (i === 0) continue;
-
-      const [, lastPoint] = this.controls[i - 1];
-      const [type, point, maybeRadius, maybeSweep] = this.controls[i];
-      let p = invert ? lastPoint : point;
-
-      switch (type) {
-        // biome-ignore lint/suspicious/noFallthroughSwitchClause: <explanation>
-        case "close":
-          p = invert ? lastPoint : this.controls[0][1];
-        case "lineTo":
-          result.lineTo(p);
-          break;
-        case "arc":
-          result.arc(p, maybeRadius, invert !== !!maybeSweep ? 1 : 0);
-          break;
-        default:
-          throw new Error();
-      }
-      if (i === endSegment && !shouldSkip) break;
-      shouldSkip = false;
+      result.controls.push([type, p, ...rest]);
     }
-    const end = this.evaluate(endSegment, endX);
-    result.controls.at(-1)[1] = end;
+    result.controls.at(-1)[1] = this.evaluate(endSegment, endX);
     result.simplify();
     return result;
   }
