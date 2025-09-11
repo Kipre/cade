@@ -296,6 +296,26 @@ bro.test("negative offset", () => {
     );
 });
 
+bro.test("offset with array of offsets", () => {
+  const path = Path.fromD(
+    "M 0 0 L 500 0 L 600 700 L 100 700 Z",
+  );
+  bro
+    .expect(path.offset([100, -50, 80]).toString())
+    .toBe(
+      "M 14.285714285714286 100 L 564.7933415133247 100 L 639.0790557990391 620.0000000000005 L 88.57142857142857 620 Z",
+    );
+});
+
+bro.test("simple line offset", () => {
+  const p = new Path();
+  p.moveTo([0, 400]);
+  p.lineTo([500, 400]);
+  bro
+    .expect(p.offset(100).toString())
+    .toBe("M 6.123233995736766e-15 500 L 500 500");
+});
+
 bro.test("simple line thicken", () => {
   let doorSpace = new Path();
   doorSpace.moveTo([0, 400]);

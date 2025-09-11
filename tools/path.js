@@ -997,9 +997,9 @@ export class Path {
   }
 
   /**
-   * @param {number} offset
+   * @param {number | number[]} offsets
    */
-  offset(offset) {
+  offset(offsets) {
     function offsetSegment(t0, t1, offset) {
       const distance = Math.abs(offset);
       const folded = placeAlong(t0, t1, { distance });
@@ -1022,56 +1022,66 @@ export class Path {
 
     const length = this.controls.length;
 
-    for (let i = 1; i < length; i++) {
-      const [lastType, lp] = this.controls[i - 1];
-      const [type, p, r1, s1] = this.controls[i];
-      const [nextType, np, r2, s2] = this.controls[i + 1] ?? [];
+    function getOffset(i) {
+      if (!Array.isArray(offsets))
+        return offsets;
+      return offsets[modulo(i, length - 1)] ?? 0;
+    }
+
+    for (const [segment1, segment2] of this.iterateOverJunctions()) {
+      const [i, lp, type, p, r1, s1] = segment1;
+      const [, , nextType, np, r2, s2] = segment2;
+
+      // not ideal
+      if (i !== 1 && !nextType) continue;
 
       let p0, p1, p2, p3;
       let nr1, nr2;
 
+      const offset = getOffset(i - 1);
+      const nextOffset = getOffset(i);
+
       if (type === "lineTo" && nextType == null) {
         [p0, p1] = offsetSegment(lp, p, offset);
         result.controls[i][1] = p1;
+
       } else if (type === "lineTo" && nextType === "lineTo") {
         [p0, p1] = offsetSegment(lp, p, offset);
-        [p2, p3] = offsetSegment(p, np, offset);
+        [p2, p3] = offsetSegment(p, np, nextOffset);
         result.controls[i][1] = intersectLines(p0, p1, p2, p3);
+
       } else if (type === "lineTo" && nextType === "arc") {
         [p0, p1] = offsetSegment(lp, p, offset);
-        [p2, p3, nr2] = offsetArc(p, np, r2, s2, offset);
+        [p2, p3, nr2] = offsetArc(p, np, r2, s2, nextOffset);
         result.controls[i][1] = intersectLineAndArc(p0, p1, p2, p3, nr2, s2);
+
       } else if (type === "arc" && nextType === "lineTo") {
         [p0, p1, nr1] = offsetArc(lp, p, r1, s1, offset);
-        [p2, p3] = offsetSegment(p, np, offset);
+        [p2, p3] = offsetSegment(p, np, nextOffset);
         result.controls[i][1] = intersectLineAndArc(
-          p2,
-          p3,
-          p0,
-          p1,
-          nr1,
-          s1,
-          true,
+          ...[p2, p3, p0, p1, nr1, s1, true],
         );
         result.controls[i][2] = nr1;
+
       } else if (type === "arc" && nextType === "arc") {
         [p0, p1, nr1] = offsetArc(lp, p, r1, s1, offset);
-        [p2, p3, nr2] = offsetArc(lp, p, r2, s2, offset);
+        [p2, p3, nr2] = offsetArc(lp, p, r2, s2, nextOffset);
         result.controls[i][1] = intersectTwoArcs(
-          p0,
-          p1,
-          nr1,
-          s1,
-          p2,
-          p3,
-          nr2,
-          s2,
+          ...[p0, p1, nr1, s1, p2, p3, nr2, s2],
         );
         result.controls[i][2] = nr1;
+
+      } else throw new Error("couldn't offset segment");
+
+      if (Number.isNaN(result.controls[i][1][0])) throw new Error();
+
+      if (i === 1) {
+        result.controls[0][1] = p0;
       }
 
-      if (lastType === "moveTo") {
-        result.controls[i - 1][1] = p0;
+      if (i === length - 1 && this.isClosed()) {
+        result.controls[0][1] = result.controls[i][1];
+        result.controls[i][1] = [];
       }
 
       if (i + 2 === length) {
@@ -1134,7 +1144,7 @@ export class Path {
       lastOne = info;
     }
 
-    yield [lastOne, first];
+    yield [lastOne, this.isClosed() ? first : []];
   }
 
   getJunctionAt(index) {

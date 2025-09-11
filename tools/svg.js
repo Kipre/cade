@@ -195,6 +195,17 @@ export function debugGeometry(...shapes) {
       orient="auto">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
     </marker>
+    <marker
+      id="start-line"
+      viewBox="0 0 10 10"
+      refX="1"
+      refY="5"
+      markerUnits="strokeWidth"
+      markerWidth="5"
+      markerHeight="10"
+      orient="auto">
+      <path d="M 4 0 L 4 10 L 6 10 L 6 0 Z" fill="context-stroke" />
+    </marker>
 </defs>`;
     svg.id = id;
     document.body.appendChild(svg);
@@ -222,8 +233,9 @@ export function debugGeometry(...shapes) {
     path.setAttribute("stroke", color);
     path.setAttribute("style", "opacity: 0.8");
     path.setAttribute("fill", "none");
+    path.setAttribute("marker-start", "url(#start-line)");
     path.setAttribute("marker-mid", marker);
-    path.setAttribute("marker-end", "url(#arrow)");
+    // path.setAttribute("marker-end", "url(#arrow)");
 
     const totalLength = path.getTotalLength();
     for (let i = 0; i < 1; i += 0.01) {
