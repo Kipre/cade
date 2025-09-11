@@ -297,9 +297,7 @@ bro.test("negative offset", () => {
 });
 
 bro.test("offset with array of offsets", () => {
-  const path = Path.fromD(
-    "M 0 0 L 500 0 L 600 700 L 100 700 Z",
-  );
+  const path = Path.fromD("M 0 0 L 500 0 L 600 700 L 100 700 Z");
   bro
     .expect(path.offset([100, -50, 80]).toString())
     .toBe(
@@ -620,26 +618,19 @@ bro.test("finds segments on line", () => {
     [-1000007.5000000001, 1.1641532182693481e-10],
   );
 
-  bro
-    .expect(segments)
-    .toEqual([3, 9, 15]);
+  bro.expect(segments).toEqual([3, 9, 15]);
 });
 
 bro.test("simplifies a close that that conicides with a line", () => {
   const p = Path.fromD("M 0 0 L 10 0 L 10 10 L 0 10 L 0 5 Z");
   p.simplify();
 
-  bro
-    .expect(p.toString())
-    .toBe("M 0 0 L 10 0 L 10 10 L 0 10 Z");
+  bro.expect(p.toString()).toBe("M 0 0 L 10 0 L 10 10 L 0 10 Z");
 
   const p2 = Path.fromD("M 0 5 L 0 0 L 10 0 L 10 10 L 0 10 Z");
   p2.simplify();
 
-  bro
-    .expect(p2.toString())
-    .toBe("M 0 0 L 10 0 L 10 10 L 0 10 Z");
-
+  bro.expect(p2.toString()).toBe("M 0 0 L 10 0 L 10 10 L 0 10 Z");
 });
 
 bro.test("inverts a circle", () => {
@@ -651,9 +642,30 @@ bro.test("inverts a circle", () => {
 
   bro
     .expect(p.invert().toString())
-    .toBe("M 1096 45.85786437626905 A 3.5 3.5 0 0 0 1089 45.85786437626905 A 3.5 3.5 0 0 0 1096 45.85786437626905 Z");
+    .toBe(
+      "M 1096 45.85786437626905 A 3.5 3.5 0 0 0 1089 45.85786437626905 A 3.5 3.5 0 0 0 1096 45.85786437626905 Z",
+    );
+
+  bro.expect(p.invert().invert().toString()).toBe(p.toString());
+});
+
+bro.test("point is inside", () => {
+  const p = new Path();
+  p.moveTo([0, 0]);
+  p.lineTo([10, 0]);
+  p.arc([10, 200], 110, 1);
+  p.lineTo([-30, 200]);
+  p.arc([0, 10], 150, 0);
+  p.close();
+  const points = [
+    [5, 5],
+    [70, 110],
+    [-70, 100],
+    [200, 90],
+    [5, 195],
+  ];
 
   bro
-    .expect(p.invert().invert().toString())
-    .toBe(p.toString());
+    .expect(points.map((x) => p.isInside(x)))
+    .toEqual([true, true, false, false, true]);
 });

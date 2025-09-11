@@ -31,6 +31,7 @@ import {
   normalizeAngle,
   pointCoordinateOnArc,
 } from "./circle.js";
+import { BBox, debugGeometry } from "./svg.js";
 import { applyTransformMatrix } from "./transform.js";
 import { modulo } from "./utils.js";
 
@@ -604,7 +605,20 @@ export class Path {
         let counter = 0;
 
         do {
-          const path = [i, side, !crossesFromTheRight];
+          const invert = !crossesFromTheRight;
+          const { segment, x } = intersections[i][side];
+
+          const [here, there] = side === "self" ? [this, other] : [other, this];
+          const point = here.evaluate(segment, invert ? x - 1e-2 : x + 1e-2);
+          const entersOtherShape = there.isInside(point);
+
+          const path = {
+            intersectionIdx: i,
+            side,
+            invert,
+            entersOtherShape,
+          };
+
           loop.push(path);
           const info = intersections[i][side];
           i = crossesFromTheRight ? info.after : info.before;
@@ -628,18 +642,29 @@ export class Path {
   booleanDifference(other) {
     const { loops, intersections } = this.#findIntersectionLoops(other);
 
-    if (loops.length === 0) throw new Error();
-    // TODO: fix this bs
-    const loop = loops[2];
+    if (!intersections.length)
+      throw new Error("difference is impossible because shapes don't overlap");
+
+    let loop;
+    let found = false;
+    for (loop of loops) {
+      if (loop.length !== 2) continue;
+      const indexOrder = loop[0].side === "self" ? 0 : 1;
+      const { entersOtherShape: enters1 } = loop[indexOrder];
+      const { entersOtherShape: enters2 } = loop[1 - indexOrder];
+
+      if (!enters1 && enters2) {
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) throw new Error("did not find the difference loop");
 
     const result = this.#fromIntersectionLoop(other, loop, intersections);
-
-    // persist closing edge
-    const [, from, , to] = this.getSegmentAt(0);
-    const segment = result.findSegmentsOnLine(from, to);
-    if (segment.length !== 1)
-      throw new Error("couldn't find old closing segment");
-    return result.moveClosingSegment(segment[0]);
+    if (this.rotatesClockwise() !== result.rotatesClockwise())
+      return result.invert();
+    return result;
   }
 
   /**
@@ -648,28 +673,40 @@ export class Path {
   booleanIntersection(other) {
     const { loops, intersections } = this.#findIntersectionLoops(other);
 
-    const exploredPaths = {};
-
-    // find intersection loop:
-    // using an indexed loop because for legacy testing reasons we want to
-    // return the first loop
     let loop;
-
-    for (let i = 0; i < loops.length; i++) {
-      loop = loops[i];
-      for (const crossing of loop) {
-        const key = crossing.toString();
-        if (key in exploredPaths) {
-          loop = loops[exploredPaths[key]];
-          break;
-        }
-        exploredPaths[key] = i;
-      }
+    for (loop of loops) {
+      if (loop.every((c) => c.entersOtherShape)) break;
     }
 
     if (loop === loops.at(-1) || loop == null) throw new Error();
 
     return this.#fromIntersectionLoop(other, loop, intersections);
+  }
+
+  #fromIntersectionLoop(other, loop, intersections) {
+    const path = new Path();
+
+    for (let i = 1; i <= loop.length; i++) {
+      const idx = i % loop.length;
+
+      const { intersectionIdx: from, side, invert } = loop[i - 1];
+      const to = loop[idx].intersectionIdx;
+
+      const { segment: startSegment, x: startX } = intersections[from][side];
+      const { segment: endSegment, x: endX } = intersections[to][side];
+
+      const sub = (side === "self" ? this : other).subpath(
+        startSegment,
+        startX,
+        endSegment,
+        endX,
+        invert,
+      );
+      path.merge(sub);
+    }
+
+    path.simplify();
+    return path;
   }
 
   rotatesClockwise() {
@@ -863,16 +900,16 @@ export class Path {
 
   /**
    * @param {number} startSegment
-  * @param {number} startX
-  * @param {number} endSegment
-  * @param {number} endX
-  * @returns {Path}
-  */
+   * @param {number} startX
+   * @param {number} endSegment
+   * @param {number} endX
+   * @returns {Path}
+   */
   subpath(startSegment, startX, endSegment, endX, invert = false) {
     const result = new Path();
 
-    if (invert) return this.subpath(endSegment, endX, startSegment, startX).invert();
-
+    if (invert)
+      return this.subpath(endSegment, endX, startSegment, startX).invert();
 
     let length = endSegment - startSegment;
     if (length < 0 || (length === 0 && startX > endX))
@@ -1023,8 +1060,7 @@ export class Path {
     const length = this.controls.length;
 
     function getOffset(i) {
-      if (!Array.isArray(offsets))
-        return offsets;
+      if (!Array.isArray(offsets)) return offsets;
       return offsets[modulo(i, length - 1)] ?? 0;
     }
 
@@ -1044,17 +1080,14 @@ export class Path {
       if (type === "lineTo" && nextType == null) {
         [p0, p1] = offsetSegment(lp, p, offset);
         result.controls[i][1] = p1;
-
       } else if (type === "lineTo" && nextType === "lineTo") {
         [p0, p1] = offsetSegment(lp, p, offset);
         [p2, p3] = offsetSegment(p, np, nextOffset);
         result.controls[i][1] = intersectLines(p0, p1, p2, p3);
-
       } else if (type === "lineTo" && nextType === "arc") {
         [p0, p1] = offsetSegment(lp, p, offset);
         [p2, p3, nr2] = offsetArc(p, np, r2, s2, nextOffset);
         result.controls[i][1] = intersectLineAndArc(p0, p1, p2, p3, nr2, s2);
-
       } else if (type === "arc" && nextType === "lineTo") {
         [p0, p1, nr1] = offsetArc(lp, p, r1, s1, offset);
         [p2, p3] = offsetSegment(p, np, nextOffset);
@@ -1062,7 +1095,6 @@ export class Path {
           ...[p2, p3, p0, p1, nr1, s1, true],
         );
         result.controls[i][2] = nr1;
-
       } else if (type === "arc" && nextType === "arc") {
         [p0, p1, nr1] = offsetArc(lp, p, r1, s1, offset);
         [p2, p3, nr2] = offsetArc(lp, p, r2, s2, nextOffset);
@@ -1070,7 +1102,6 @@ export class Path {
           ...[p0, p1, nr1, s1, p2, p3, nr2, s2],
         );
         result.controls[i][2] = nr1;
-
       } else throw new Error("couldn't offset segment");
 
       if (Number.isNaN(result.controls[i][1][0])) throw new Error();
@@ -1237,28 +1268,20 @@ export class Path {
     return result;
   }
 
-  #fromIntersectionLoop(other, loop, intersections) {
-    const path = new Path();
+  isInside(p) {
+    const bbox = this.bbox();
+    const pointOutside = minus(bbox.extrema()[0], [10, 10]);
+    const intersections = this.intersectLine(pointOutside, p);
+    return intersections.length % 2 === 1;
+  }
 
-    for (let i = 1; i <= loop.length; i++) {
-      const idx = i % loop.length;
-      const [from, side, invert] = loop[i - 1];
-      const [to] = loop[idx];
-      // TODO: change loop datatype
-      const { segment: startSegment, x: startX } = intersections[from][side];
-      const { segment: endSegment, x: endX } = intersections[to][side];
-
-      const sub = (side === "self" ? this : other).subpath(
-        startSegment,
-        startX,
-        endSegment,
-        endX,
-        invert,
-      );
-      path.merge(sub);
+  bbox() {
+    // TODO this is ineficient
+    const bbox = new BBox();
+    for (let i = 0; i < 1; i += 1 / 100) {
+      const p = this.evaluateAnywhere(i);
+      bbox.include(p);
     }
-
-    path.simplify();
-    return path;
+    return bbox;
   }
 }

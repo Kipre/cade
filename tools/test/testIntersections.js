@@ -15,7 +15,7 @@ bro.test("first stair", () => {
   bro
     .expect(loop.booleanIntersection(path).toString())
     .toBe(
-      "M 2809.0353766099665 1279.9794107165994 L 2725.5405109099383 1784.719817295343 L 2144.697960371747 1056.366296493606 A 200 200 0 0 0 2200.193773580484 986.7767478235116 Z",
+      "M 2200.193773580484 986.7767478235116 A 200 200 0 0 1 2144.697960371747 1056.366296493606 L 2725.540510909939 1784.7198172953433 L 2809.035376609966 1279.9794107165994 Z",
     );
 });
 
@@ -62,5 +62,20 @@ bro.test("simple difference", () => {
 
   bro
     .expect(firstPath.booleanDifference(secondPath).toString())
-    .toBe("M 0 0 L 0 10 L 5 10 L 5 5 L 8 5 L 8 10 L 10 10 L 10 0 Z");
+    .toBe("M 10 10 L 10 0 L 0 0 L 0 10 L 5 10 L 5 5 L 8 5 L 8 10 Z");
+});
+
+bro.test("difference 1", () => {
+  const firstPath = Path.fromD(
+    "M 600 0 L 53.210678118654755 0 L 53.210678118654755 -70 L 600 -70 Z",
+  );
+  const secondPath = Path.fromD(
+    "M 85 -35 A 3 3 0 0 0 85 -29 L 85 35 L 100 35 L 100 -29 A 3 3 0 0 0 100 -35 Z",
+  );
+
+  bro
+    .expect(firstPath.booleanDifference(secondPath).toString())
+    .toBe(
+      "M 53.210678118654755 0 L 53.210678118654755 -70 L 600 -70 L 600 0 L 100 0 L 100 -29 A 3 3 0 0 0 100 -35 L 85 -35 A 3 3 0 0 0 85 -29 L 85 0 Z",
+    );
 });

@@ -18,7 +18,7 @@ export class BBox {
   }
 
   /**
-   * @param {types.Point | [number, number, number] } point
+   * @param {types.Point | types.Point3 } point
    */
   include(point) {
     this.xMin = Math.min(this.xMin, point[0]);
@@ -29,6 +29,30 @@ export class BBox {
     if (point[2] != null) {
       this.zMin = Math.min(this.zMin, point[2]);
       this.zMax = Math.max(this.zMax, point[2]);
+    }
+  }
+
+  /**
+   * @returns {types.Point | types.Point3}
+   */
+  extrema() {
+    if (Number.isFinite(this.zMin))
+      return [
+        [this.xMin, this.yMin, this.zMin],
+        [this.xMax, this.yMax, this.zMax],
+      ];
+    return [
+      [this.xMin, this.yMin],
+      [this.xMax, this.yMax],
+    ];
+  }
+
+  /**
+   * @param {BBox} other
+   */
+  combine(other) {
+    for (const point of other.extrema()) {
+      this.include(point);
     }
   }
 
