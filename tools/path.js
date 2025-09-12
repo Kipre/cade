@@ -869,6 +869,31 @@ export class Path {
   }
 
   /**
+   * @param {number} width
+   * @param {number} height
+   */
+  static makeRectangle(width, height) {
+    const result = new Path();
+    result.moveTo([0, 0]);
+    result.lineTo([0, height]);
+    result.lineTo([width, height]);
+    result.lineTo([width, 0]);
+    result.close();
+    return result;
+  }
+
+  /**
+   * @param {number} width
+   * @param {number} height
+   * @param {number} radius
+   */
+  static makeRoundedRectangle(width, height, radius) {
+    const result = Path.makeRectangle(width, height);
+    result.roundFilletAll(radius);
+    return result;
+  }
+
+  /**
    * @param {types.Point[]} polyline
    */
   static fromPolyline(polyline) {

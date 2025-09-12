@@ -1,7 +1,7 @@
 // @ts-check
 /** @import * as types from './types' */
 
-const eps = 1e-5;
+export const eps = 1e-5;
 
 import { pairs } from "./iteration.js";
 import { debugGeometry } from "./svg.js";
