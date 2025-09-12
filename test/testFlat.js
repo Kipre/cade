@@ -1,46 +1,82 @@
 // @ts-check
 
-import { makePolygonFromLines } from "../lib/flat.js";
+import { makePolygonFromLines, spindleClearedLineTo } from "../lib/flat.js";
+import { Path } from "../tools/path.js";
 import bro from "../tools/test/brotest/brotest.js";
 
 bro.test("make polygon from parallel lines", () => {
-  const lines = [
-    [
-      [53.210678118654755, 7.5],
-      [600, 7.5],
-    ],
-    [
-      [53.210678118654755, -77.5],
-      [600, -77.5],
-    ],
-  ];
+	const lines = [
+		[
+			[53.210678118654755, 7.5],
+			[600, 7.5],
+		],
+		[
+			[53.210678118654755, -77.5],
+			[600, -77.5],
+		],
+	];
 
-  bro
-    .expect(makePolygonFromLines(lines, [15, 20]).toString())
-    .toBe(
-      "M 600 0 L 53.210678118654755 0 L 53.210678118654755 -67.5 L 600 -67.5 Z",
-    );
+	bro
+		.expect(makePolygonFromLines(lines, [15, 20]).toString())
+		.toBe(
+			"M 600 -70 L 53.210678118654755 -70 L 53.210678118654755 -2.5 L 600 -2.5 Z",
+		);
 });
 
 bro.test("make polygon from three walls", () => {
-  const lines = [
-    [
-      [-7.5, -85],
-      [-7.5, 500],
-    ],
-    [
-      [-15, -7.5],
-      [-97.0034898277757, -7.5],
-    ],
-    [
-      [-107.5, -110],
-      [-107.5, 500],
-    ],
-  ];
+	const lines = [
+		[
+			[-7.5, -85],
+			[-7.5, 500],
+		],
+		[
+			[-15, -7.5],
+			[-97.0034898277757, -7.5],
+		],
+		[
+			[-107.5, -110],
+			[-107.5, 500],
+		],
+	];
 
-  bro
-    .expect(makePolygonFromLines(lines, [15, 15, 15]).toString())
-    .toBe(
-      "M 0 500 L 0 -15 L -115 -15 L -115 500 Z",
-    );
+	bro
+		.expect(makePolygonFromLines(lines, [15, 15, 15]).toString())
+		.toBe("M -15 500 L -15 0 L -100 0 L -100 500 Z");
+});
+
+bro.test("clears spindle in angles", () => {
+	const r = 2;
+	const p = new Path();
+	p.moveTo([0, 0]);
+	p.lineTo([10, 0]);
+	spindleClearedLineTo(p, [10, 10], r);
+	spindleClearedLineTo(p, [20, 10], r);
+	spindleClearedLineTo(p, [20, 0], r, true);
+	spindleClearedLineTo(p, [30, 0], r, true);
+	spindleClearedLineTo(p, [40, 10], r);
+
+	bro
+		.expect(p.toString())
+		.toBe(
+			"M 0 0 L 10 0 A 2 2 0 0 1 10 4 L 10 10 A 2 2 0 0 0 14 10 L 16 10 A 2 2 0 0 0 20 10 L 20 4 A 2 2 0 0 1 20 0 L 30 0 A 2 2 0 0 1 32 2 L 40 10",
+		);
+});
+
+bro.test("clears spindle in mortise", () => {
+	const thickness = 15;
+	const spindleDiameter = 6;
+	const length = 30;
+
+	const mortise = new Path();
+	mortise.moveTo([0, -thickness / 2]);
+	mortise.lineTo([-length / 2, -thickness / 2]);
+	spindleClearedLineTo(mortise, [-length / 2, 0], spindleDiameter / 2, true);
+	mortise.mirror([0, 0]);
+	mortise.mirror();
+
+	bro
+		.expect(mortise.toString())
+		.toBe(
+			"M -9 -7.5 A 3 3 0 0 0 -15 -7.5 L -14.999999999999995 7.5 A 3 3 0 0 0 -8.999999999999998 7.5 L 8.999999999999991 7.499999999999999 A 3 3 0 0 0 14.999999999999988 7.499999999999995 L 15 -7.500000000000009 A 3 3 0 0 0 9 -7.500000000000003 Z",
+		);
 });
