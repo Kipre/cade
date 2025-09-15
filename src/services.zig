@@ -9,13 +9,46 @@ const meshBodySize = 1024 * std.math.pow(i32, 2, 10);
 const ServerAction = enum {
     thicken,
     export_step,
+    solidify,
     unknown,
 };
 
 const actions_map = std.StaticStringMap(ServerAction).initComptime(.{
     .{ "/occ/thicken", .thicken },
     .{ "/occ/export", .export_step },
+    .{ "/occ/solidify", .solidify },
 });
+
+fn solidify(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
+    const body = readRequestBody(req, allocator, reqBodySize) catch |err| {
+        try sendJsonError(req, "Failed to read request body", 400);
+        return err;
+    };
+    defer allocator.free(body);
+
+    std.debug.print("Received body: {s}\n", .{body});
+
+    var input = std.json.parseFromSlice(std.json.Value, allocator, body, .{}) catch |err| {
+        std.debug.print("JSON parse error: {any}\n", .{err});
+        try sendJsonError(req, "Invalid JSON format", 400);
+        return;
+    };
+    defer input.deinit();
+
+    var output_buffer: [meshBodySize]u8 = undefined;
+    const obj_size = try api.solidify(allocator, &input.value, &output_buffer);
+
+    if (obj_size == 0) {
+        std.debug.print("Failed to thicken part\n", .{});
+        try sendJsonError(req, "Part defninition did not yield a valid solid", 400);
+        return;
+    }
+
+    const response_body = output_buffer[0..obj_size];
+    try req.respond(response_body, .{ .extra_headers = &.{
+        .{ .name = "content-type", .value = "application/text" },
+    } });
+}
 
 fn export_step(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     const body = readRequestBody(req, allocator, reqBodySize) catch |err| {
@@ -83,6 +116,7 @@ pub fn handlePostRequest(req: *http.Server.Request, allocator: std.mem.Allocator
     switch (action) {
         .thicken => try thicken(req, allocator),
         .export_step => try export_step(req, allocator),
+        .solidify => try solidify(req, allocator),
         .unknown => {
             std.debug.print("Failed to understand request: {s}\n", .{path});
             try sendJsonError(req, "Action not found", 404);

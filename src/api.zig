@@ -48,13 +48,87 @@ pub fn flatPartToOBJ(allocator: std.mem.Allocator, part: *RawFlatPart, output_bu
     const size = segments.items.len;
     const array = try segments.toOwnedSlice(allocator);
 
-    const shape = occ.pathsToShape(array.ptr, size, 15);
+    const shape = occ.extrudePathWithHoles(array.ptr, size, 15);
     defer occ.freeShape(shape);
 
     const cint_obj_size = occ.writeToOBJ(shape, output_buffer);
 
     const obj_size: usize = @intCast(cint_obj_size);
     return obj_size;
+}
+
+pub fn solidify(allocator: std.mem.Allocator, definition: *std.json.Value, output_buffer: [*c]u8) !usize {
+    const shape = try executeShapeRecipe(allocator, definition);
+    defer occ.freeShape(shape);
+
+    const cint_obj_size = occ.writeToOBJ(shape, output_buffer);
+
+    const obj_size: usize = @intCast(cint_obj_size);
+    return obj_size;
+}
+
+pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *std.json.Value) !*occ.Shape {
+    const shapeRecipe = definition.object.get("shape").?.array;
+    const nbSteps = shapeRecipe.items.len;
+    var shapes = try allocator.alloc(*occ.Shape, nbSteps);
+    defer allocator.free(shapes);
+
+    for (0..nbSteps) |i| {
+        const step = shapeRecipe.items[i].object;
+        const operation = step.get("type").?.string;
+
+        if (std.mem.eql(u8, operation, "extrusion")) {
+            var segments: std.ArrayList(PathSegment) = .empty;
+            // defer allocator.free(segments);
+
+            try parsePath(allocator, &segments, step.get("outside").?.string);
+
+            for (step.get("insides").?.array.items) |path| {
+                try parsePath(allocator, &segments, path.string);
+            }
+
+            const size = segments.items.len;
+            const array = try segments.toOwnedSlice(allocator);
+
+            var result = occ.extrudePathWithHoles(array.ptr, size, step.get("thickness").?.float);
+
+            const placement = step.get("placement");
+            const transform = placement.?.array.items;
+            if (placement == null) {
+                var mat: [16]f64 = undefined;
+                for (0..15) |j| mat[j] = transform[i].float;
+                const trsf = occ.makeTransform(&mat[0]);
+                result = occ.applyShapeLocationTransform(result, trsf);
+            }
+
+            shapes[i] = result.?;
+            continue;
+        }
+
+        if (std.mem.eql(u8, operation, "fuse")) {
+            const shapeIndexes = step.get("shapes").?.array.items;
+            var currentShape = shapes[@intCast(shapeIndexes[0].integer)];
+            for (1..shapeIndexes.len) |idx| {
+                currentShape = occ.fuseShapes(currentShape, shapes[@intCast(shapeIndexes[idx].integer)]).?;
+            }
+
+            shapes[i] = currentShape;
+            continue;
+        }
+
+        if (std.mem.eql(u8, operation, "cut")) {
+            const shapeIndexes = step.get("shapes").?.array.items;
+            var currentShape = shapes[@intCast(shapeIndexes[0].integer)];
+            for (1..shapeIndexes.len) |idx| {
+                currentShape = occ.cutShape(currentShape, shapes[@intCast(shapeIndexes[idx].integer)]).?;
+            }
+
+            shapes[i] = currentShape;
+            continue;
+        }
+    }
+
+    return shapes[nbSteps - 1];
 }
 
 pub fn exportAsSTEP(allocator: std.mem.Allocator, definition: *CompactPartDefinition) !void {
@@ -67,7 +141,7 @@ pub fn exportAsSTEP(allocator: std.mem.Allocator, definition: *CompactPartDefini
         const array = try segments.toOwnedSlice(allocator);
 
         for (geom.instances) |instance| {
-            const shape = occ.pathsToShape(array.ptr, size, 15);
+            const shape = occ.extrudePathWithHoles(array.ptr, size, 15);
             var mat: [16]f64 = instance;
             const transform = occ.makeTransform(&mat[0]);
             occ.addShapeToCompound(compound, shape, transform);

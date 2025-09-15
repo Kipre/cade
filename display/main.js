@@ -2,7 +2,7 @@
 
 import { mat4, utils, vec3 } from "wgpu-matrix";
 import { BBox } from "../tools/svg.js";
-import { Camera } from "./camera.js";
+import { OrthoCamera, PerspectiveCamera } from "./camera.js";
 import { parseObjFile } from "./obj.js";
 import { fragmentShader, vertexShader } from "./shaders.js";
 import { createBuffer, invariant } from "./utils.js";
@@ -217,7 +217,7 @@ export async function displayScene(items) {
 
   const objectSize = bbox.size();
   const center = vec3.create(...bbox.center());
-  const camera = new Camera(
+  const camera = new OrthoCamera(
     utils.degToRad(-40),
     utils.degToRad(10),
     objectSize,
@@ -275,16 +275,7 @@ export async function displayScene(items) {
     queue.writeBuffer(instanceBuffer, 0, instanceBufferArray);
 
     const model = mat4.translation(vec3.create(0, 0, 0));
-    const view = camera.getView();
-
-    const projection = mat4.perspective(
-      utils.degToRad(45),
-      canvas.width / canvas.height,
-      1,
-      camera.distance + 3 * bbox.size(),
-    );
-
-    const mvp = mat4.multiply(projection, mat4.multiply(view, model));
+    const mvp = mat4.multiply(camera.getMVP(), model);
     const cameraPosition = camera.getPosition();
 
     const bufferData = [

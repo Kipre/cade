@@ -2,8 +2,9 @@
 
 import { mat4, vec3 } from "wgpu-matrix";
 import { clamp } from "./utils.js";
+import { degs } from "../tools/2d.js";
 
-export class Camera {
+class BaseCamera {
   scrollDirection = 0;
   wheelTimeout = null;
   lastX = 0;
@@ -21,9 +22,10 @@ export class Camera {
     document.addEventListener("mousedown", this.handleMouseDown);
     document.addEventListener("mousemove", this.handleMouseMove);
     document.addEventListener("mouseup", this.handleMouseUp);
-    document
-      .querySelector("canvas")
-      .addEventListener("wheel", this.handleMouseWheel);
+    this.canvas = document.querySelector("canvas");
+    if (this.canvas == null) throw new Error();
+
+    this.canvas.addEventListener("wheel", this.handleMouseWheel);
     this.pitch = pitch;
     this.yaw = yaw;
     this.size = size;
@@ -105,5 +107,29 @@ export class Camera {
   getView() {
     const position = this.getPosition();
     return mat4.lookAt(position, this.target, vec3.create(0, 0, 1));
+  }
+}
+
+export class PerspectiveCamera extends BaseCamera {
+  getMVP() {
+    const view = this.getView();
+    const projection = mat4.perspective(
+      (45 * Math.PI) / 180,
+      this.canvas.width / this.canvas.height,
+      1,
+      this.distance + 3 * this.size,
+    );
+    return mat4.multiply(projection, view);
+  }
+}
+
+export class OrthoCamera extends BaseCamera {
+  getMVP() {
+    const view = this.getView();
+    const mult = this.distance / this.size;
+    const x = (mult * this.canvas.width) / 2;
+    const y = (mult * this.canvas.height) / 2;
+    const projection = mat4.ortho(-x, x, -y, y, -1 * this.size, 4 * this.size);
+    return mat4.multiply(projection, view);
   }
 }
