@@ -56,6 +56,9 @@
 #include <TopLoc_Location.hxx>
 #include <gp_Trsf.hxx>
 
+#include <BRepAlgoAPI_Fuse.hxx>
+#include <BRepAlgoAPI_Cut.hxx>
+
 #include "occ.hxx"
 
 std::string segmentsToPathString(const PathSegment *segments, size_t length) {
@@ -441,7 +444,8 @@ struct Transform {
 
 extern "C" {
 
-Shape *pathsToShape(const PathSegment *segments, size_t size, float thickness) {
+Shape *extrudePathWithHoles(const PathSegment *segments, size_t size,
+                            double thickness) {
   TopoDS_Face face = makeFaceFromSegments(segments, size);
   if (!face.IsNull()) {
     std::cout << "Successfully created TopoDS_Face from the wire." << std::endl;
@@ -464,7 +468,47 @@ Shape *pathsToShape(const PathSegment *segments, size_t size, float thickness) {
 
   return result;
 }
+
 void freeShape(Shape *shape) { delete shape; }
+
+Shape *applyShapeLocationTransform(Shape *shape, Transform *trsf) {
+  if (!shape || !trsf)
+    return shape;
+
+  TopoDS_Shape s = shape->shape;
+  TopLoc_Location loc(trsf->trsf);
+
+  Shape *result = new Shape;
+  result->shape = s.Located(loc);
+
+  return result;
+}
+
+Shape *fuseShapes(Shape *shape1, Shape *shape2) {
+  if (!shape1 || !shape2)
+    return shape1;
+
+  TopoDS_Shape s1 = shape1->shape;
+  TopoDS_Shape s2 = shape2->shape;
+
+  Shape *result = new Shape;
+  result->shape = BRepAlgoAPI_Fuse(s2, s2);
+
+  return result;
+}
+
+Shape *cutShape(Shape *toCut, Shape *cutout) {
+  if (!toCut || !cutout)
+    return toCut;
+
+  TopoDS_Shape s1 = toCut->shape;
+  TopoDS_Shape s2 = cutout->shape;
+
+  Shape *result = new Shape;
+  result->shape = BRepAlgoAPI_Cut(s2, s2);
+
+  return result;
+}
 
 int writeToOBJ(Shape *shape, char *buffer) {
   const auto out_length = writeSolidToObj(shape->shape, buffer);
