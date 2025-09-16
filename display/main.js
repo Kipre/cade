@@ -2,9 +2,9 @@
 
 import { mat4, utils, vec3 } from "wgpu-matrix";
 import { BBox } from "../tools/svg.js";
-import { OrthoCamera, PerspectiveCamera } from "./camera.js";
+import { OrthoCamera } from "./camera.js";
 import { parseObjFile } from "./obj.js";
-import { fragmentShader, vertexShader } from "./shaders.js";
+import { fragmentShader2, vertexShader } from "./shaders.js";
 import { createBuffer, invariant } from "./utils.js";
 
 let context;
@@ -108,7 +108,7 @@ export async function displayScene(items) {
   });
 
   const uniformBuffer = device.createBuffer({
-    size: 4 * 16 + 4 * 16 + 3 * 4 * 4, // mat4x4f + mat4x4f + 3 * vec3f
+    size: 3 * 4 * 16 + 3 * 4 * 4, // 3 * mat4x4f + 3 * vec3f
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
 
@@ -120,7 +120,7 @@ export async function displayScene(items) {
   });
 
   const vertModule = device.createShaderModule({ code: vertexShader });
-  const fragModule = device.createShaderModule({ code: fragmentShader });
+  const fragModule = device.createShaderModule({ code: fragmentShader2 });
 
   // Shader Stages
   const vertex = {
@@ -276,11 +276,13 @@ export async function displayScene(items) {
 
     const model = mat4.translation(vec3.create(0, 0, 0));
     const mvp = mat4.multiply(camera.getMVP(), model);
+    const view = camera.getMVP();
     const cameraPosition = camera.getPosition();
 
     const bufferData = [
       ...mvp,
       ...model,
+      ...view,
       ...cameraPosition,
       0,
       // ...lightPosition,
