@@ -64,6 +64,11 @@ pub fn main() !void {
     const input_file_path = "OCCT/adm/templates/Standard_Version.hxx.in";
     const output_file_path = "inc/Standard_Version.hxx";
 
+    _ = std.fs.cwd().makeDir("inc") catch |err| switch (err) {
+        error.PathAlreadyExists => return,
+        else => return err,
+    };
+
     // --- Hardcoded Replacements ---
     var replacements = std.StringHashMap([]const u8).init(allocator);
     defer replacements.deinit();

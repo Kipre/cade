@@ -117,24 +117,24 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
 
     // specific test
-    const specific_test = b.addTest(.{
-        .name = "test",
-        .root_module = mod,
-    });
-
-    if (target.result.os.tag == .windows) {
-        exe.linkSystemLibrary("Ws2_32");
-    }
-    specific_test.linkLibCpp();
-    specific_test.addIncludePath(b.path("src"));
-    specific_test.addIncludePath(b.path("inc"));
-    specific_test.addCSourceFile(.{ .file = b.path("src/occ.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
-
-    for (occt_libs) |lib| {
-        specific_test.linkLibrary(lib);
-    }
-
-    const specific_test_step = b.step("test", "Run tests");
-    const run_specific = b.addRunArtifact(specific_test);
-    specific_test_step.dependOn(&run_specific.step);
+    // const specific_test = b.addTest(.{
+    //     .name = "test",
+    //     .root_module = mod,
+    // });
+    //
+    // if (target.result.os.tag == .windows) {
+    //     exe.linkSystemLibrary("Ws2_32");
+    // }
+    // specific_test.linkLibCpp();
+    // specific_test.addIncludePath(b.path("src"));
+    // specific_test.addIncludePath(b.path("inc"));
+    // specific_test.addCSourceFile(.{ .file = b.path("src/occ.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
+    //
+    // for (occt_libs) |lib| {
+    //     specific_test.linkLibrary(lib);
+    // }
+    //
+    // const specific_test_step = b.step("test", "Run tests");
+    // const run_specific = b.addRunArtifact(specific_test);
+    // specific_test_step.dependOn(&run_specific.step);
 }

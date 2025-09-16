@@ -485,27 +485,33 @@ Shape *applyShapeLocationTransform(Shape *shape, Transform *trsf) {
 }
 
 Shape *fuseShapes(Shape *shape1, Shape *shape2) {
-  if (!shape1 || !shape2)
+  if (!shape1 || !shape2) {
+    std::cout << "couldn't fuse shapes as one of the arguments is null"
+              << std::endl;
     return shape1;
+  }
 
   TopoDS_Shape s1 = shape1->shape;
   TopoDS_Shape s2 = shape2->shape;
 
   Shape *result = new Shape;
-  result->shape = BRepAlgoAPI_Fuse(s2, s2);
+  result->shape = BRepAlgoAPI_Fuse(s1, s2);
 
   return result;
 }
 
 Shape *cutShape(Shape *toCut, Shape *cutout) {
-  if (!toCut || !cutout)
+  if (!toCut || !cutout) {
+    std::cout << "couldn't cut shapes as one of the arguments is null"
+              << std::endl;
     return toCut;
+  }
 
   TopoDS_Shape s1 = toCut->shape;
   TopoDS_Shape s2 = cutout->shape;
 
   Shape *result = new Shape;
-  result->shape = BRepAlgoAPI_Cut(s2, s2);
+  result->shape = BRepAlgoAPI_Cut(s1, s2);
 
   return result;
 }

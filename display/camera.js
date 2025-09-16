@@ -69,7 +69,7 @@ class BaseCamera {
     event.preventDefault();
     const scaleFactor = 1e-3 * this.distance;
     this.distance += event.deltaY * scaleFactor;
-    this.distance = clamp(this.distance, 0.3 * this.size, 3 * this.size);
+    this.distance = clamp(this.distance, 0.1 * this.size, 3 * this.size);
   };
 
   /**
