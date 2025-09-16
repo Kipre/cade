@@ -7,14 +7,12 @@ const reqBodySize = 1024 * std.math.pow(i32, 2, 6);
 const meshBodySize = 1024 * std.math.pow(i32, 2, 10);
 
 const ServerAction = enum {
-    thicken,
     export_step,
     solidify,
     unknown,
 };
 
 const actions_map = std.StaticStringMap(ServerAction).initComptime(.{
-    .{ "/occ/thicken", .thicken },
     .{ "/occ/export", .export_step },
     .{ "/occ/solidify", .solidify },
 });
@@ -39,7 +37,7 @@ fn solidify(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     const obj_size = try api.solidify(allocator, &input.value, &output_buffer);
 
     if (obj_size == 0) {
-        std.debug.print("Failed to thicken part\n", .{});
+        std.debug.print("Failed to solidify part\n", .{});
         try sendJsonError(req, "Part defninition did not yield a valid solid", 400);
         return;
     }
@@ -76,45 +74,10 @@ fn export_step(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     } });
 }
 
-fn thicken(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
-    const body = readRequestBody(req, allocator, reqBodySize) catch |err| {
-        try sendJsonError(req, "Failed to read request body", 400);
-        return err;
-    };
-    defer allocator.free(body);
-
-    std.debug.print("Received body: {s}\n", .{body});
-
-    // Parse JSON into our struct
-    var input = std.json.parseFromSlice(api.RawFlatPart, allocator, body, .{
-        .ignore_unknown_fields = true, // Ignore extra fields
-    }) catch |err| {
-        std.debug.print("JSON parse error: {any}\n", .{err});
-        try sendJsonError(req, "Invalid JSON format", 400);
-        return;
-    };
-    defer input.deinit();
-
-    var output_buffer: [meshBodySize]u8 = undefined;
-    const obj_size = try api.flatPartToOBJ(allocator, &input.value, &output_buffer);
-
-    if (obj_size == 0) {
-        std.debug.print("Failed to thicken part\n", .{});
-        try sendJsonError(req, "Part defninition did not yield a valid solid", 400);
-        return;
-    }
-
-    const response_body = output_buffer[0..obj_size];
-    try req.respond(response_body, .{ .extra_headers = &.{
-        .{ .name = "content-type", .value = "application/text" },
-    } });
-}
-
 pub fn handlePostRequest(req: *http.Server.Request, allocator: std.mem.Allocator, path: []const u8) !void {
     const action = actions_map.get(path) orelse .unknown;
 
     switch (action) {
-        .thicken => try thicken(req, allocator),
         .export_step => try export_step(req, allocator),
         .solidify => try solidify(req, allocator),
         .unknown => {
