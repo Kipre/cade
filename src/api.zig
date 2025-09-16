@@ -22,6 +22,14 @@ pub const CompactPartDefinition = struct {
     geometries: []InstancedGeometry,
 };
 
+pub fn getNumber(val: std.json.Value) !f64 {
+    return switch (val) {
+        .integer => |i| @floatFromInt(i),
+        .float => |f| f,
+        else => return error.NotANumber,
+    };
+}
+
 pub fn parsePath(allocator: Allocator, segmentsArray: *std.ArrayList(PathSegment), path: []const u8) !void {
     var iterator = parse.SVGPathIterator.init(path);
     while (try iterator.next()) |val| {
@@ -68,13 +76,13 @@ pub fn solidify(allocator: std.mem.Allocator, definition: *std.json.Value, outpu
 }
 
 pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *std.json.Value) !*occ.Shape {
-    const shapeRecipe = definition.object.get("shape").?.array;
-    const nbSteps = shapeRecipe.items.len;
+    const shapeRecipe = definition.object.get("shape").?.array.items;
+    const nbSteps = shapeRecipe.len;
     var shapes = try allocator.alloc(*occ.Shape, nbSteps);
     defer allocator.free(shapes);
 
-    for (0..nbSteps) |i| {
-        const step = shapeRecipe.items[i].object;
+    for (shapeRecipe, 0..) |recipeStep, i| {
+        const step = recipeStep.object;
         const operation = step.get("type").?.string;
 
         if (std.mem.eql(u8, operation, "extrusion")) {
@@ -90,13 +98,12 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *std.json.Va
             const size = segments.items.len;
             const array = try segments.toOwnedSlice(allocator);
 
-            var result = occ.extrudePathWithHoles(array.ptr, size, step.get("thickness").?.float);
+            var result = occ.extrudePathWithHoles(array.ptr, size, try getNumber(step.get("length").?));
 
-            const placement = step.get("placement");
-            const transform = placement.?.array.items;
-            if (placement == null) {
+            if (step.get("placement")) |placement| {
+                const transform = placement.array.items;
                 var mat: [16]f64 = undefined;
-                for (0..15) |j| mat[j] = transform[i].float;
+                for (0..15) |j| mat[j] = try getNumber(transform[j]);
                 const trsf = occ.makeTransform(&mat[0]);
                 result = occ.applyShapeLocationTransform(result, trsf);
             }
@@ -108,8 +115,9 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *std.json.Va
         if (std.mem.eql(u8, operation, "fuse")) {
             const shapeIndexes = step.get("shapes").?.array.items;
             var currentShape = shapes[@intCast(shapeIndexes[0].integer)];
-            for (1..shapeIndexes.len) |idx| {
-                currentShape = occ.fuseShapes(currentShape, shapes[@intCast(shapeIndexes[idx].integer)]).?;
+            for (shapeIndexes, 0..) |idx, j| {
+                if (j == 0) continue;
+                currentShape = occ.fuseShapes(currentShape, shapes[@intCast(idx.integer)]).?;
             }
 
             shapes[i] = currentShape;
@@ -117,10 +125,10 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *std.json.Va
         }
 
         if (std.mem.eql(u8, operation, "cut")) {
-            const shapeIndexes = step.get("shapes").?.array.items;
-            var currentShape = shapes[@intCast(shapeIndexes[0].integer)];
-            for (1..shapeIndexes.len) |idx| {
-                currentShape = occ.cutShape(currentShape, shapes[@intCast(shapeIndexes[idx].integer)]).?;
+            const cutoutIndexes = step.get("cutouts").?.array.items;
+            var currentShape = shapes[@intCast(step.get("shape").?.integer)];
+            for (cutoutIndexes) |idx| {
+                currentShape = occ.cutShape(currentShape, shapes[@intCast(idx.integer)]).?;
             }
 
             shapes[i] = currentShape;
