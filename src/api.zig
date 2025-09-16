@@ -13,13 +13,13 @@ pub const RawFlatPart = struct {
 
 pub const Transform = [16]f64;
 
-pub const InstancedGeometry = struct {
-    part: RawFlatPart,
+pub const GeometryInstances = struct {
+    part: std.json.Value,
     instances: []Transform,
 };
 
 pub const CompactPartDefinition = struct {
-    geometries: []InstancedGeometry,
+    geometries: []GeometryInstances,
 };
 
 pub fn getNumber(val: std.json.Value) !f64 {
@@ -75,7 +75,7 @@ pub fn solidify(allocator: std.mem.Allocator, definition: *std.json.Value, outpu
     return obj_size;
 }
 
-pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *std.json.Value) !*occ.Shape {
+pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *const std.json.Value) !*occ.Shape {
     const shapeRecipe = definition.object.get("shape").?.array.items;
     const nbSteps = shapeRecipe.len;
     var shapes = try allocator.alloc(*occ.Shape, nbSteps);
@@ -102,7 +102,7 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *std.json.Va
 
             if (step.get("placement")) |placement| {
                 const transform = placement.array.items;
-                var mat: [16]f64 = undefined;
+                var mat: Transform = undefined;
                 for (0..15) |j| mat[j] = try getNumber(transform[j]);
                 const trsf = occ.makeTransform(&mat[0]);
                 result = occ.applyShapeLocationTransform(result, trsf);
@@ -144,13 +144,10 @@ pub fn exportAsSTEP(allocator: std.mem.Allocator, definition: *CompactPartDefini
     defer occ.freeCompound(compound);
 
     for (definition.geometries) |geom| {
-        var segments = try parseRawFlatPart(allocator, &geom.part);
-        const size = segments.items.len;
-        const array = try segments.toOwnedSlice(allocator);
+        const shape = try executeShapeRecipe(allocator, &geom.part);
 
         for (geom.instances) |instance| {
-            const shape = occ.extrudePathWithHoles(array.ptr, size, 15);
-            var mat: [16]f64 = instance;
+            var mat: Transform = instance;
             const transform = occ.makeTransform(&mat[0]);
             occ.addShapeToCompound(compound, shape, transform);
         }
