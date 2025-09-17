@@ -32,6 +32,35 @@ fn main(
 }
 `;
 
+export const lineVertexShader = `
+struct VSOut {
+  @builtin(position) Position: vec4f,
+};
+
+struct Uniforms {
+  mvp: mat4x4f,
+  model: mat4x4f,
+  view: mat4x4f,
+  cameraPosition: vec3f,
+  lightPosition: vec3f,
+  lightColor: vec3f,
+}
+
+@group(0) @binding(0) var<uniform> uni: Uniforms;
+@group(1) @binding(0) var<storage, read> instances : array<mat4x4<f32>>;
+
+@vertex
+fn main(
+  @location(0) inPosition: vec3f,
+  @builtin(instance_index) idx : u32
+) -> VSOut {
+    var vsOut: VSOut;
+    let transformed = instances[idx] * vec4f(inPosition, 1);
+    vsOut.Position = uni.mvp * transformed;
+    return vsOut;
+}
+`;
+
 export const fragmentShader = `
 struct Uniforms {
   mvp: mat4x4f,
@@ -112,5 +141,12 @@ fn main(
     let finalColor = mix(shadedColor, shadedColor * 0.5, edgeFactor * 0.5);
 
     return vec4<f32>(finalColor, 1.0);
+}
+`;
+
+export const lineFragmentShader = `
+@fragment
+fn main() -> @location(0) vec4<f32> {
+    return vec4<f32>(0.0, 0.0, 0.0, 1.0); // black lines
 }
 `;

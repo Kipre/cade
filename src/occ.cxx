@@ -1,6 +1,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
 
@@ -56,10 +57,18 @@
 #include <TopLoc_Location.hxx>
 #include <gp_Trsf.hxx>
 
-#include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
+#include <BRepAlgoAPI_Fuse.hxx>
+
+#include <BRepAdaptor_Curve.hxx>
+#include <GCPnts_QuasiUniformDeflection.hxx>
 
 #include "occ.hxx"
+
+void printPoint(gp_Pnt pnt) {
+  std::cout << std::setprecision(15) << "Vertex: " << pnt.X() << ", " << pnt.Y()
+            << ", " << pnt.Z() << std::endl;
+}
 
 std::string segmentsToPathString(const PathSegment *segments, size_t length) {
   std::ostringstream oss;
@@ -95,15 +104,24 @@ std::string segmentsToPathString(const PathSegment *segments, size_t length) {
   return oss.str();
 }
 
+std::tuple<int, int, int> getPointKey(const gp_Pnt &p) {
+  // Use rounded integer key to avoid floating-point mismatch
+  int keyX = static_cast<int>(std::round(p.X() * 1000000)); // 1e-6 tolerance
+  int keyY = static_cast<int>(std::round(p.Y() * 1000000));
+  int keyZ = static_cast<int>(std::round(p.Z() * 1000000));
+  return std::make_tuple(keyX, keyY, keyZ);
+}
+
 /**
  * @brief Meshes a given solid shape and writes the mesh data to an OBJ file.
  * @param aShape The solid shape to be meshed.
  * @param buffer The buffer to write to.
  */
-int writeSolidToObj(const TopoDS_Shape &aShape, char *buffer) {
+int writeSolidToObj(const TopoDS_Shape &shape, char *buffer,
+                    bool dumpOutlines = true) {
   std::ostringstream oss;
 
-  if (aShape.IsNull()) {
+  if (shape.IsNull()) {
     std::cerr << "Error: Cannot write a null shape to OBJ." << std::endl;
     return -1;
   }
@@ -111,14 +129,17 @@ int writeSolidToObj(const TopoDS_Shape &aShape, char *buffer) {
   buffer[1024 * 16 + 10] = '4';
   // Use a sensible deflection value (e.g., 0.1) for a good balance of detail
   // and file size.
-  BRepMesh_IncrementalMesh aMesh(aShape, 1, false, 0.5);
+  BRepMesh_IncrementalMesh aMesh(shape, 1, false, 0.5);
 
   oss << "# Open CASCADE Technology generated OBJ file" << std::endl;
   oss << "g occt_solid" << std::endl;
 
+  // A map to store vertices and their assigned OBJ indices
+  std::map<std::tuple<int, int, int>, int> vertexMap;
+
   // Keep track of the vertex index count as OBJ face indices are 1-based.
   int vertexCount = 1;
-  TopExp_Explorer anExpFace(aShape, TopAbs_FACE);
+  TopExp_Explorer anExpFace(shape, TopAbs_FACE);
   for (; anExpFace.More(); anExpFace.Next()) {
     const TopoDS_Face &aFace = TopoDS::Face(anExpFace.Current());
     TopLoc_Location aLocation;
@@ -134,15 +155,60 @@ int writeSolidToObj(const TopoDS_Shape &aShape, char *buffer) {
           node.Transform(aLocation.Transformation());
         }
 
+        const auto key = getPointKey(node);
+        vertexMap[key] = vertexCount++;
+
         oss << "v " << node.X() << " " << node.Y() << " " << node.Z()
             << std::endl;
       }
     }
   }
 
+  std::ostringstream linesStream;
+
+  for (TopExp_Explorer exp(shape, TopAbs_EDGE); exp.More(); exp.Next()) {
+    TopoDS_Edge edge = TopoDS::Edge(exp.Current());
+
+    // Get 3D curve of the edge
+    Standard_Real first, last;
+    Handle(Geom_Curve) curve = BRep_Tool::Curve(edge, first, last);
+    if (curve.IsNull())
+      continue;
+
+    BRepAdaptor_Curve adapt(edge);
+
+    // Discretize edge with a deflection-based algorithm
+    GCPnts_QuasiUniformDeflection discretizer(adapt, 0.01); // tolerance = 0.01
+    if (!discretizer.IsDone())
+      continue;
+
+    linesStream << "l";
+
+    for (int i = 1; i <= discretizer.NbPoints(); ++i) {
+      gp_Pnt p = discretizer.Value(i);
+
+      const auto key = getPointKey(p);
+      auto it = vertexMap.find(key);
+
+      int idx;
+
+      if (it == vertexMap.end()) {
+        idx = vertexCount;
+        vertexMap[key] = vertexCount++;
+        oss << "v " << p.X() << " " << p.Y() << " " << p.Z() << std::endl;
+      } else {
+        idx = it->second;
+      }
+
+      linesStream << " " << idx;
+    }
+
+    linesStream << "\n";
+  }
+
   // This loop is separate to ensure all vertices are defined before the faces.
   int currentVertexOffset = 1;
-  anExpFace.Init(aShape, TopAbs_FACE);
+  anExpFace.Init(shape, TopAbs_FACE);
 
   for (; anExpFace.More(); anExpFace.Next()) {
     const TopoDS_Face &aFace = TopoDS::Face(anExpFace.Current());
@@ -151,7 +217,6 @@ int writeSolidToObj(const TopoDS_Shape &aShape, char *buffer) {
         BRep_Tool::Triangulation(aFace, aLocation);
 
     if (!aTriangulation.IsNull()) {
-      // const Poly_Array1OfTriangle& triangles = aTriangulation->Triangle();
       const auto nb_triangles = aTriangulation->NbTriangles();
       for (int i = 1; i <= nb_triangles; ++i) {
         Poly_Triangle tri = aTriangulation->Triangle(i);
@@ -166,6 +231,10 @@ int writeSolidToObj(const TopoDS_Shape &aShape, char *buffer) {
       }
       currentVertexOffset += aTriangulation->NbNodes();
     }
+  }
+
+  if (dumpOutlines) {
+    oss << linesStream.str();
   }
 
   std::string str = oss.str();
@@ -263,11 +332,6 @@ gp_Pnt2d getCircleCenter(const gp_Pnt &startPoint, const gp_Pnt &endPoint,
 }
 
 gp_Pnt promote(gp_Pnt2d p) { return gp_Pnt(p.X(), p.Y(), 0.0); }
-
-void printPoint(gp_Pnt pnt) {
-  std::cout << std::setprecision(15) << "Vertex: " << pnt.X() << ", " << pnt.Y()
-            << ", " << pnt.Z() << std::endl;
-}
 
 /**
  * @brief Creates an OpenCASCADE TopoDS_Wire from parsed SVG path segments.
@@ -567,5 +631,4 @@ void addShapeToCompound(Compound *cmp, Shape *shape, Transform *trsf) {
   }
   cmp->builder.Add(cmp->compound, s);
 }
-
 }
