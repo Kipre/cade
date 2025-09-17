@@ -4,7 +4,12 @@ import { mat4, utils, vec3 } from "wgpu-matrix";
 import { BBox } from "../tools/svg.js";
 import { OrthoCamera } from "./camera.js";
 import { parseObjFile } from "./obj.js";
-import { fragmentShader2, vertexShader } from "./shaders.js";
+import {
+  fragmentShader2,
+  lineFragmentShader,
+  lineVertexShader,
+  vertexShader,
+} from "./shaders.js";
 import { createBuffer, invariant } from "./utils.js";
 
 let context;
@@ -28,12 +33,9 @@ function setup() {
 /** @typedef {{obj: string, instances: DOMMatrix[]}} ObjInstances */
 
 /**
- * @param {string} objString
  * @param {BBox | null} bbox
  */
-function parseObjAndRecomputeNormals(objString, bbox = null) {
-  const obj = parseObjFile(objString);
-
+function parseObjAndRecomputeNormals(obj, bbox = null) {
   const buffer = [];
   for (const face of obj.faces) {
     let recomputedN;
@@ -57,6 +59,54 @@ function parseObjAndRecomputeNormals(objString, bbox = null) {
   return buffer;
 }
 
+function makeLineBuffer(obj) {
+  const buffer = [];
+  for (const line of obj.polylines) {
+    for (let i = 1; i < line.length; i++) {
+      buffer.push(...obj.vertices[line[i - 1]], ...obj.vertices[line[i]]);
+    }
+  }
+  return buffer;
+}
+
+function makeOutlinePipeline(device, layout) {
+  const vertModule = device.createShaderModule({ code: lineVertexShader });
+  const fragModule = device.createShaderModule({ code: lineFragmentShader });
+
+  // Shader Stages
+  const vertex = {
+    module: vertModule,
+    entryPoint: "main",
+    buffers: [
+      {
+        attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
+        arrayStride: 3 * 4,
+        stepMode: "vertex",
+      },
+    ],
+  };
+
+  const fragment = {
+    module: fragModule,
+    entryPoint: "main",
+    targets: [{ format: "bgra8unorm" }],
+  };
+
+  return device.createRenderPipeline({
+    vertex,
+    fragment,
+    layout,
+    primitive: {
+      topology: "line-list",
+    },
+    depthStencil: {
+      depthWriteEnabled: false,
+      depthCompare: "less-equal",
+      format: "depth24plus-stencil8",
+    },
+  });
+}
+
 /**
  * @param {ObjInstances[]} items
  */
@@ -71,6 +121,7 @@ export async function displayScene(items) {
   const bbox = new BBox();
 
   const geometryBuffers = [];
+  const lineBuffers = [];
   const allInstances = [];
   let totalNbInstances = 0;
   const lengths = [0];
@@ -80,9 +131,15 @@ export async function displayScene(items) {
   const instanceStride = 4 * 16;
 
   for (const { obj, instances } of items) {
-    const buffer = parseObjAndRecomputeNormals(obj, bbox);
+    const objResult = parseObjFile(obj);
+    const buffer = parseObjAndRecomputeNormals(objResult, bbox);
+    const lineBuffer = makeLineBuffer(objResult);
+
     geometryBuffers.push(
       createBuffer(device, new Float32Array(buffer), GPUBufferUsage.VERTEX),
+    );
+    lineBuffers.push(
+      createBuffer(device, new Float32Array(lineBuffer), GPUBufferUsage.VERTEX),
     );
     allInstances.push(...instances.flatMap((mat) => [...mat.toFloat32Array()]));
     totalNbInstances += instances.length;
@@ -171,12 +228,14 @@ export async function displayScene(items) {
     ],
   });
 
+  const pipelineLayout = device.createPipelineLayout({
+    bindGroupLayouts: [bindGroupLayout, instanceBindGroupLayout],
+  });
+
   const pipeline = device.createRenderPipeline({
     vertex,
     fragment,
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [bindGroupLayout, instanceBindGroupLayout],
-    }),
+    layout: pipelineLayout,
     primitive: {
       frontFace: "cw",
       cullMode: "none",
@@ -184,19 +243,23 @@ export async function displayScene(items) {
     },
     depthStencil: {
       depthWriteEnabled: true,
+      depthBias: -1,
       depthCompare: "less",
       format: "depth24plus-stencil8",
     },
   });
 
+  const linePipeline = makeOutlinePipeline(device, pipelineLayout);
+
   const bindGroup = device.createBindGroup({
-    layout: pipeline.getBindGroupLayout(0),
+    label: "uniform bind group",
+    layout: bindGroupLayout,
     entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
   });
 
   const instanceBindGroup = device.createBindGroup({
     label: "instanceBindGroup",
-    layout: pipeline.getBindGroupLayout(1),
+    layout: instanceBindGroupLayout,
     entries: [
       {
         binding: 0,
@@ -256,19 +319,26 @@ export async function displayScene(items) {
       colorAttachments: [colorAttachment],
       depthStencilAttachment: depthAttachment,
     });
-    passEncoder.setPipeline(pipeline);
+
     passEncoder.setViewport(0, 0, canvas.width, canvas.height, 0, 1);
     passEncoder.setScissorRect(0, 0, canvas.width, canvas.height);
     passEncoder.setBindGroup(0, bindGroup);
 
-    for (let i = 0; i < items.length; i++) {
-      const nbInstances = nbInstancesPerItem[i];
-      passEncoder.setBindGroup(1, instanceBindGroup, [
-        lengths[i] * instanceStride,
-      ]);
-      const geomBuffer = geometryBuffers[i];
-      passEncoder.setVertexBuffer(0, geomBuffer);
-      passEncoder.draw(geomBuffer.size / (2 * 3 * 4), nbInstances);
+    for (const [ppline, buffers] of [
+      [pipeline, geometryBuffers],
+      [linePipeline, lineBuffers],
+    ]) {
+      passEncoder.setPipeline(ppline);
+
+      for (let i = 0; i < items.length; i++) {
+        const nbInstances = nbInstancesPerItem[i];
+        passEncoder.setBindGroup(1, instanceBindGroup, [
+          lengths[i] * instanceStride,
+        ]);
+        const buffer = buffers[i];
+        passEncoder.setVertexBuffer(0, buffer);
+        passEncoder.draw(buffer.size / (2 * 3 * 4), nbInstances);
+      }
     }
     passEncoder.end();
 

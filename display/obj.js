@@ -5,6 +5,7 @@ export function parseObjFile(objFileContents) {
   const uvs = [];
   const normals = [];
   const faces = [];
+  const polylines = [];
 
   const lines = objFileContents.split("\n");
   for (const line of lines) {
@@ -37,8 +38,15 @@ export function parseObjFile(objFileContents) {
         face.push({ vertexIndex, uvIndex, normalIndex });
       }
       faces.push({ vertices: face });
+    } else if (t[0] === "l") {
+      const line = [];
+      for (let i = 1; i < t.length; i++) {
+        const vertexIndex = Number.parseInt(t[i]) - 1;
+        line.push(vertexIndex);
+      }
+      polylines.push(line);
     }
   }
 
-  return { vertices, uvs, normals, faces };
+  return { vertices, uvs, normals, faces, polylines };
 }
