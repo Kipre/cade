@@ -133,7 +133,10 @@ export async function displayScene(items) {
   const lengths = [0];
   const nbInstancesPerItem = [];
 
-  for (const { item, instances } of items) {
+  // we sort by the number of instances to make the instances buffer work
+  const sortedItems = items.toSorted((a, b) => a.instances.length - b.instances.length);
+
+  for (const { item, instances } of sortedItems) {
     const obj = item.mesh;
     const objResult = parseObjFile(obj);
     const buffer = parseObjAndRecomputeNormals(objResult, bbox);
@@ -145,7 +148,9 @@ export async function displayScene(items) {
     lineBuffers.push(
       createBuffer(device, new Float32Array(lineBuffer), GPUBufferUsage.VERTEX),
     );
-    allInstances.push(...instances.flatMap((mat) => [...mat.toFloat32Array()]));
+
+    for (const mat of instances) allInstances.push(...mat.toFloat32Array());
+
     totalNbInstances += instances.length;
     nbInstancesPerItem.push(instances.length);
     const alignement = (totalNbInstances * instanceStride) % 256;
@@ -158,12 +163,11 @@ export async function displayScene(items) {
     }
     lengths.push(totalNbInstances);
 
-    // 0 padding
+    const colors = item.material.colors;
     allColors.push(
-      ...[
-        ...item.material.colors,
-        ...Array.from({ length: colorsStride }, () => 0),
-      ].slice(0, colorsStride / 4),
+      ...colors,
+      // 0 padding
+      ...Array.from({ length: colorsStride / 4 - colors.length }, () => 0),
     );
   }
 
@@ -182,7 +186,7 @@ export async function displayScene(items) {
   });
 
   const instanceBuffer = device.createBuffer({
-    label: "instanceBuffer",
+    label: "instance buffer",
     size: totalNbInstances * instanceStride,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
