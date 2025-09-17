@@ -1,6 +1,7 @@
 // @ts-check
 
 import { mat4, utils, vec3 } from "wgpu-matrix";
+import { Material } from "../lib/materials.js";
 import { BBox } from "../tools/svg.js";
 import { OrthoCamera } from "./camera.js";
 import { parseObjFile } from "./obj.js";
@@ -30,7 +31,7 @@ function setup() {
   invariant(entry, "WebGPU is not supported in this browser.");
 }
 
-/** @typedef {{obj: string, instances: DOMMatrix[]}} ObjInstances */
+/** @typedef {{item: {obj: string, material: Material}, instances: DOMMatrix[]}} ObjInstances */
 
 /**
  * @param {BBox | null} bbox
@@ -107,6 +108,10 @@ function makeOutlinePipeline(device, layout) {
   });
 }
 
+// float32 -> 4 bytes * mat4 -> 16 floats
+const instanceStride = 4 * 16;
+const colorsStride = 256; // 4 * 4 * NB_COLORS_PER_MATERIAL;
+
 /**
  * @param {ObjInstances[]} items
  */
@@ -123,14 +128,13 @@ export async function displayScene(items) {
   const geometryBuffers = [];
   const lineBuffers = [];
   const allInstances = [];
+  const allColors = [];
   let totalNbInstances = 0;
   const lengths = [0];
   const nbInstancesPerItem = [];
 
-  // float32 -> 4 bytes * mat4 -> 16 floats
-  const instanceStride = 4 * 16;
-
-  for (const { obj, instances } of items) {
+  for (const { item, instances } of items) {
+    const obj = item.mesh;
     const objResult = parseObjFile(obj);
     const buffer = parseObjAndRecomputeNormals(objResult, bbox);
     const lineBuffer = makeLineBuffer(objResult);
@@ -153,6 +157,14 @@ export async function displayScene(items) {
       totalNbInstances += requiredEmptyMatrixes;
     }
     lengths.push(totalNbInstances);
+
+    // 0 padding
+    allColors.push(
+      ...[
+        ...item.material.colors,
+        ...Array.from({ length: colorsStride }, () => 0),
+      ].slice(0, colorsStride / 4),
+    );
   }
 
   const maxNbInstances = Math.max(...nbInstancesPerItem);
@@ -172,7 +184,12 @@ export async function displayScene(items) {
   const instanceBuffer = device.createBuffer({
     label: "instanceBuffer",
     size: totalNbInstances * instanceStride,
-    // size: 1 * instanceStride,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
+
+  const colorBuffer = device.createBuffer({
+    label: "color buffer",
+    size: colorsStride * items.length,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
 
@@ -208,12 +225,11 @@ export async function displayScene(items) {
       {
         binding: 0,
         visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-        buffer: {
-          type: "uniform",
-        },
+        buffer: { type: "uniform" },
       },
     ],
   });
+
   const instanceBindGroupLayout = device.createBindGroupLayout({
     entries: [
       {
@@ -224,6 +240,11 @@ export async function displayScene(items) {
           hasDynamicOffset: true,
           // minBindingSize: 256,
         },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: "read-only-storage", hasDynamicOffset: true },
       },
     ],
   });
@@ -268,6 +289,13 @@ export async function displayScene(items) {
           size: maxNbInstances * instanceStride,
         },
       },
+      {
+        binding: 1,
+        resource: {
+          buffer: colorBuffer,
+          size: colorsStride,
+        },
+      },
     ],
   });
 
@@ -290,6 +318,7 @@ export async function displayScene(items) {
   const lightPosition = vec3.mulScalar(vec3.create(1, 1, 1), objectSize);
   const lightColor = vec3.create(1, 1, 1);
   const instanceBufferArray = new Float32Array(allInstances);
+  const colorsBufferArray = new Float32Array(allColors);
 
   function render() {
     const colorTexture = context.getCurrentTexture();
@@ -334,6 +363,7 @@ export async function displayScene(items) {
         const nbInstances = nbInstancesPerItem[i];
         passEncoder.setBindGroup(1, instanceBindGroup, [
           lengths[i] * instanceStride,
+          i * colorsStride,
         ]);
         const buffer = buffers[i];
         passEncoder.setVertexBuffer(0, buffer);
@@ -343,6 +373,7 @@ export async function displayScene(items) {
     passEncoder.end();
 
     queue.writeBuffer(instanceBuffer, 0, instanceBufferArray);
+    queue.writeBuffer(colorBuffer, 0, colorsBufferArray);
 
     const model = mat4.translation(vec3.create(0, 0, 0));
     const mvp = mat4.multiply(camera.getMVP(), model);
@@ -355,8 +386,7 @@ export async function displayScene(items) {
       ...view,
       ...cameraPosition,
       0,
-      // ...lightPosition,
-      ...cameraPosition,
+      ...lightPosition,
       0,
       ...lightColor,
       0,
