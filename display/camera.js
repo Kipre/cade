@@ -2,7 +2,9 @@
 
 import { mat4, vec3 } from "wgpu-matrix";
 import { clamp } from "./utils.js";
-import { degs } from "../tools/2d.js";
+
+const maxZoom = 5;
+const minZoom = 0.1;
 
 class BaseCamera {
   scrollDirection = 0;
@@ -29,7 +31,7 @@ class BaseCamera {
     this.pitch = pitch;
     this.yaw = yaw;
     this.size = size;
-    this.distance = this.size * 2;
+    this.distance = this.size;
     this.target = vec3.create(...(target ?? [0, 0, 0]));
   }
 
@@ -69,7 +71,11 @@ class BaseCamera {
     event.preventDefault();
     const scaleFactor = 1e-3 * this.distance;
     this.distance += event.deltaY * scaleFactor;
-    this.distance = clamp(this.distance, 0.1 * this.size, 3 * this.size);
+    this.distance = clamp(
+      this.distance,
+      minZoom * this.size,
+      maxZoom * this.size,
+    );
   };
 
   /**
@@ -117,7 +123,7 @@ export class PerspectiveCamera extends BaseCamera {
       (45 * Math.PI) / 180,
       this.canvas.width / this.canvas.height,
       1,
-      this.distance + 3 * this.size,
+      this.distance + maxZoom * this.size,
     );
     return mat4.multiply(projection, view);
   }
@@ -126,10 +132,17 @@ export class PerspectiveCamera extends BaseCamera {
 export class OrthoCamera extends BaseCamera {
   getMVP() {
     const view = this.getView();
-    const mult = this.distance / this.size;
-    const x = (mult * this.canvas.width) / 2;
-    const y = (mult * this.canvas.height) / 2;
-    const projection = mat4.ortho(-x, x, -y, y, -1 * this.size, 4 * this.size);
+    const aspect = this.canvas.width / this.canvas.height;
+    const x = this.distance * aspect;
+    const y = this.distance;
+    const projection = mat4.ortho(
+      -x,
+      x,
+      -y,
+      y,
+      -1 * this.size,
+      (maxZoom + 1) * this.size,
+    );
     return mat4.multiply(projection, view);
   }
 }
