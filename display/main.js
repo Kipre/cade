@@ -6,7 +6,7 @@ import { BBox } from "../tools/svg.js";
 import { OrthoCamera } from "./camera.js";
 import { parseObjFile } from "./obj.js";
 import {
-  fragmentShader2,
+  fragmentShader,
   lineFragmentShader,
   lineVertexShader,
   vertexShader,
@@ -198,7 +198,7 @@ export async function displayScene(items) {
   });
 
   const vertModule = device.createShaderModule({ code: vertexShader });
-  const fragModule = device.createShaderModule({ code: fragmentShader2 });
+  const fragModule = device.createShaderModule({ code: fragmentShader });
 
   // Shader Stages
   const vertex = {
