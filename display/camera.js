@@ -6,6 +6,8 @@ import { clamp } from "./utils.js";
 const maxZoom = 5;
 const minZoom = 0.1;
 
+let timerId;
+
 class BaseCamera {
   scrollDirection = 0;
   wheelTimeout = null;
@@ -33,6 +35,29 @@ class BaseCamera {
     this.size = size;
     this.distance = this.size;
     this.target = vec3.create(...(target ?? [0, 0, 0]));
+
+    const cache = sessionStorage.getItem("camera");
+    if (cache) {
+      const { pitch, yaw, distance, target } = JSON.parse(cache);
+      this.pitch = pitch;
+      this.yaw = yaw;
+      this.distance = distance;
+      this.target = vec3.create(...target);
+    }
+  }
+
+  saveToCache() {
+    // debounce
+    clearTimeout(timerId);
+    timerId = setTimeout(() => {
+      const state = {
+        pitch: this.pitch,
+        yaw: this.yaw,
+        distance: this.distance,
+        target: [...this.target],
+      };
+      sessionStorage.setItem("camera", JSON.stringify(state));
+    }, 200);
   }
 
   handleMouseDown = (event) => {
@@ -59,6 +84,7 @@ class BaseCamera {
     } else if (this.isPanning) {
       this.pan(dx, dy);
     }
+    this.saveToCache();
   };
 
   handleMouseUp = (event) => {
@@ -76,6 +102,7 @@ class BaseCamera {
       minZoom * this.size,
       maxZoom * this.size,
     );
+    this.saveToCache();
   };
 
   /**
@@ -97,6 +124,7 @@ class BaseCamera {
     );
 
     this.target = vec3.add(this.target, panOffset);
+    this.saveToCache();
   }
 
   getPosition() {
