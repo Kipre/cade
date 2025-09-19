@@ -242,7 +242,10 @@ export class Path {
       if (
         type1 === "arc" &&
         type2 === "arc" &&
-        areOnSameCircle(p0, p1, r1, s1, p1, p2, r2, s2)
+        areOnSameCircle(p0, p1, r1, s1, p1, p2, r2, s2) &&
+        Math.abs(getArcAngularLength(p0, p1, r1, s1)) +
+        Math.abs(getArcAngularLength(p1, p2, r2, s2)) <
+        Math.PI
       ) {
         this.controls.splice(i, 1);
         nbControlsToCheck--;

@@ -669,3 +669,9 @@ bro.test("point is inside", () => {
     .expect(points.map((x) => p.isInside(x)))
     .toEqual([true, true, false, false, true]);
 });
+
+bro.test("simplify small arcs that for a big arc", () => {
+  const p = Path.makeCircle(30);
+  p.simplify();
+  bro.expect(p.toString()).toEqual("M -30 0 A 30 30 0 0 0 30 0 A 30 30 0 0 0 -30 0 Z");
+});

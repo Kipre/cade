@@ -1,7 +1,15 @@
 // @ts-check
 /** @import * as types from './types' */
 
-import { minus, mult, norm, placeAlong, plus, rotatePoint } from "./2d.js";
+import {
+  minus,
+  mult,
+  norm,
+  placeAlong,
+  plus,
+  pointInsideLineBbox,
+  rotatePoint,
+} from "./2d.js";
 import { Path } from "./path.js";
 import { debugGeometry } from "./svg.js";
 import { modulo } from "./utils.js";
@@ -49,7 +57,7 @@ export function getCircleCenter(p1, p2, radius, sweep) {
  * @param {types.Point} end
  * @param {number} radius
  * @param {number} sweep
- * @param {boolean} softSelection
+ * @param {boolean} softSelection TODO: what does it do
  * @returns {types.Point}
  */
 export function intersectLineAndArc(
@@ -72,11 +80,20 @@ export function intersectLineAndArc(
       : roots[1];
   }
 
-  for (const root of roots)
-    if (isInPieSlice(root, start, end, radius, sweep)) return root;
+  const isInArc = roots.map((r) => isInPieSlice(r, start, end, radius, sweep));
 
-  // debugGeometry([start, end], [p1, p2], Path.makeCircle(radius).translate(center));
-  throw new Error("failed");
+  if (isInArc.every((x) => !x) || !roots.length) {
+    // const dbg = new Path();
+    // dbg.moveTo(start);
+    // dbg.arc(end, radius, sweep);
+    // debugGeometry([p1, p2], dbg);
+    throw new Error("failed");
+  }
+
+  if (!isInArc[0]) return roots[1];
+  if (!isInArc[1]) return roots[0];
+  if (!pointInsideLineBbox(roots[1], p1, p2)) return roots[0];
+  return roots[1];
 }
 
 /**

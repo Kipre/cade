@@ -5,6 +5,7 @@ import {
   arcTangentAt,
   evaluateArc,
   getCircleCenter,
+  intersectLineAndArc,
   isInPieSlice,
   pointCoordinateOnArc,
 } from "../circle.js";
@@ -162,4 +163,17 @@ bro.test("get center limit case", () => {
   bro
     .expect(getCircleCenter(lastPoint, p, radius, sweep))
     .toEqual([1115, 56.999999999999964]);
+});
+
+bro.test("intersect line and arc bug", () => {
+  const res = intersectLineAndArc(
+    [3, 0],
+    [3, 23],
+    [0, 29],
+    [0, 17],
+    6,
+    0,
+    true,
+  );
+  bro.expect(res).toEqual([3, 17.803847577293368]);
 });
