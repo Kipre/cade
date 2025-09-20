@@ -28,8 +28,9 @@ export function applyTransformMatrix(m, p) {
  * @param {types.Point3} p
  * @returns {types.Point3}
  */
-export function transformPoint3(m, p) {
+export function transformPoint3(m, p, noTranslation=false) {
   const domp = new DOMPoint(p[0], p[1], p[2]);
+  if (noTranslation) domp.w = 0;
   const p2 = m.transformPoint(domp);
   return [p2.x, p2.y, p2.z];
 }

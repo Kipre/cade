@@ -875,7 +875,7 @@ export class Path {
    * @param {number} width
    * @param {number} height
    */
-  static makeRectangle(width, height) {
+  static makeRect(width, height) {
     const result = new Path();
     result.moveTo([0, 0]);
     result.lineTo([0, height]);
@@ -890,8 +890,8 @@ export class Path {
    * @param {number} height
    * @param {number} radius
    */
-  static makeRoundedRectangle(width, height, radius) {
-    const result = Path.makeRectangle(width, height);
+  static makeRoundedRect(width, height, radius) {
+    const result = Path.makeRect(width, height);
     result.roundFilletAll(radius);
     return result;
   }
