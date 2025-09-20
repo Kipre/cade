@@ -56,7 +56,9 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *const std.j
             var segments: std.ArrayList(PathSegment) = .empty;
             // defer allocator.free(segments);
 
-            try parsePath(allocator, &segments, step.get("outside").?.string);
+            for (step.get("outsides").?.array.items) |path| {
+                try parsePath(allocator, &segments, path.string);
+            }
 
             for (step.get("insides").?.array.items) |path| {
                 try parsePath(allocator, &segments, path.string);

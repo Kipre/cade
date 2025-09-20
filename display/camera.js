@@ -4,7 +4,7 @@ import { mat4, vec3 } from "wgpu-matrix";
 import { clamp } from "./utils.js";
 
 const maxZoom = 5;
-const minZoom = 0.1;
+const minZoom = 0.01;
 
 let timerId;
 
