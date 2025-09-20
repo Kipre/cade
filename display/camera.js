@@ -25,10 +25,11 @@ class BaseCamera {
   constructor(pitch, yaw, size, target = null) {
     document.addEventListener("mousedown", this.handleMouseDown);
     document.addEventListener("mousemove", this.handleMouseMove);
-    document.addEventListener("mouseup", this.handleMouseUp);
     this.canvas = document.querySelector("canvas");
     if (this.canvas == null) throw new Error();
 
+    this.canvas.addEventListener("contextmenu", e => e.preventDefault());
+    this.canvas.addEventListener("mouseup", this.handleMouseUp);
     this.canvas.addEventListener("wheel", this.handleMouseWheel);
     this.pitch = pitch;
     this.yaw = yaw;
