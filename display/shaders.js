@@ -1,8 +1,10 @@
 export const vertexShader = `
+
 struct VSOut {
   @builtin(position) Position: vec4f,
   @location(0) fragmentPosition: vec3f,
   @location(1) normal: vec3f,
+  @location(2) @interpolate(flat) instance_idx: u32,
 };
 
 struct Uniforms {
@@ -28,6 +30,7 @@ fn main(
     vsOut.Position = uni.mvp * transformed;
     vsOut.fragmentPosition = inPosition;
     vsOut.normal = normalize(uni.view * instances[idx] * vec4f(inNormal, 0)).xyz;
+    vsOut.instance_idx = idx;
     return vsOut;
 }
 `;
@@ -69,24 +72,40 @@ struct Uniforms {
   cameraPosition: vec3f,
   lightPosition: vec3f,
   lightColor: vec3f,
+  selected_gidx: u32,
+  selected_iidx: u32,
+}
+
+struct GeometryMetadata {
+  geometry_idx: u32,
+  _pad: array<u32, 3>,
+  colors: array<f32, 12>,
 }
 
 @group(0) @binding(0) var<uniform> uni: Uniforms;
 @group(1) @binding(0) var<storage, read> instances : array<mat4x4<f32>>;
-@group(1) @binding(1) var<storage, read> col : array<f32, 12>;
+@group(1) @binding(1) var<storage, read> metadata : GeometryMetadata;
 
 @fragment
 fn main(
   @location(0) fragmentPosition: vec3f,
   @location(1) normal: vec3f,
+  @location(2) @interpolate(flat) instance_idx: u32,
 ) -> @location(0) vec4f {
+    let geom_idx = metadata.geometry_idx;
 
+
+    let col = metadata.colors;
     var uBaseColor = vec3f(col[9], col[10], col[11]);
 
     if (fragmentPosition.z < col[0]) {
         uBaseColor = vec3f(col[1], col[2], col[3]);
     } else if (fragmentPosition.z < col[4]) {
         uBaseColor = vec3f(col[5], col[6], col[7]);
+    }
+
+    if (uni.selected_gidx == geom_idx && uni.selected_iidx == instance_idx) {
+        uBaseColor = vec3f(0, 0, 1);
     }
 
     // Normalize inputs
@@ -111,5 +130,31 @@ export const lineFragmentShader = `
 @fragment
 fn main() -> @location(0) vec4<f32> {
     return vec4<f32>(0.0, 0.0, 0.0, 1.0); // black lines
+}
+`;
+
+export const pickingFragmentShader = `
+struct GeometryMetadata {
+  geometry_idx: u32,
+  _pad: array<u32, 3>,
+  colors: array<f32, 12>,
+}
+
+@group(1) @binding(1) var<storage, read> metadata : GeometryMetadata;
+
+@fragment
+fn main(
+  @builtin(position) pos: vec4<f32>,
+  @location(2) @interpolate(flat) instance_idx: u32,
+) -> @location(0) vec4<f32> {
+    let geom_idx = metadata.geometry_idx;
+
+    // Encode into RGBA [0,1]
+    // let r = f32((id >> 16) & 255u) / 255.0;
+    // let g = f32((id >> 8) & 255u) / 255.0;
+    // let b = f32(id & 255u) / 255.0;
+    let r = f32(geom_idx) / 255.0;
+    let g = f32(instance_idx) / 255.0;
+    return vec4<f32>(r, g, 1, 0);
 }
 `;
