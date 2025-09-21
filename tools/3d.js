@@ -60,10 +60,13 @@ export function dot3(p1, p2) {
 }
 
 /**
- * @param {types.Point3} p
+ * @param {types.Point3} p1
+ * @param {types.Point3} p2
  * @returns {number}
  */
-export function norm3(p) {
+export function norm3(p1, p2) {
+  p2 ??= [0, 0, 0];
+  const p = minus3(p1, p2);
   return Math.sqrt(p[0] ** 2 + p[1] ** 2 + p[2] ** 2);
 }
 
