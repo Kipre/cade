@@ -404,161 +404,7 @@ export async function displayScene(items) {
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
   });
 
-  async function pickObjectAt(x, y) {
-    if (readBuffer.mapState !== "unmapped") {
-      clearTimeout(pickerTimeoutId);
-      pickerTimeoutId = setTimeout(() => pickObjectAt(x, y), 10);
-      return;
-    }
-
-    // const pickingTexture = context.getCurrentTexture();
-    const colorAttachment = {
-      view: pickingTexture.createView(),
-      clearValue: { r: 0, g: 0, b: 0, a: 0 },
-      loadOp: "clear",
-      storeOp: "store",
-    };
-
-    const depthAttachment = {
-      view: depthTextureView,
-      depthClearValue: 1,
-      depthLoadOp: "clear",
-      depthStoreOp: "store",
-      stencilClearValue: 0,
-      stencilLoadOp: "clear",
-      stencilStoreOp: "store",
-    };
-    const commandEncoder = device.createCommandEncoder({
-      label: "picking command encoder",
-    });
-
-    // Encode drawing commands
-    const passEncoder = commandEncoder.beginRenderPass({
-      colorAttachments: [colorAttachment],
-      depthStencilAttachment: depthAttachment,
-    });
-
-    passEncoder.setViewport(0, 0, canvas.width, canvas.height, 0, 1);
-    passEncoder.setScissorRect(0, 0, canvas.width, canvas.height);
-    passEncoder.setBindGroup(0, bindGroup);
-
-    passEncoder.setPipeline(pickerPipeline);
-
-    for (let i = 0; i < items.length; i++) {
-      const nbInstances = nbInstancesPerItem[i];
-      passEncoder.setBindGroup(1, instanceBindGroup, [
-        lengths[i] * instanceStride,
-        i * geometryMetaStride,
-      ]);
-      const buffer = geometryBuffers[i];
-      passEncoder.setVertexBuffer(0, buffer);
-      passEncoder.draw(buffer.size / (2 * 3 * 4), nbInstances);
-    }
-
-    passEncoder.end();
-
-    queue.writeBuffer(instanceBuffer, 0, instanceBufferArray);
-    queue.writeBuffer(geometryMetaBuffer, 0, geometryMetaBufferArray);
-
-    const model = mat4.translation(vec3.create(0, 0, 0));
-    const mvp = mat4.multiply(camera.getMVP(), model);
-    const view = camera.getMVP();
-    const cameraPosition = camera.getPosition();
-
-    const bufferData = [
-      ...mvp,
-      ...model,
-      ...view,
-      ...cameraPosition,
-      0,
-      ...lightPosition,
-      0,
-      ...lightColor,
-      0,
-    ];
-    const uniformArray = new Float32Array(bufferData);
-    queue.writeBuffer(uniformBuffer, 0, uniformArray);
-
-    // Copy 1 pixel
-    commandEncoder.copyTextureToBuffer(
-      { texture: pickingTexture, origin: { x, y } },
-      { buffer: readBuffer, bytesPerRow: 256 }, // must be 256-byte aligned
-      { width: 1, height: 1 },
-    );
-
-    await readBuffer.mapAsync(GPUMapMode.READ);
-    const array = new Uint8Array(readBuffer.getMappedRange());
-    const [r, g, b] = array;
-    readBuffer.unmap();
-    queue.submit([commandEncoder.finish()]);
-
-    if (r !== 255) {
-      selectedGeometry = 256;
-      selectedInstance = 256;
-    } else {
-      selectedGeometry = b;
-      selectedInstance = g;
-    }
-  }
-
-  canvas.addEventListener("mousemove", (event) => {
-    if (camera.isPanning || camera.isDragging || event.shiftKey) return;
-    const x = event.clientX;
-    const y = event.clientY;
-    pickObjectAt(x, y);
-  });
-
-  function render() {
-    const colorTexture = context.getCurrentTexture();
-    const colorTextureView = colorTexture.createView();
-
-    const colorAttachment = {
-      view: colorTextureView,
-      clearValue: { r: 0.1, g: 0.1, b: 0.1, a: 1 },
-      loadOp: "clear",
-      storeOp: "store",
-    };
-
-    const depthAttachment = {
-      view: depthTextureView,
-      depthClearValue: 1,
-      depthLoadOp: "clear",
-      depthStoreOp: "store",
-      stencilClearValue: 0,
-      stencilLoadOp: "clear",
-      stencilStoreOp: "store",
-    };
-    const commandEncoder = device.createCommandEncoder();
-
-    // Encode drawing commands
-    const passEncoder = commandEncoder.beginRenderPass({
-      colorAttachments: [colorAttachment],
-      depthStencilAttachment: depthAttachment,
-    });
-
-    passEncoder.setViewport(0, 0, canvas.width, canvas.height, 0, 1);
-    passEncoder.setScissorRect(0, 0, canvas.width, canvas.height);
-    passEncoder.setBindGroup(0, bindGroup);
-
-    for (const [ppline, buffers] of [
-      [pipeline, geometryBuffers],
-      [linePipeline, lineBuffers],
-    ]) {
-      passEncoder.setPipeline(ppline);
-
-      for (let i = 0; i < items.length; i++) {
-        const nbInstances = nbInstancesPerItem[i];
-        passEncoder.setBindGroup(1, instanceBindGroup, [
-          lengths[i] * instanceStride,
-          i * geometryMetaStride,
-        ]);
-        const buffer = buffers[i];
-        passEncoder.setVertexBuffer(0, buffer);
-        passEncoder.draw(buffer.size / (2 * 3 * 4), nbInstances);
-      }
-    }
-    passEncoder.end();
-
+  function writeBuffers(queue) {
     queue.writeBuffer(instanceBuffer, 0, instanceBufferArray);
     queue.writeBuffer(geometryMetaBuffer, 0, geometryMetaBufferArray);
 
@@ -584,11 +430,124 @@ export async function displayScene(items) {
     ];
     const uniformArray = new Float32Array(bufferData);
     queue.writeBuffer(uniformBuffer, 0, uniformArray);
+  }
 
+  async function updateSelectedObject(commandEncoder, x, y) {
+    // Copy 1 pixel
+    commandEncoder.copyTextureToBuffer(
+      { texture: pickingTexture, origin: { x, y } },
+      { buffer: readBuffer, bytesPerRow: 256 }, // must be 256-byte aligned
+      { width: 1, height: 1 },
+    );
+
+    await readBuffer.mapAsync(GPUMapMode.READ);
+    const array = new Uint8Array(readBuffer.getMappedRange());
+    const [r, g, b] = array;
+
+    if (r !== 255) {
+      selectedGeometry = 256;
+      selectedInstance = 256;
+    } else {
+      selectedGeometry = b;
+      selectedInstance = g;
+    }
+
+    readBuffer.unmap();
+  }
+
+  function makePassEncoder(commandEncoder, overrides) {
+    let view;
+    if (!overrides.view)
+      view = context.getCurrentTexture().createView();
+
+    const passEncoder = commandEncoder.beginRenderPass({
+      colorAttachments: [{
+        view,
+        clearValue: { r: 0.1, g: 0.1, b: 0.1, a: 1 },
+        loadOp: "clear",
+        storeOp: "store",
+        ...overrides,
+      }],
+      depthStencilAttachment: {
+        view: depthTextureView,
+        depthClearValue: 1,
+        depthLoadOp: "clear",
+        depthStoreOp: "store",
+        stencilClearValue: 0,
+        stencilLoadOp: "clear",
+        stencilStoreOp: "store",
+      },
+    });
+
+    passEncoder.setViewport(0, 0, canvas.width, canvas.height, 0, 1);
+    passEncoder.setScissorRect(0, 0, canvas.width, canvas.height);
+    passEncoder.setBindGroup(0, bindGroup);
+
+    return passEncoder;
+  }
+
+  function renderPipeline(passEncoder, ppline, buffers) {
+    passEncoder.setPipeline(ppline);
+
+    for (let i = 0; i < items.length; i++) {
+      const nbInstances = nbInstancesPerItem[i];
+      passEncoder.setBindGroup(1, instanceBindGroup, [
+        lengths[i] * instanceStride,
+        i * geometryMetaStride,
+      ]);
+      const buffer = buffers[i];
+      passEncoder.setVertexBuffer(0, buffer);
+      passEncoder.draw(buffer.size / (2 * 3 * 4), nbInstances);
+    }
+  }
+
+  /**
+   * @param {number} x
+   * @param {number} y
+   */
+  async function pickObjectAt(x, y) {
+    // read buffer is still busy
+    if (readBuffer.mapState !== "unmapped") {
+      clearTimeout(pickerTimeoutId);
+      pickerTimeoutId = setTimeout(() => pickObjectAt(x, y), 10);
+      return;
+    }
+
+    const commandEncoder = device.createCommandEncoder();
+    const passEncoder = makePassEncoder(commandEncoder, {
+      view: pickingTexture.createView(),
+      clearValue: { r: 0, g: 0, b: 0, a: 0 },
+    });
+
+    renderPipeline(passEncoder, pickerPipeline, geometryBuffers);
+    passEncoder.end();
+
+    writeBuffers(queue);
+    await updateSelectedObject(commandEncoder, x, y);
+    queue.submit([commandEncoder.finish()]);
+  }
+
+
+  function render() {
+    const commandEncoder = device.createCommandEncoder();
+    const passEncoder = makePassEncoder(commandEncoder, {});
+
+    renderPipeline(passEncoder, pipeline, geometryBuffers);
+    renderPipeline(passEncoder, linePipeline, lineBuffers);
+
+    passEncoder.end();
+    writeBuffers(queue);
     queue.submit([commandEncoder.finish()]);
 
     requestAnimationFrame(render);
   }
+
+  canvas.addEventListener("mousemove", (event) => {
+    if (camera.isPanning || camera.isDragging || event.shiftKey) return;
+    const x = event.clientX;
+    const y = event.clientY;
+    pickObjectAt(x, y);
+  });
 
   render();
 }
