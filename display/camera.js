@@ -8,6 +8,13 @@ const minZoom = 0.01;
 
 let timerId;
 
+/**
+ * @param {MouseEvent} event
+ */
+function isPanningEvent(event) {
+  return event.button === 1 || event.shiftKey;
+}
+
 class BaseCamera {
   scrollDirection = 0;
   wheelTimeout = null;
@@ -60,12 +67,13 @@ class BaseCamera {
     }, 200);
   }
 
+
   handleMouseDown(event) {
     event.preventDefault();
     this.lastX = event.clientX;
     this.lastY = event.clientY;
 
-    if (event.button === 1 || event.shiftKey) {
+    if (isPanningEvent(event)) {
       this.isPanning = true;
     } else {
       this.isDragging = true;
@@ -180,15 +188,38 @@ export class CADOrthoCamera extends OrthoCamera {
   constructor(...args) {
     super(...args);
     this.nextTarget = null;
+    this.nextCenter = null;
+    this.center = [0, 0];
   }
-  setNextTarget(target) {
+  setNextTarget(target, center) {
     this.nextTarget = target;
+    this.nextCenter = center;
   }
+  /**
+   * @param {MouseEvent} event
+   */
   handleMouseDown(event) {
-    if (this.nextTarget) {
+    if (this.nextTarget && !isPanningEvent(event)) {
       this.target = vec3.create(...this.nextTarget);
+      this.center = this.nextCenter;
     }
-    console.log(...this.target);
     super.handleMouseDown(event);
+  }
+  getMVP() {
+    const view = this.getView();
+    const aspect = this.canvas.width / this.canvas.height;
+    const x = this.distance * aspect;
+    const y = this.distance;
+    const xOff = x * this.center[0];
+    const yOff = y * this.center[1];
+    const projection = mat4.ortho(
+      -x - xOff,
+      x - xOff,
+      -y + yOff,
+      y + yOff,
+      -1 * this.size,
+      (maxZoom + 1) * this.size,
+    );
+    return mat4.multiply(projection, view);
   }
 }
