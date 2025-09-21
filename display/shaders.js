@@ -142,11 +142,16 @@ struct GeometryMetadata {
 
 @group(1) @binding(1) var<storage, read> metadata : GeometryMetadata;
 
+struct FragmentOutput {
+    @location(0) obj_id: vec4<f32>,
+    @location(1) depth: f32,
+}
+
 @fragment
 fn main(
   @builtin(position) pos: vec4<f32>,
   @location(2) @interpolate(flat) instance_idx: u32,
-) -> @location(0) vec4<f32> {
+) -> FragmentOutput {
     let geom_idx = metadata.geometry_idx;
 
     // Encode into RGBA [0,1]
@@ -155,6 +160,15 @@ fn main(
     // let b = f32(id & 255u) / 255.0;
     let r = f32(geom_idx) / 255.0;
     let g = f32(instance_idx) / 255.0;
-    return vec4<f32>(r, g, 1, 0);
+    let objId = vec4<f32>(r, g, 1, 0);
+
+    let depth = pos.z / pos.w;
+    let linearDepth = (depth * 0.5 + 0.5);
+
+    var out: FragmentOutput;
+    out.obj_id = objId;
+    out.depth = linearDepth;
+
+    return out;
 }
 `;
