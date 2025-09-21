@@ -1,6 +1,6 @@
 // @ts-check
 
-import { mat4, utils, vec3 } from "wgpu-matrix";
+import { mat4, utils, vec3, vec4 } from "wgpu-matrix";
 import { Material } from "../lib/materials.js";
 import { BBox } from "../tools/svg.js";
 import { OrthoCamera } from "./camera.js";
@@ -18,6 +18,9 @@ const buf = new ArrayBuffer(4);
 const f32 = new Float32Array(buf);
 const u32 = new Uint32Array(buf);
 
+/**
+ * @param {number} u
+ */
 function u32ToF32(u) {
   u32[0] = u;
   return f32[0];
@@ -27,6 +30,7 @@ let pickerTimeoutId;
 
 let selectedGeometry = 256;
 let selectedInstance = 256;
+let hitPoint = [0, 0, 0];
 
 let context;
 let canvas;
@@ -148,7 +152,7 @@ function makePickerPipeline(device, layout) {
     label: "picker fragment module",
     module: fragModule,
     entryPoint: "main",
-    targets: [{ format: "bgra8unorm" }],
+    targets: [{ format: "bgra8unorm" }, { format: "r32float" }],
   };
 
   return device.createRenderPipeline({
@@ -379,11 +383,18 @@ export async function displayScene(items) {
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
   });
 
+  const hitPointTexture = device.createTexture({
+    size: [context.canvas.width, context.canvas.height],
+    format: "r32float",
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+  });
+
   const depthTexture = device.createTexture({
     size: [context.canvas.width, context.canvas.height],
     format: "depth24plus-stencil8",
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
   });
+
   const depthTextureView = depthTexture.createView();
 
   const objectSize = bbox.size();
@@ -399,8 +410,15 @@ export async function displayScene(items) {
   const lightColor = vec3.create(1, 1, 1);
   const instanceBufferArray = new Float32Array(allInstances);
 
-  const readBuffer = device.createBuffer({
-    size: 4, // RGBA8 = 4 bytes
+  const objIdReadBuffer = device.createBuffer({
+    label: "obj_id read buffer",
+    size: 4,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  });
+
+  const depthReadBuffer = device.createBuffer({
+    label: "depth read buffer",
+    size: 4,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
   });
 
@@ -431,17 +449,29 @@ export async function displayScene(items) {
     const uniformArray = new Float32Array(bufferData);
     queue.writeBuffer(uniformBuffer, 0, uniformArray);
   }
-
-  async function updateSelectedObject(commandEncoder, x, y) {
-    // Copy 1 pixel
+  async function readTextureThroughBuffer(commandEncoder, tex, buf, x, y) {
     commandEncoder.copyTextureToBuffer(
-      { texture: pickingTexture, origin: { x, y } },
-      { buffer: readBuffer, bytesPerRow: 256 }, // must be 256-byte aligned
+      { texture: tex, origin: { x, y } },
+      { buffer: buf, bytesPerRow: 256 }, // must be 256-byte aligned
       { width: 1, height: 1 },
     );
 
-    await readBuffer.mapAsync(GPUMapMode.READ);
-    const array = new Uint8Array(readBuffer.getMappedRange());
+    await buf.mapAsync(GPUMapMode.READ);
+    const array = new Uint8Array(buf.getMappedRange());
+    const result = new Uint8Array([...array]);
+    buf.unmap();
+    return result;
+  }
+
+  async function updateSelectedObject(commandEncoder, x, y) {;
+    const ce = commandEncoder;
+    const buffers = [
+      readTextureThroughBuffer(ce, pickingTexture, objIdReadBuffer, x, y),
+      readTextureThroughBuffer(ce, hitPointTexture, depthReadBuffer, x, y),
+    ];
+
+    const [array, buf] = await Promise.all(buffers);
+
     const [r, g, b] = array;
 
     if (r !== 255) {
@@ -452,22 +482,33 @@ export async function displayScene(items) {
       selectedInstance = g;
     }
 
-    readBuffer.unmap();
+    const [val] = new Float32Array(buf.buffer);
+    if (val === 0) {
+      hitPoint = [0, 0, 0];
+      return;
+    }
+
+    const mvp = camera.getMVP();
+    const inv = mat4.inverse(mvp);
+    const ndcX = 2 * x / canvas.width - 1;
+    const ndcY = 2 * y / canvas.height - 1;
+    const ndcZ = 2 * val - 1;
+    const clip = vec4.create(ndcX, ndcY, ndcZ, 1);
+    const back = vec4.transformMat4(clip, inv);
+    hitPoint = [back[0] / back[3], back[1] / back[3], back[2] / back[3]];
   }
 
-  function makePassEncoder(commandEncoder, overrides) {
-    let view;
-    if (!overrides.view)
-      view = context.getCurrentTexture().createView();
-
-    const passEncoder = commandEncoder.beginRenderPass({
-      colorAttachments: [{
-        view,
+  function makePassEncoder(commandEncoder, ...attachments) {
+    if (!attachments.length)
+      attachments.push({
+        view: context.getCurrentTexture().createView(),
         clearValue: { r: 0.1, g: 0.1, b: 0.1, a: 1 },
         loadOp: "clear",
         storeOp: "store",
-        ...overrides,
-      }],
+      });
+
+    const passEncoder = commandEncoder.beginRenderPass({
+      colorAttachments: attachments,
       depthStencilAttachment: {
         view: depthTextureView,
         depthClearValue: 1,
@@ -507,17 +548,31 @@ export async function displayScene(items) {
    */
   async function pickObjectAt(x, y) {
     // read buffer is still busy
-    if (readBuffer.mapState !== "unmapped") {
+    if (
+      depthReadBuffer.mapState !== "unmapped" ||
+      objIdReadBuffer.mapState !== "unmapped"
+    ) {
       clearTimeout(pickerTimeoutId);
       pickerTimeoutId = setTimeout(() => pickObjectAt(x, y), 10);
       return;
     }
 
     const commandEncoder = device.createCommandEncoder();
-    const passEncoder = makePassEncoder(commandEncoder, {
-      view: pickingTexture.createView(),
-      clearValue: { r: 0, g: 0, b: 0, a: 0 },
-    });
+    const passEncoder = makePassEncoder(
+      commandEncoder,
+      {
+        view: pickingTexture.createView(),
+        clearValue: { r: 0, g: 0, b: 0, a: 0 },
+        loadOp: "clear",
+        storeOp: "store",
+      },
+      {
+        view: hitPointTexture.createView(),
+        clearValue: { r: 0, g: 0, b: 0, a: 0 },
+        loadOp: "clear",
+        storeOp: "store",
+      },
+    );
 
     renderPipeline(passEncoder, pickerPipeline, geometryBuffers);
     passEncoder.end();
@@ -527,10 +582,9 @@ export async function displayScene(items) {
     queue.submit([commandEncoder.finish()]);
   }
 
-
   function render() {
     const commandEncoder = device.createCommandEncoder();
-    const passEncoder = makePassEncoder(commandEncoder, {});
+    const passEncoder = makePassEncoder(commandEncoder);
 
     renderPipeline(passEncoder, pipeline, geometryBuffers);
     renderPipeline(passEncoder, linePipeline, lineBuffers);
