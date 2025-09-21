@@ -457,7 +457,7 @@ export async function displayScene(items) {
     const miss = norm3(hitPoint, zero3) < eps;
 
     if (miss) {
-      camera.setNextTarget(null);
+      camera.setNextTarget(null, null);
       selectedGeometry = 65_535;
       selectedInstance = 65_535;
       return;
@@ -466,7 +466,8 @@ export async function displayScene(items) {
     selectedGeometry = geomId;
     selectedInstance = instId;
 
-    camera.setNextTarget(hitPoint);
+    const ndcClick = [(2 * x) / canvas.width - 1, (2 * y) / canvas.height - 1];
+    camera.setNextTarget(hitPoint, ndcClick);
   }
 
   function makePassEncoder(commandEncoder, ...attachments) {
