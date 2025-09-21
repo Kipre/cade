@@ -4,7 +4,8 @@ struct VSOut {
   @builtin(position) Position: vec4f,
   @location(0) fragmentPosition: vec3f,
   @location(1) normal: vec3f,
-  @location(2) @interpolate(flat) instance_idx: u32,
+  @location(2) worldPosition: vec3f,
+  @location(3) @interpolate(flat) instance_idx: u32,
 };
 
 struct Uniforms {
@@ -29,6 +30,7 @@ fn main(
     let transformed = instances[idx] * vec4f(inPosition, 1);
     vsOut.Position = uni.mvp * transformed;
     vsOut.fragmentPosition = inPosition;
+    vsOut.worldPosition = transformed.xyz;
     vsOut.normal = normalize(uni.view * instances[idx] * vec4f(inNormal, 0)).xyz;
     vsOut.instance_idx = idx;
     return vsOut;
@@ -90,7 +92,7 @@ struct GeometryMetadata {
 fn main(
   @location(0) fragmentPosition: vec3f,
   @location(1) normal: vec3f,
-  @location(2) @interpolate(flat) instance_idx: u32,
+  @location(3) @interpolate(flat) instance_idx: u32,
 ) -> @location(0) vec4f {
     let geom_idx = metadata.geometry_idx;
 
@@ -142,33 +144,21 @@ struct GeometryMetadata {
 
 @group(1) @binding(1) var<storage, read> metadata : GeometryMetadata;
 
-struct FragmentOutput {
-    @location(0) obj_id: vec4<f32>,
-    @location(1) depth: f32,
+fn pack2xU16(low: u32, high: u32) -> u32 {
+    // keep only the lowest 16 bits of each
+    let l = low  & 0xFFFFu;
+    let h = (high & 0xFFFFu) << 16u;
+    return l | h;
 }
 
 @fragment
 fn main(
+  @location(2) worldPosition: vec3f,
+  @location(3) @interpolate(flat) instance_idx: u32,
   @builtin(position) pos: vec4<f32>,
-  @location(2) @interpolate(flat) instance_idx: u32,
-) -> FragmentOutput {
+) -> @location(0) vec4<f32> {
     let geom_idx = metadata.geometry_idx;
-
-    // Encode into RGBA [0,1]
-    // let r = f32((id >> 16) & 255u) / 255.0;
-    // let g = f32((id >> 8) & 255u) / 255.0;
-    // let b = f32(id & 255u) / 255.0;
-    let r = f32(geom_idx) / 255.0;
-    let g = f32(instance_idx) / 255.0;
-    let objId = vec4<f32>(r, g, 1, 0);
-
-    let depth = pos.z / pos.w;
-    let linearDepth = (depth * 0.5 + 0.5);
-
-    var out: FragmentOutput;
-    out.obj_id = objId;
-    out.depth = linearDepth;
-
-    return out;
+    let packed: u32 = pack2xU16(geom_idx, instance_idx);
+    return vec4(worldPosition, bitcast<f32>(packed));
 }
 `;

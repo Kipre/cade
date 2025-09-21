@@ -3,7 +3,7 @@
 import { mat4, utils, vec3, vec4 } from "wgpu-matrix";
 import { Material } from "../lib/materials.js";
 import { BBox } from "../tools/svg.js";
-import { OrthoCamera } from "./camera.js";
+import { CADOrthoCamera, OrthoCamera } from "./camera.js";
 import { parseObjFile } from "./obj.js";
 import {
   fragmentShader,
@@ -13,6 +13,9 @@ import {
   vertexShader,
 } from "./shaders.js";
 import { createBuffer, invariant } from "./utils.js";
+import { norm3 } from "../tools/3d.js";
+import { eps } from "../tools/2d.js";
+import { zero3 } from "../lib/defaults.js";
 
 const buf = new ArrayBuffer(4);
 const f32 = new Float32Array(buf);
@@ -30,7 +33,6 @@ let pickerTimeoutId;
 
 let selectedGeometry = 256;
 let selectedInstance = 256;
-let hitPoint = [0, 0, 0];
 
 let context;
 let canvas;
@@ -152,7 +154,7 @@ function makePickerPipeline(device, layout) {
     label: "picker fragment module",
     module: fragModule,
     entryPoint: "main",
-    targets: [{ format: "bgra8unorm" }, { format: "r32float" }],
+    targets: [{ format: "rgba32float" }],
   };
 
   return device.createRenderPipeline({
@@ -377,15 +379,9 @@ export async function displayScene(items) {
     ],
   });
 
-  const pickingTexture = device.createTexture({
+  const raycastTexture = device.createTexture({
     size: [context.canvas.width, context.canvas.height],
-    format: "bgra8unorm",
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
-  });
-
-  const hitPointTexture = device.createTexture({
-    size: [context.canvas.width, context.canvas.height],
-    format: "r32float",
+    format: "rgba32float",
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
   });
 
@@ -399,7 +395,7 @@ export async function displayScene(items) {
 
   const objectSize = bbox.size();
   const center = vec3.create(...bbox.center());
-  const camera = new OrthoCamera(
+  const camera = new CADOrthoCamera(
     utils.degToRad(-40),
     utils.degToRad(10),
     objectSize,
@@ -410,15 +406,9 @@ export async function displayScene(items) {
   const lightColor = vec3.create(1, 1, 1);
   const instanceBufferArray = new Float32Array(allInstances);
 
-  const objIdReadBuffer = device.createBuffer({
-    label: "obj_id read buffer",
-    size: 4,
-    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-  });
-
-  const depthReadBuffer = device.createBuffer({
+  const raycastReadBuffer = device.createBuffer({
     label: "depth read buffer",
-    size: 4,
+    size: 16,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
   });
 
@@ -449,53 +439,34 @@ export async function displayScene(items) {
     const uniformArray = new Float32Array(bufferData);
     queue.writeBuffer(uniformBuffer, 0, uniformArray);
   }
-  async function readTextureThroughBuffer(commandEncoder, tex, buf, x, y) {
+
+  async function updateSelectedObject(commandEncoder, x, y) {
     commandEncoder.copyTextureToBuffer(
-      { texture: tex, origin: { x, y } },
-      { buffer: buf, bytesPerRow: 256 }, // must be 256-byte aligned
+      { texture: raycastTexture, origin: { x, y } },
+      { buffer: raycastReadBuffer, bytesPerRow: 256 }, // must be 256-byte aligned
       { width: 1, height: 1 },
     );
 
-    await buf.mapAsync(GPUMapMode.READ);
-    const array = new Uint8Array(buf.getMappedRange());
-    const result = new Uint8Array([...array]);
-    buf.unmap();
-    return result;
-  }
+    await raycastReadBuffer.mapAsync(GPUMapMode.READ);
+    const range = raycastReadBuffer.getMappedRange();
 
-  async function updateSelectedObject(commandEncoder, x, y) {;
-    const ce = commandEncoder;
-    const buffers = [
-      readTextureThroughBuffer(ce, pickingTexture, objIdReadBuffer, x, y),
-      readTextureThroughBuffer(ce, hitPointTexture, depthReadBuffer, x, y),
-    ];
+    const hitPoint = [...new Float32Array(range).slice(0, 3)];
+    const [geomId, instId] = new Uint16Array(range).slice(6);
+    raycastReadBuffer.unmap();
 
-    const [array, buf] = await Promise.all(buffers);
+    const miss = norm3(hitPoint, zero3) < eps;
 
-    const [r, g, b] = array;
-
-    if (r !== 255) {
-      selectedGeometry = 256;
-      selectedInstance = 256;
-    } else {
-      selectedGeometry = b;
-      selectedInstance = g;
-    }
-
-    const [val] = new Float32Array(buf.buffer);
-    if (val === 0) {
-      hitPoint = [0, 0, 0];
+    if (miss) {
+      camera.setNextTarget(null);
+      selectedGeometry = 65_535;
+      selectedInstance = 65_535;
       return;
     }
 
-    const mvp = camera.getMVP();
-    const inv = mat4.inverse(mvp);
-    const ndcX = 2 * x / canvas.width - 1;
-    const ndcY = 2 * y / canvas.height - 1;
-    const ndcZ = 2 * val - 1;
-    const clip = vec4.create(ndcX, ndcY, ndcZ, 1);
-    const back = vec4.transformMat4(clip, inv);
-    hitPoint = [back[0] / back[3], back[1] / back[3], back[2] / back[3]];
+    selectedGeometry = geomId;
+    selectedInstance = instId;
+
+    camera.setNextTarget(hitPoint);
   }
 
   function makePassEncoder(commandEncoder, ...attachments) {
@@ -548,31 +519,19 @@ export async function displayScene(items) {
    */
   async function pickObjectAt(x, y) {
     // read buffer is still busy
-    if (
-      depthReadBuffer.mapState !== "unmapped" ||
-      objIdReadBuffer.mapState !== "unmapped"
-    ) {
+    if (raycastReadBuffer.mapState !== "unmapped") {
       clearTimeout(pickerTimeoutId);
       pickerTimeoutId = setTimeout(() => pickObjectAt(x, y), 10);
       return;
     }
 
     const commandEncoder = device.createCommandEncoder();
-    const passEncoder = makePassEncoder(
-      commandEncoder,
-      {
-        view: pickingTexture.createView(),
-        clearValue: { r: 0, g: 0, b: 0, a: 0 },
-        loadOp: "clear",
-        storeOp: "store",
-      },
-      {
-        view: hitPointTexture.createView(),
-        clearValue: { r: 0, g: 0, b: 0, a: 0 },
-        loadOp: "clear",
-        storeOp: "store",
-      },
-    );
+    const passEncoder = makePassEncoder(commandEncoder, {
+      view: raycastTexture.createView(),
+      clearValue: { r: 0, g: 0, b: 0, a: 0 },
+      loadOp: "clear",
+      storeOp: "store",
+    });
 
     renderPipeline(passEncoder, pickerPipeline, geometryBuffers);
     passEncoder.end();

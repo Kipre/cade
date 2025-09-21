@@ -23,7 +23,7 @@ class BaseCamera {
    * @param {[number, number, number] | null} target
    */
   constructor(pitch, yaw, size, target = null) {
-    document.addEventListener("mousedown", this.handleMouseDown);
+    document.addEventListener("mousedown", (e) => this.handleMouseDown(e));
     document.addEventListener("mousemove", this.handleMouseMove);
     this.canvas = document.querySelector("canvas");
     if (this.canvas == null) throw new Error();
@@ -60,7 +60,7 @@ class BaseCamera {
     }, 200);
   }
 
-  handleMouseDown = (event) => {
+  handleMouseDown(event) {
     event.preventDefault();
     this.lastX = event.clientX;
     this.lastY = event.clientY;
@@ -70,7 +70,7 @@ class BaseCamera {
     } else {
       this.isDragging = true;
     }
-  };
+  }
 
   handleMouseMove = (event) => {
     const dx = event.clientX - this.lastX;
@@ -173,5 +173,22 @@ export class OrthoCamera extends BaseCamera {
       (maxZoom + 1) * this.size,
     );
     return mat4.multiply(projection, view);
+  }
+}
+
+export class CADOrthoCamera extends OrthoCamera {
+  constructor(...args) {
+    super(...args);
+    this.nextTarget = null;
+  }
+  setNextTarget(target) {
+    this.nextTarget = target;
+  }
+  handleMouseDown(event) {
+    if (this.nextTarget) {
+      this.target = vec3.create(...this.nextTarget);
+    }
+    console.log(...this.target);
+    super.handleMouseDown(event);
   }
 }
