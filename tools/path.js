@@ -873,9 +873,10 @@ export class Path {
 
   /**
    * @param {number} width
-   * @param {number} height
+   * @param {number} [height]
    */
   static makeRect(width, height) {
+    height ??= width;
     const result = new Path();
     result.moveTo([0, 0]);
     result.lineTo([0, height]);

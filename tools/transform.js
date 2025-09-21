@@ -1,6 +1,7 @@
 // @ts-check
 /** @import * as types from './types' */
 
+import { eps, norm } from "./2d.js";
 import { cross, normalize3 } from "./3d.js";
 // import { DOMMatrix, DOMPoint } from "./dom.js";
 import { w3svg } from "./svg.js";
@@ -61,8 +62,10 @@ export function matrixToAxes(m) {
  */
 export function a2m(maybeOrigin = null, maybeUp = null, maybeDir = null) {
   const origin = maybeOrigin ?? [0, 0, 0];
-  const dir = maybeDir ?? [1, 0, 0];
+  let dir = maybeDir ?? [1, 0, 0];
   const up = maybeUp ?? [0, 0, 1];
+  if (norm(up, dir) < eps)
+   dir = [0, 1, 0];
 
   const z = normalize3(up);
   const y = normalize3(cross(z, dir));
