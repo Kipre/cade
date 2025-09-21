@@ -28,7 +28,6 @@ class BaseCamera {
     this.canvas = document.querySelector("canvas");
     if (this.canvas == null) throw new Error();
 
-    this.canvas.addEventListener("contextmenu", e => e.preventDefault());
     this.canvas.addEventListener("mouseup", this.handleMouseUp);
     this.canvas.addEventListener("wheel", this.handleMouseWheel);
     this.pitch = pitch;
@@ -62,10 +61,11 @@ class BaseCamera {
   }
 
   handleMouseDown = (event) => {
+    event.preventDefault();
     this.lastX = event.clientX;
     this.lastY = event.clientY;
 
-    if (event.button === 2) {
+    if (event.button === 1 || event.shiftKey) {
       this.isPanning = true;
     } else {
       this.isDragging = true;
