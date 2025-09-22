@@ -30,11 +30,11 @@ class BaseCamera {
    * @param {[number, number, number] | null} target
    */
   constructor(pitch, yaw, size, target = null) {
-    document.addEventListener("mousedown", (e) => this.handleMouseDown(e));
-    document.addEventListener("mousemove", this.handleMouseMove);
     this.canvas = document.querySelector("canvas");
     if (this.canvas == null) throw new Error();
 
+    this.canvas.addEventListener("mousedown", (e) => this.handleMouseDown(e));
+    this.canvas.addEventListener("mousemove", this.handleMouseMove);
     this.canvas.addEventListener("mouseup", this.handleMouseUp);
     this.canvas.addEventListener("wheel", this.handleMouseWheel);
     this.pitch = pitch;

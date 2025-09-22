@@ -41,6 +41,30 @@ let pickerTimeoutId;
 let hoveredGeometry = MAX_U16;
 let hoveredInstance = MAX_U16;
 
+
+window.addEventListener("keydown", (event) => {
+  if (hoveredGeometry === MAX_U16) return;
+  if (event.code !== "KeyH") return;
+
+  const objId = pairToObjId[hoveredGeometry][hoveredInstance];
+  hiddenObjects.add(objId);
+
+  const item = document.createElement("div");
+  item.textContent = `hidden ${objId.split("¨")[0]}`;
+  const close = document.createElement("button");
+  close.textContent = "x";
+  close.onclick = (e) => {
+    e.preventDefault();
+    item.remove();
+    hiddenObjects.delete(objId);
+  };
+  item.appendChild(close);
+  document.querySelector("#hidden-items")?.appendChild(item);
+
+  hoveredGeometry = MAX_U16;
+  hoveredInstance = MAX_U16;
+});
+
 let context;
 let canvas;
 let entry;
@@ -277,7 +301,7 @@ export async function displayScene(items) {
 
     for (let j = 0; j < instances.length; j++) {
       const mat = instances[j];
-      const objId = name + mat.toFloat32Array().join("");
+      const objId = `${name}¨${mat.toFloat32Array().join("")}`;
       instanceToObjId.push(objId);
       objIdToPair[objId] = [i, j];
       allInstances.push(...mat.toFloat32Array());
@@ -581,14 +605,6 @@ export async function displayScene(items) {
     const x = event.clientX;
     const y = event.clientY;
     pickObjectAt(x, y);
-  });
-
-  canvas.addEventListener("click", (event) => {
-    if (hoveredGeometry === MAX_U16) return;
-    const objId = pairToObjId[hoveredGeometry][hoveredInstance];
-    hiddenObjects.add(objId);
-    console.log(hiddenObjects);
-    console.log(hoveredGeometry, hoveredInstance);
   });
 
   render();
