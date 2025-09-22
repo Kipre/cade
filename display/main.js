@@ -1,7 +1,10 @@
 // @ts-check
 
 import { mat4, utils, vec3, vec4 } from "wgpu-matrix";
+import { zero3 } from "../lib/defaults.js";
 import { Material } from "../lib/materials.js";
+import { eps } from "../tools/2d.js";
+import { norm3 } from "../tools/3d.js";
 import { BBox } from "../tools/svg.js";
 import { CADOrthoCamera, OrthoCamera } from "./camera.js";
 import { parseObjFile } from "./obj.js";
@@ -13,9 +16,8 @@ import {
   vertexShader,
 } from "./shaders.js";
 import { createBuffer, invariant } from "./utils.js";
-import { norm3 } from "../tools/3d.js";
-import { eps } from "../tools/2d.js";
-import { zero3 } from "../lib/defaults.js";
+
+const MAX_U16 = 65_535;
 
 const buf = new ArrayBuffer(4);
 const f32 = new Float32Array(buf);
@@ -29,10 +31,15 @@ function u32ToF32(u) {
   return f32[0];
 }
 
+const hiddenObjects = new Set();
+
+const objIdToPair = {};
+const pairToObjId = [];
+
 let pickerTimeoutId;
 
-let selectedGeometry = 256;
-let selectedInstance = 256;
+let hoveredGeometry = MAX_U16;
+let hoveredInstance = MAX_U16;
 
 let context;
 let canvas;
@@ -93,21 +100,17 @@ function makeLineBuffer(obj) {
 
 function makeOutlinePipeline(device, layout) {
   const vertModule = device.createShaderModule({ code: lineVertexShader });
-  const fragModule = device.createShaderModule({ code: lineFragmentShader });
-
-  // Shader Stages
   const vertex = {
     module: vertModule,
     entryPoint: "main",
-    buffers: [
-      {
-        attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
-        arrayStride: 3 * 4,
-        stepMode: "vertex",
-      },
-    ],
+    buffers: [{
+      attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
+      arrayStride: 3 * 4,
+      stepMode: "vertex",
+    }],
   };
 
+  const fragModule = device.createShaderModule({ code: lineFragmentShader });
   const fragment = {
     module: fragModule,
     entryPoint: "main",
@@ -131,8 +134,6 @@ function makeOutlinePipeline(device, layout) {
 
 function makePickerPipeline(device, layout) {
   const vertModule = device.createShaderModule({ code: vertexShader });
-  const fragModule = device.createShaderModule({ code: pickingFragmentShader });
-
   const vertex = {
     module: vertModule,
     entryPoint: "main",
@@ -150,6 +151,7 @@ function makePickerPipeline(device, layout) {
     ],
   };
 
+  const fragModule = device.createShaderModule({ code: pickingFragmentShader });
   const fragment = {
     label: "picker fragment module",
     module: fragModule,
@@ -259,9 +261,12 @@ export async function displayScene(items) {
     const { item, instances } = sortedItems[i];
 
     const obj = item.mesh;
+    const name = item.name;
     const objResult = parseObjFile(obj);
     const buffer = parseObjAndRecomputeNormals(objResult, bbox);
     const lineBuffer = makeLineBuffer(objResult);
+    const instanceToObjId = [];
+    pairToObjId.push(instanceToObjId);
 
     geometryBuffers.push(
       createBuffer(device, new Float32Array(buffer), GPUBufferUsage.VERTEX),
@@ -270,7 +275,13 @@ export async function displayScene(items) {
       createBuffer(device, new Float32Array(lineBuffer), GPUBufferUsage.VERTEX),
     );
 
-    for (const mat of instances) allInstances.push(...mat.toFloat32Array());
+    for (let j = 0; j < instances.length; j++) {
+      const mat = instances[j];
+      const objId = name + mat.toFloat32Array().join("");
+      instanceToObjId.push(objId);
+      objIdToPair[objId] = [i, j];
+      allInstances.push(...mat.toFloat32Array());
+    }
 
     totalNbInstances += instances.length;
     nbInstancesPerItem.push(instances.length);
@@ -413,6 +424,15 @@ export async function displayScene(items) {
   });
 
   function writeBuffers(queue) {
+
+    for (let i = 0; i < items.length; i++) {
+      const instances = sortedItems[i].instances;
+      for (let j = 0; j < instances.length; j++) {
+        const flag = hiddenObjects.has(pairToObjId[i][j]);
+        instanceBufferArray[16 * (lengths[i] + j) + 15] = flag ? 0 : 1;
+      }
+    }
+
     queue.writeBuffer(instanceBuffer, 0, instanceBufferArray);
     queue.writeBuffer(geometryMetaBuffer, 0, geometryMetaBufferArray);
 
@@ -430,8 +450,8 @@ export async function displayScene(items) {
       ...lightPosition,
       0,
       ...lightColor,
-      u32ToF32(selectedGeometry),
-      u32ToF32(selectedInstance),
+      u32ToF32(hoveredGeometry),
+      u32ToF32(hoveredInstance),
       0,
       0,
       0,
@@ -440,7 +460,7 @@ export async function displayScene(items) {
     queue.writeBuffer(uniformBuffer, 0, uniformArray);
   }
 
-  async function updateSelectedObject(commandEncoder, x, y) {
+  async function updateHoveredObject(commandEncoder, x, y) {
     commandEncoder.copyTextureToBuffer(
       { texture: raycastTexture, origin: { x, y } },
       { buffer: raycastReadBuffer, bytesPerRow: 256 }, // must be 256-byte aligned
@@ -458,13 +478,13 @@ export async function displayScene(items) {
 
     if (miss) {
       camera.setNextTarget(null, null);
-      selectedGeometry = 65_535;
-      selectedInstance = 65_535;
+      hoveredGeometry = MAX_U16;
+      hoveredInstance = MAX_U16;
       return;
     }
 
-    selectedGeometry = geomId;
-    selectedInstance = instId;
+    hoveredGeometry = geomId;
+    hoveredInstance = instId;
 
     const ndcClick = [(2 * x) / canvas.width - 1, (2 * y) / canvas.height - 1];
     camera.setNextTarget(hitPoint, ndcClick);
@@ -538,7 +558,7 @@ export async function displayScene(items) {
     passEncoder.end();
 
     writeBuffers(queue);
-    await updateSelectedObject(commandEncoder, x, y);
+    await updateHoveredObject(commandEncoder, x, y);
     queue.submit([commandEncoder.finish()]);
   }
 
@@ -561,6 +581,14 @@ export async function displayScene(items) {
     const x = event.clientX;
     const y = event.clientY;
     pickObjectAt(x, y);
+  });
+
+  canvas.addEventListener("click", (event) => {
+    if (hoveredGeometry === MAX_U16) return;
+    const objId = pairToObjId[hoveredGeometry][hoveredInstance];
+    hiddenObjects.add(objId);
+    console.log(hiddenObjects);
+    console.log(hoveredGeometry, hoveredInstance);
   });
 
   render();
