@@ -240,6 +240,14 @@ bro.test("rotation direction", () => {
   bro.expect(path.invert().rotatesClockwise()).toBe(true);
 });
 
+bro.test("rotation direction for circle and rect", () => {
+  const path = Path.makeCircle(300);
+  const p2 = Path.makeRect(300);
+
+  bro.expect(path.rotatesClockwise()).toBe(true);
+  bro.expect(p2.rotatesClockwise()).toBe(true);
+});
+
 bro.test("boolean intersection", () => {
   const center = [half + interCenter, half];
   const end = plus(center, rotatePoint([0, 0], [1000, 0], Math.PI / 3));

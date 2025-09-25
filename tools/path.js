@@ -491,6 +491,7 @@ export class Path {
           p = this.controls[0][1];
 
         case "lineTo": {
+          if (norm(lastPoint, p) < eps) break;
           const ints = other.intersectLine(lastPoint, p);
           for (const { point, ...other } of ints) {
             const x = pointCoordinateOnLine(point, lastPoint, p);
@@ -598,6 +599,8 @@ export class Path {
       self: this.rotatesClockwise(),
     };
 
+    const maxIterations = 10;
+
     // walk loops
     for (let idx = 0; idx < length; idx++) {
       for (let side of ["self", "other"]) {
@@ -630,8 +633,10 @@ export class Path {
           side = side === "self" ? "other" : "self";
           crossesFromTheRight = rot === info.crossesFromTheRight;
           counter++;
-        } while (i !== idx && counter < 10);
-        if (counter === 10) throw new Error("failed to find loop");
+        } while (i !== idx && counter < maxIterations);
+
+        if (counter === maxIterations) throw new Error("failed to find loop");
+
         if (loop.length) loops.push(loop);
       }
     }
@@ -713,10 +718,18 @@ export class Path {
   }
 
   rotatesClockwise() {
-    if (this.controls.at(-1)[0] !== "close")
+    if (!this.isClosed())
       throw new Error("cannot determine rotation direction of an open path");
 
-    const points = this.controls.slice(0, -1).map((c) => c[1]);
+    const points = [];
+    for (const segment of this.iterateOverSegments()) {
+      const [, p1, type, p2, r, sweep] = segment;
+      if (type === "arc") {
+        points.push(evaluateArc(0.5, p1, p2, r, sweep));
+      }
+      points.push(p2);
+    }
+
     return signedArea(points) < 0;
   }
 

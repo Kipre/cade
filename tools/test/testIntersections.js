@@ -79,3 +79,21 @@ bro.test("difference 1", () => {
       "M 53.210678118654755 0 L 53.210678118654755 -70 L 600 -70 L 600 0 L 100 0 L 100 -29 A 3 3 0 0 0 100 -35 L 85 -35 A 3 3 0 0 0 85 -29 L 85 0 Z",
     );
 });
+
+
+bro.test("intersect two halved circle", () => {
+  const rollerThickness = 40;
+  const rollerWidth = 52;
+  const ballScrewPlateDiameter = 48;
+
+  const rollerBbox = Path.makeRect(rollerWidth, rollerThickness).translate([-rollerWidth / 2, -rollerThickness / 2]);
+
+  const result = Path.makeCircle(ballScrewPlateDiameter / 2)
+    .booleanIntersection(rollerBbox);
+
+  bro
+    .expect(result.toString())
+    .toBe(
+      "M 13.2664991614216 20 A 24 24 0 0 0 13.266499161421601 -20 L -13.2664991614216 -20 A 24 24 0 0 0 -13.266499161421601 20 Z",
+    );
+});
