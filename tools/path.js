@@ -1116,7 +1116,9 @@ export class Path {
       } else if (type === "lineTo" && nextType === "arc") {
         [p0, p1] = offsetSegment(lp, p, offset);
         [p2, p3, nr2] = offsetArc(p, np, r2, s2, nextOffset);
-        result.controls[i][1] = intersectLineAndArc(p0, p1, p2, p3, nr2, s2);
+        result.controls[i][1] = intersectLineAndArc(
+          ...[p0, p1, p2, p3, nr2, s2, true]
+        );
       } else if (type === "arc" && nextType === "lineTo") {
         [p0, p1, nr1] = offsetArc(lp, p, r1, s1, offset);
         [p2, p3] = offsetSegment(p, np, nextOffset);
