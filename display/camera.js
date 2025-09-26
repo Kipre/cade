@@ -36,7 +36,7 @@ class BaseCamera {
     this.canvas.addEventListener("mousedown", (e) => this.handleMouseDown(e));
     this.canvas.addEventListener("mousemove", this.handleMouseMove);
     this.canvas.addEventListener("mouseup", this.handleMouseUp);
-    this.canvas.addEventListener("wheel", this.handleMouseWheel);
+    this.canvas.addEventListener("wheel", e => this.handleMouseWheel(e));
     this.pitch = pitch;
     this.yaw = yaw;
     this.size = size;
@@ -102,7 +102,7 @@ class BaseCamera {
     this.isPanning = false;
   };
 
-  handleMouseWheel = (event) => {
+  handleMouseWheel(event) {
     event.preventDefault();
     const scaleFactor = 1e-3 * this.distance;
     this.distance += event.deltaY * scaleFactor;
@@ -191,10 +191,16 @@ export class CADOrthoCamera extends OrthoCamera {
     this.nextCenter = null;
     this.center = [0, 0];
   }
+
   setNextTarget(target, center) {
+    const ndcClick = center != null ? [
+      (2 * center[0]) / this.canvas.width - 1,
+      (2 * center[1]) / this.canvas.height - 1
+    ] : null;
     this.nextTarget = target;
-    this.nextCenter = center;
+    this.nextCenter = ndcClick;
   }
+
   /**
    * @param {MouseEvent} event
    */
@@ -205,6 +211,18 @@ export class CADOrthoCamera extends OrthoCamera {
     }
     super.handleMouseDown(event);
   }
+
+  handleMouseWheel(event) {
+    if (this.nextTarget) {
+      this.target = vec3.create(...this.nextTarget);
+      this.center = [
+        (2 * event.clientX) / this.canvas.width - 1,
+        (2 * event.clientY) / this.canvas.height - 1
+      ];
+    }
+    super.handleMouseWheel(event);
+  };
+
   getMVP() {
     const view = this.getView();
     const aspect = this.canvas.width / this.canvas.height;
