@@ -3,7 +3,7 @@ const http = std.http;
 const parse = @import("parse_path.zig");
 const api = @import("api.zig");
 
-const reqBodySize = 1024 * std.math.pow(i32, 2, 6);
+const reqBodySize = 1024 * std.math.pow(i32, 2, 8);
 const meshBodySize = 1024 * std.math.pow(i32, 2, 10);
 
 const ServerAction = enum {

@@ -510,8 +510,7 @@ export async function displayScene(items) {
     hoveredGeometry = geomId;
     hoveredInstance = instId;
 
-    const ndcClick = [(2 * x) / canvas.width - 1, (2 * y) / canvas.height - 1];
-    camera.setNextTarget(hitPoint, ndcClick);
+    camera.setNextTarget(hitPoint, [x, y]);
   }
 
   function makePassEncoder(commandEncoder, ...attachments) {
