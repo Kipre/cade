@@ -683,3 +683,19 @@ bro.test("simplify small arcs that for a big arc", () => {
   p.simplify();
   bro.expect(p.toString()).toEqual("M -30 0 A 30 30 0 0 0 30 0 A 30 30 0 0 0 -30 0 Z");
 });
+
+bro.test("inserts feature as expected", () => {
+  const p = Path.makeRect(100);
+
+  const tenon = new Path();
+  tenon.moveTo([-6 - 30 / 2, 0]);
+  tenon.arc([-30 / 2, 0], 6 / 2, 1);
+  tenon.lineTo([-30 / 2, 15]);
+  tenon.arcTo([0, 15], 3);
+  tenon.mirror([0, 0], [0, 1]);
+
+  p.insertFeature(tenon, 2, { fraction: 0.33 });
+  p.insertFeature(tenon, 1, { fromStart: 50 });
+
+  bro.expect(p.toString()).toEqual("M 0 0 L -1.2858791391047208e-15 29 A 3 3 0 0 1 -9.18485099360515e-16 35 L -12 35 A 3 3 0 0 0 -15 38 L -15.000000000000009 62 A 3 3 0 0 0 -11.999999999999998 65 L 9.18485099360515e-16 65 A 3 3 0 0 1 1.2858791391047208e-15 71 L 0 100 L 12 100 A 3 3 0 0 1 18 100 L 18 112 A 3 3 0 0 0 21 115 L 45 115.00000000000001 A 3 3 0 0 0 48 112 L 48 100 A 3 3 0 0 1 54 100 L 100 100 L 100 0 Z");
+});

@@ -33,6 +33,15 @@ export function minus(p1, p2) {
   return [p1[0] - p2[0], p1[1] - p2[1]];
 }
 
+/**
+ * @param {types.Point} p1
+ * @param {types.Point} p2
+ * @returns {number}
+ */
+export function dot(p1, p2) {
+  return p1[0] * p2[0] + p1[1] * p2[1];
+}
+
 export function areOnSameLine(p1, p2, p3) {
   const u = minus(p1, p2);
   const v = minus(p1, p3);
@@ -122,6 +131,15 @@ export function normalizePolygon(poly) {
  */
 export function getInterpolation([[x0, y0], [x1, y1]], p) {
   return [x0 * (1 - p) + x1 * p, y0 * (1 - p) + y1 * p];
+}
+
+/**
+ * @param {types.Point} v
+ * @returns {types.Point}
+ */
+export function normalize(v) {
+  const length = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+  return [v[0] / length, v[1] / length];
 }
 
 /**

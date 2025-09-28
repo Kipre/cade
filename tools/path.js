@@ -4,6 +4,7 @@
 import {
   areOnSameLine,
   computeAngleBetween,
+  computeVectorAngle,
   intersectLines,
   isToTheLeft,
   minus,
@@ -773,6 +774,22 @@ export class Path {
     this.controls.splice(idx, 0, firstControl, ...rest);
   }
 
+  /**
+   * @param {Path} feature
+   * @param {number} index
+   * @param {{ distance: number; } | { fromStart: number; } | { fromEnd: number; } | { fraction: number; }} placeAlongOpts
+   */
+  insertFeature(feature, index, placeAlongOpts) {
+    if (index === 0) throw new Error("are you sure index is zero ?");
+
+    const [, p1, type, p2] = this.getSegmentAt(index);
+    if (type !== "lineTo") throw new Error("cannot insert feature if segment is not a line");
+
+    const location = placeAlong(p1, p2, placeAlongOpts);
+    const rotation = computeVectorAngle(minus(p2, p1));
+    this.insert(index, feature.rotate(rotation).translate(location));
+  }
+
   invert() {
     const path = new Path();
     let length = this.controls.length;
@@ -1172,11 +1189,17 @@ export class Path {
    * @param {types.Point} l1
    * @param {types.Point} l2
    */
-  findSegmentsOnLine(l1, l2) {
+  findSegmentsOnLine(l1, l2, closed = false) {
     const result = [];
     for (const [i, lp, type, p] of this.iterateOverSegments()) {
       if (type !== "lineTo") continue;
       if (!areOnSameLine(l1, l2, lp) || !areOnSameLine(l1, l2, p)) continue;
+      if (closed && !(
+        pointInsideLineBbox(lp, l1, l2) ||
+        pointInsideLineBbox(p, l1, l2) ||
+        pointInsideLineBbox(l1, lp, p) ||
+        pointInsideLineBbox(l2, lp, p)
+      )) continue;
       result.push(i);
     }
     return result;
