@@ -1,6 +1,6 @@
 // @ts-check
 
-import { makePolygonFromLines, spindleClearedLineTo } from "../lib/flat.js";
+import { makePolygonFromLines, spindleCleared2LineTo, spindleClearedLineTo } from "../lib/flat.js";
 import { Path } from "../tools/path.js";
 import { debugGeometry } from "../tools/svg.js";
 import bro from "../tools/test/brotest/brotest.js";
@@ -78,4 +78,40 @@ bro.test("make polygon from four walls", () => {
   bro
     .expect(makePolygonFromLines(lines, [15, 15, 15, 15]).toString())
     .toBe("M -42.5 -65 L -42.5 20 L 57.5 20 L 57.5 -65 Z");
+});
+
+bro.test("clears spindle in angles with minimal angle", () => {
+  const r = 2;
+  const p = new Path();
+  p.moveTo([0, 0]);
+  p.lineTo([10, 0]);
+  spindleCleared2LineTo(p, [10, 10], r);
+  spindleCleared2LineTo(p, [20, 10], r);
+  spindleCleared2LineTo(p, [20, 0], r);
+  spindleCleared2LineTo(p, [30, 0], r);
+  spindleCleared2LineTo(p, [40, 10], r);
+
+  bro
+    .expect(p.toString())
+    .toBe(
+      "M 0 0 L 7.171572875253809 -2.220446049250313e-16 A 2 2 0 0 1 10 2.8284271247461894 L 10 7.17157287525381 A 2 2 0 0 0 12.82842712474619 10 L 17.17157287525381 10 A 2 2 0 0 0 20 7.17157287525381 L 20 2.8284271247461894 A 2 2 0 0 1 22.82842712474619 -2.220446049250313e-16 L 28.46926627053964 -2.220446049250313e-16 A 2 2 0 0 1 31.082392200292396 1.0823922002923951 L 40 10",
+    );
+});
+
+bro.test("clears spindle in angles with minimal angle", () => {
+  const length = 15;
+  const thickness = 15;
+  const spindleDiameter = 6;
+  const p = new Path();
+  p.moveTo([-10, -thickness / 2]);
+  p.lineTo([length, -thickness / 2]);
+  spindleClearedLineTo(p, [length, 0], spindleDiameter / 2, true);
+  p.mirror([0, 0]);
+  p.close();
+
+  bro
+    .expect(p.toString())
+    .toBe(
+      "M -10 -7.5 L 9 -7.5 A 3 3 0 0 1 15 -7.5 L 14.999999999999998 7.5 A 3 3 0 0 1 8.999999999999998 7.5 L -9.999999999999998 7.5 Z",
+    );
 });
