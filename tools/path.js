@@ -930,12 +930,13 @@ export class Path {
   /**
    * @param {types.Point[]} polyline
    */
-  static fromPolyline(polyline) {
+  static fromPolyline(polyline, close = true) {
     const result = new Path();
     const [first, ...rest] = polyline;
     result.moveTo(first);
     for (const p of rest) result.lineTo(p);
-    result.close();
+    if (close)
+      result.close();
     return result;
   }
 

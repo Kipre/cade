@@ -1,8 +1,9 @@
 // @ts-check
 /** @import * as types from './types' */
 
+import { zero3 } from "../lib/defaults.js";
 import { eps, norm } from "./2d.js";
-import { cross, normalize3 } from "./3d.js";
+import { cross, minus3, normalize3 } from "./3d.js";
 // import { DOMMatrix, DOMPoint } from "./dom.js";
 import { w3svg } from "./svg.js";
 
@@ -29,7 +30,7 @@ export function applyTransformMatrix(m, p) {
  * @param {types.Point3} p
  * @returns {types.Point3}
  */
-export function transformPoint3(m, p, noTranslation=false) {
+export function transformPoint3(m, p, noTranslation = false) {
   const domp = new DOMPoint(p[0], p[1], p[2]);
   if (noTranslation) domp.w = 0;
   const p2 = m.transformPoint(domp);
@@ -55,6 +56,17 @@ export function matrixToAxes(m) {
 }
 
 /**
+ * @param {DOMMatrix} mat
+ * @param {DOMMatrix} transform
+ */
+export function transformOnlyOrigin(mat, transform) {
+  const origin = transformPoint3(mat, zero3);
+  return new DOMMatrix()
+    .translate(...minus3(transformPoint3(transform, origin), origin))
+    .multiply(mat);
+}
+
+/**
  * Stands for axes to matrix
  * @param {types.Point3?} maybeOrigin
  * @param {types.Point3?} maybeUp
@@ -65,7 +77,7 @@ export function a2m(maybeOrigin = null, maybeUp = null, maybeDir = null) {
   let dir = maybeDir ?? [1, 0, 0];
   const up = maybeUp ?? [0, 0, 1];
   if (norm(up, dir) < eps)
-   dir = [0, 1, 0];
+    dir = [0, 1, 0];
 
   const z = normalize3(up);
   const y = normalize3(cross(z, dir));
