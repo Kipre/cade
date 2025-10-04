@@ -12,7 +12,7 @@ let timerId;
  * @param {MouseEvent} event
  */
 function isPanningEvent(event) {
-  return event.button === 1 || event.shiftKey;
+  return event.buttons === 4 || event.shiftKey;
 }
 
 class BaseCamera {
@@ -20,8 +20,6 @@ class BaseCamera {
   wheelTimeout = null;
   lastX = 0;
   lastY = 0;
-  isDragging = false;
-  isPanning = false;
 
   /**
    * @param {any} pitch
@@ -33,15 +31,15 @@ class BaseCamera {
     this.canvas = document.querySelector("canvas");
     if (this.canvas == null) throw new Error();
 
-    this.canvas.addEventListener("mousedown", (e) => this.handleMouseDown(e));
-    this.canvas.addEventListener("mousemove", this.handleMouseMove);
-    this.canvas.addEventListener("mouseup", this.handleMouseUp);
+    this.canvas.addEventListener("pointerdown", (e) => this.handlePointerDown(e));
+    this.canvas.addEventListener("pointerup", this.handlePointerUp);
     this.canvas.addEventListener("wheel", e => this.handleMouseWheel(e));
     this.pitch = pitch;
     this.yaw = yaw;
     this.size = size;
     this.distance = this.size;
     this.target = vec3.create(...(target ?? [0, 0, 0]));
+    this.isMoving = false;
 
     const cache = sessionStorage.getItem("camera");
     if (cache) {
@@ -67,17 +65,14 @@ class BaseCamera {
     }, 200);
   }
 
-
-  handleMouseDown(event) {
+  handlePointerDown(event) {
     event.preventDefault();
     this.lastX = event.clientX;
     this.lastY = event.clientY;
+    this.isMoving = true;
 
-    if (isPanningEvent(event)) {
-      this.isPanning = true;
-    } else {
-      this.isDragging = true;
-    }
+    this.canvas.onpointermove = e => this.handleMouseMove(e);
+    this.canvas.setPointerCapture(event.pointerId);
   }
 
   handleMouseMove = (event) => {
@@ -87,19 +82,20 @@ class BaseCamera {
     this.lastX = event.clientX;
     this.lastY = event.clientY;
 
-    if (this.isDragging) {
-      this.pitch -= dy * 0.01;
-      this.yaw += dx * 0.01;
-    } else if (this.isPanning) {
+    if (isPanningEvent(event)) {
       this.pan(dx, dy);
+    } else {
+      this.pitch += dy * 0.01;
+      this.yaw += dx * 0.01;
     }
     this.saveToCache();
   };
 
-  handleMouseUp = (event) => {
-    if (this.isPanning) event.preventDefault();
-    this.isDragging = false;
-    this.isPanning = false;
+  handlePointerUp = (event) => {
+    this.isMoving = false;
+
+    this.canvas.onpointermove = null;
+    this.canvas.releasePointerCapture(event.pointerId);
   };
 
   handleMouseWheel(event) {
@@ -204,12 +200,12 @@ export class CADOrthoCamera extends OrthoCamera {
   /**
    * @param {MouseEvent} event
    */
-  handleMouseDown(event) {
+  handlePointerDown(event) {
     if (this.nextTarget && !isPanningEvent(event)) {
       this.target = vec3.create(...this.nextTarget);
       this.center = this.nextCenter;
     }
-    super.handleMouseDown(event);
+    super.handlePointerDown(event);
   }
 
   handleMouseWheel(event) {
