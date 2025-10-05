@@ -192,6 +192,26 @@ export class Path {
   }
 
   /**
+   * @param {types.Point} p1
+   * @param {types.Point} p2
+   */
+  intersectLineTo(p1, p2) {
+    const [, lastPoint, type, point, radius, sweep] = this.getSegmentAt(-1);
+
+    let intersection;
+    if (type === "lineTo")
+      intersection = intersectLines(lastPoint, point, p1, p2);
+
+    if (type === "arc")
+      intersection = intersectLineAndArc(p1, p2, lastPoint, point, radius, sweep);
+
+    if (intersection == null) throw new Error();
+
+    this.controls.at(-1)[1] = intersection;
+    this.lineTo(p2);
+  }
+
+  /**
    * @param {number} width
    */
   fillet(width) {
