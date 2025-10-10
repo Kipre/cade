@@ -1,10 +1,9 @@
 // @ts-check
 /** @import * as types from './types' */
 
-import { zero3 } from "../lib/defaults.js";
 import { eps, norm } from "./2d.js";
 import { cross, minus3, normalize3 } from "./3d.js";
-// import { DOMMatrix, DOMPoint } from "./dom.js";
+import { DOMMatrix, DOMPoint } from "./dom.js";
 import { w3svg } from "./svg.js";
 
 export function parseTransformFunction(transform) {
@@ -60,7 +59,7 @@ export function matrixToAxes(m) {
  * @param {DOMMatrix} transform
  */
 export function transformOnlyOrigin(mat, transform) {
-  const origin = transformPoint3(mat, zero3);
+  const origin = transformPoint3(mat, [0, 0, 0]);
   return new DOMMatrix()
     .translate(...minus3(transformPoint3(transform, origin), origin))
     .multiply(mat);
