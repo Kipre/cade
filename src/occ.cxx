@@ -9,6 +9,7 @@
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepOffsetAPI_MakePipe.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <Geom_BezierCurve.hxx>
 #include <Geom_Line.hxx>
@@ -549,6 +550,34 @@ Shape *revolvePath(const PathSegment *segments, size_t size, Transform *trsf,
 
   BRepAlgoAPI_Check check(aShape);
 
+  if (!check.IsValid()) {
+    std::cerr << "Error: Solid doesn't seem to be valid." << std::endl;
+  }
+
+  Shape *result = new Shape;
+  result->shape = aShape;
+
+  return result;
+}
+
+Shape *sweepPathAlong3DPath(const PathSegment *segments, size_t directrixSize,
+                            size_t size) {
+  TopoDS_Wire wire = createWireFromPathSegments(segments, directrixSize);
+
+  TopoDS_Face face =
+      makeFaceFromSegments(segments + directrixSize, size - directrixSize);
+
+  if (!face.IsNull()) {
+    std::cout << "Successfully created TopoDS_Face from the wire." << std::endl;
+  }
+
+  BRepOffsetAPI_MakePipe pipeMaker(wire, face);
+  TopoDS_Shape aShape = pipeMaker.Shape();
+
+  std::cout << "Successfully created a TopoDS_Shape from sweeping."
+            << std::endl;
+
+  BRepAlgoAPI_Check check(aShape);
   if (!check.IsValid()) {
     std::cerr << "Error: Solid doesn't seem to be valid." << std::endl;
   }

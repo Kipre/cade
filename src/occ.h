@@ -9,6 +9,8 @@ Shape *extrudePathWithHoles(const struct PathSegment *segments, size_t size,
                             double thickness);
 Shape *revolvePath(const struct PathSegment *segments, size_t size, Transform *trsf,
                             double rotation);
+Shape *sweepPathAlong3DPath(const struct PathSegment *segments, size_t directrixSize,
+                            size_t size);
 void freeShape(Shape *shape);
 
 int writeToOBJ(Shape *shape, char *buffer);
