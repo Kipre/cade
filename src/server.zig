@@ -159,10 +159,16 @@ fn serveDirectory(req: *http.Server.Request, allocator: std.mem.Allocator, full_
     const index_path = try fs.path.join(allocator, &[_][]const u8{ full_path, "index.html" });
     defer allocator.free(index_path);
 
+    print("full path {s}", .{full_path});
+
     if (fs.cwd().statFile(index_path)) |_| {
         try serveFile(req, allocator, index_path);
         return;
     } else |_| {
+        if (std.mem.eql(u8, full_path, "./")) {
+            try serveFile(req, allocator, "./cade/lib/index.html");
+            return;
+        }
         try sendError(req, .not_found, allocator, "index.html file not found");
     }
 }
