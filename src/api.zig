@@ -81,6 +81,44 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *const std.j
             continue;
         }
 
+        if (std.mem.eql(u8, operation, "sweep")) {
+            var segments: std.ArrayList(PathSegment) = .empty;
+            std.debug.print("parsing directrix\n", .{});
+
+            try parsePath(allocator, &segments, step.get("directrix").?.string);
+            const directrixSize = segments.items.len;
+
+            std.debug.print("{d}\n\n", .{segments.items.len});
+
+            for (step.get("outsides").?.array.items) |path| {
+                try parsePath(allocator, &segments, path.string);
+            }
+            std.debug.print("{d}\n\n", .{segments.items.len});
+
+            for (step.get("insides").?.array.items) |path| {
+                try parsePath(allocator, &segments, path.string);
+            }
+            std.debug.print("{d}\n\n", .{segments.items.len});
+
+            const size = segments.items.len;
+            const array = try segments.toOwnedSlice(allocator);
+
+            std.debug.print("{d} {d}\n\n", .{directrixSize, size});
+
+            var result = occ.sweepPathAlong3DPath(array.ptr, directrixSize, size);
+
+            if (step.get("placement")) |placement| {
+                const transform = placement.array.items;
+                var mat2: Transform = undefined;
+                for (0..15) |j| mat2[j] = try getNumber(transform[j]);
+                const trsf = occ.makeTransform(&mat2[0]);
+                result = occ.applyShapeLocationTransform(result, trsf);
+            }
+
+            shapes[i] = result.?;
+            continue;
+        }
+
         if (std.mem.eql(u8, operation, "revolve")) {
             var segments: std.ArrayList(PathSegment) = .empty;
 
@@ -131,6 +169,9 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *const std.j
             shapes[i] = currentShape;
             continue;
         }
+
+        std.debug.print("could not understand operation {s}\n", .{operation});
+        return error.TypeError;
     }
 
     return shapes[nbSteps - 1];
