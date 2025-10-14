@@ -8,6 +8,7 @@ pub const Transform = occ.Transform;
 pub const PathSegment = occ.PathSegment;
 
 pub const extrudePathWithHoles = occ.extrudePathWithHoles;
+pub const revolvePath = occ.revolvePath;
 pub const freeShape = occ.freeShape;
 pub const writeToOBJ = occ.writeToOBJ;
 pub const saveToSTEP = occ.saveToSTEP;

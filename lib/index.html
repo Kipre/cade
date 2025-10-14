@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" type="text/css" href="./cade/lib/style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "wgpu-matrix": "https://cdn.jsdelivr.net/npm/wgpu-matrix@3.4.0/+esm"
+        }
+      }
+    </script>
+    <title>cade</title>
+  </head>
+  <body>
+    <script type="module">
+      import "./main.js";
+    </script>
+    <div id="display">
+      <canvas id="canvas" ></canvas>
+      <div id="hidden-items"></div>
+    </div>
+  </body>
+</html>

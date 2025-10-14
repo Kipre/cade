@@ -81,6 +81,34 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *const std.j
             continue;
         }
 
+        if (std.mem.eql(u8, operation, "revolve")) {
+            var segments: std.ArrayList(PathSegment) = .empty;
+
+            try parsePath(allocator, &segments, step.get("path").?.string);
+
+            const axis_numbers = step.get("axis").?.array.items;
+            var mat: Transform = undefined;
+            for (0..15) |j| mat[j] = try getNumber(axis_numbers[j]);
+            const axis = occ.makeTransform(&mat[0]);
+
+            const size = segments.items.len;
+            const array = try segments.toOwnedSlice(allocator);
+
+            const rotation = try getNumber(step.get("rotation").?);
+            var result = occ.revolvePath(array.ptr, size, axis, rotation);
+
+            if (step.get("placement")) |placement| {
+                const transform = placement.array.items;
+                var mat2: Transform = undefined;
+                for (0..15) |j| mat2[j] = try getNumber(transform[j]);
+                const trsf = occ.makeTransform(&mat2[0]);
+                result = occ.applyShapeLocationTransform(result, trsf);
+            }
+
+            shapes[i] = result.?;
+            continue;
+        }
+
         if (std.mem.eql(u8, operation, "fuse")) {
             const shapeIndexes = step.get("shapes").?.array.items;
             var currentShape = shapes[@intCast(shapeIndexes[0].integer)];
