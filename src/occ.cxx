@@ -78,12 +78,12 @@ gp_Dir getWireStartTangent(const TopoDS_Wire& wire) {
         throw Standard_Failure("Wire has no edges");
     }
 
-    // TopoDS_Edge edge = TopoDS::Edge(expEdge.Current());
+    TopoDS_Edge edge = TopoDS::Edge(expEdge.Current());
 
-    TopoDS_Edge edge;
-    for (; expEdge.More(); expEdge.Next()) {
-        edge = TopoDS::Edge(expEdge.Current());
-    }
+    // TopoDS_Edge edge;
+    // for (; expEdge.More(); expEdge.Next()) {
+    //     edge = TopoDS::Edge(expEdge.Current());
+    // }
 
 
     // Get start and end vertices
@@ -608,8 +608,8 @@ Shape *sweepPathAlong3DPath(const PathSegment *segments, size_t directrixSize,
 
   gp_Dir tangent = getWireStartTangent(wire);
 
-  gp_Ax3 from(gp_Pnt(0,0,0), gp_Dir(0,0,1), gp_Dir(0, 1, 0)); // current wire frame
-  gp_Ax3 to(gp_Pnt(0,0,0), tangent);
+  gp_Ax3 to(gp_Pnt(0,0,0), gp_Dir(0,0,1));
+  gp_Ax3 from(gp_Pnt(0,0,0), tangent, gp_Dir(0, 0, 1));
 
   gp_Trsf trsf;
   trsf.SetTransformation(from, to);

@@ -83,27 +83,19 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *const std.j
 
         if (std.mem.eql(u8, operation, "sweep")) {
             var segments: std.ArrayList(PathSegment) = .empty;
-            std.debug.print("parsing directrix\n", .{});
 
             try parsePath(allocator, &segments, step.get("directrix").?.string);
             const directrixSize = segments.items.len;
 
-            std.debug.print("{d}\n\n", .{segments.items.len});
-
             for (step.get("outsides").?.array.items) |path| {
                 try parsePath(allocator, &segments, path.string);
             }
-            std.debug.print("{d}\n\n", .{segments.items.len});
-
             for (step.get("insides").?.array.items) |path| {
                 try parsePath(allocator, &segments, path.string);
             }
-            std.debug.print("{d}\n\n", .{segments.items.len});
 
             const size = segments.items.len;
             const array = try segments.toOwnedSlice(allocator);
-
-            std.debug.print("{d} {d}\n\n", .{directrixSize, size});
 
             var result = occ.sweepPathAlong3DPath(array.ptr, directrixSize, size);
 
