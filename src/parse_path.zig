@@ -42,7 +42,7 @@ fn parseNumber(
     path: []const u8,
 ) !NumberParseResult {
     var length: usize = 0;
-    while (!tokenize.isWhitespace(path[length]) and length < 100) length += 1;
+    while (length < path.len and !tokenize.isWhitespace(path[length]) and length < 100) length += 1;
 
     if (length == 0 or length == 100) return ParseError.EndOfPath;
 

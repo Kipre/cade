@@ -9,6 +9,7 @@
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepBuilderAPI_Transform.hxx>
 #include <BRepOffsetAPI_MakePipe.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <Geom_BezierCurve.hxx>
@@ -65,7 +66,45 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <GCPnts_QuasiUniformDeflection.hxx>
 
+#include <TopExp.hxx>
+
 #include "occ.hxx"
+
+
+gp_Dir getWireStartTangent(const TopoDS_Wire& wire) {
+    // Get the first edge of the wire
+    TopExp_Explorer expEdge(wire, TopAbs_EDGE);
+    if (!expEdge.More()) {
+        throw Standard_Failure("Wire has no edges");
+    }
+
+    // TopoDS_Edge edge = TopoDS::Edge(expEdge.Current());
+
+    TopoDS_Edge edge;
+    for (; expEdge.More(); expEdge.Next()) {
+        edge = TopoDS::Edge(expEdge.Current());
+    }
+
+
+    // Get start and end vertices
+    TopoDS_Vertex vStart, vEnd;
+    TopExp::Vertices(edge, vStart, vEnd);
+
+
+    // Get the start point
+    gp_Pnt pnt = BRep_Tool::Pnt(vStart);
+
+    // Get tangent direction at the start
+    BRepAdaptor_Curve curve(edge);
+    gp_Dir tangent;
+    gp_Vec d1;
+    curve.D1(curve.FirstParameter(), pnt, d1);
+    tangent = gp_Dir(d1);
+    return tangent;
+
+    // Construct and return gp_Ax1
+    // return gp_Ax1(pnt, tangent);
+}
 
 void printPoint(gp_Pnt pnt) {
   std::cout << std::setprecision(15) << "Vertex: " << pnt.X() << ", " << pnt.Y()
@@ -465,7 +504,7 @@ TopoDS_Face makeFaceFromSegments(const PathSegment *segments, size_t size) {
     outer.Reverse();
   }
 
-  BRepBuilderAPI_MakeFace makeFace(wires[0]);
+  BRepBuilderAPI_MakeFace makeFace(outer);
   if (!makeFace.IsDone()) {
     std::cerr << "Warning: Could not create a face from the wire. It might not "
                  "be closed or planar."
@@ -564,8 +603,18 @@ Shape *sweepPathAlong3DPath(const PathSegment *segments, size_t directrixSize,
                             size_t size) {
   TopoDS_Wire wire = createWireFromPathSegments(segments, directrixSize);
 
-  TopoDS_Face face =
+  TopoDS_Face flatFace =
       makeFaceFromSegments(segments + directrixSize, size - directrixSize);
+
+  gp_Dir tangent = getWireStartTangent(wire);
+
+  gp_Ax3 from(gp_Pnt(0,0,0), gp_Dir(0,0,1), gp_Dir(0, 1, 0)); // current wire frame
+  gp_Ax3 to(gp_Pnt(0,0,0), tangent);
+
+  gp_Trsf trsf;
+  trsf.SetTransformation(from, to);
+  BRepBuilderAPI_Transform trsfBuilder(flatFace, trsf);
+  TopoDS_Face face = TopoDS::Face(trsfBuilder.Shape());
 
   if (!face.IsNull()) {
     std::cout << "Successfully created TopoDS_Face from the wire." << std::endl;
