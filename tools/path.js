@@ -738,10 +738,10 @@ export class Path {
     return path;
   }
 
-  rotatesClockwise() {
-    if (!this.isClosed())
-      throw new Error("cannot determine rotation direction of an open path");
-
+  /**
+    * @returns {types.Point[]}
+    */
+  getPointsWithHalfArcs() {
     const points = [];
     for (const segment of this.iterateOverSegments()) {
       const [, p1, type, p2, r, sweep] = segment;
@@ -750,7 +750,14 @@ export class Path {
       }
       points.push(p2);
     }
+    return points;
+  }
 
+  rotatesClockwise() {
+    if (!this.isClosed())
+      throw new Error("cannot determine rotation direction of an open path");
+
+    const points = this.getPointsWithHalfArcs();
     return signedArea(points) < 0;
   }
 

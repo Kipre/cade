@@ -45,7 +45,7 @@ export function dot(p1, p2) {
 export function areOnSameLine(p1, p2, p3) {
   const u = minus(p1, p2);
   const v = minus(p1, p3);
-  return Math.abs(u[1] * v[0] - v[1] * u[0]) < 1e-5;
+  return Math.abs(u[1] * v[0] - v[1] * u[0]) < 1e-3;
 }
 
 /**
@@ -197,7 +197,7 @@ export function intersectLines(p0, p1, l0, l1) {
 
 /**
  * Checks if a point is within a bbox defined by two points.
- * Useful for determining if an intersection in in the relevant.
+ * Useful for determining if an intersection is relevant.
  *
  * @param {types.Point} p
  * @param {types.Point} l1
