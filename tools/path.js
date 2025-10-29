@@ -9,6 +9,7 @@ import {
   isToTheLeft,
   minus,
   mirrorPoint,
+  mult,
   norm,
   offsetPolyline,
   placeAlong,
@@ -203,7 +204,14 @@ export class Path {
       intersection = intersectLines(lastPoint, point, p1, p2);
 
     if (type === "arc")
-      intersection = intersectLineAndArc(p1, p2, lastPoint, point, radius, sweep);
+      intersection = intersectLineAndArc(
+        p1,
+        p2,
+        lastPoint,
+        point,
+        radius,
+        sweep,
+      );
 
     if (intersection == null) throw new Error();
 
@@ -739,8 +747,32 @@ export class Path {
   }
 
   /**
-    * @returns {types.Point[]}
-    */
+   * @param {types.Point} l1
+   * @param {types.Point} l2
+   */
+  cutOnLine(l1, l2, other = false) {
+    const bbox = this.bbox();
+    const size = bbox.size();
+    const center = bbox.center();
+
+    const centerOnLine = pointToLine(center, l1, l2);
+    const p1 = placeAlong(centerOnLine, l1, { fromStart: 2 * size });
+    const p2 = placeAlong(centerOnLine, l1, { fromStart: -2 * size });
+    const [p4, p3] = offsetPolyline([p1, p2], (other ? -2 : 2) * size);
+
+    const toRemove = Path.fromPolyline([p1, p2, p3, p4]);
+    return this.booleanDifference(toRemove);
+  }
+
+  recenter() {
+    const bbox = this.bbox();
+    const center = bbox.center();
+    return this.translate(mult(center, -1));
+  }
+
+  /**
+   * @returns {types.Point[]}
+   */
   getPointsWithHalfArcs() {
     const points = [];
     for (const segment of this.iterateOverSegments()) {
@@ -810,7 +842,8 @@ export class Path {
     if (index === 0) throw new Error("are you sure index is zero ?");
 
     const [, p1, type, p2] = this.getSegmentAt(index);
-    if (type !== "lineTo") throw new Error("cannot insert feature if segment is not a line");
+    if (type !== "lineTo")
+      throw new Error("cannot insert feature if segment is not a line");
 
     const location = placeAlong(p1, p2, placeAlongOpts);
     const rotation = computeVectorAngle(minus(p2, p1));
@@ -962,8 +995,7 @@ export class Path {
     const [first, ...rest] = polyline;
     result.moveTo(first);
     for (const p of rest) result.lineTo(p);
-    if (close)
-      result.close();
+    if (close) result.close();
     return result;
   }
 
@@ -1175,7 +1207,7 @@ export class Path {
         [p0, p1] = offsetSegment(lp, p, offset);
         [p2, p3, nr2] = offsetArc(p, np, r2, s2, nextOffset);
         result.controls[i][1] = intersectLineAndArc(
-          ...[p0, p1, p2, p3, nr2, s2, true]
+          ...[p0, p1, p2, p3, nr2, s2, true],
         );
       } else if (type === "arc" && nextType === "lineTo") {
         [p0, p1, nr1] = offsetArc(lp, p, r1, s1, offset);
@@ -1222,12 +1254,16 @@ export class Path {
     for (const [i, lp, type, p] of this.iterateOverSegments()) {
       if (type !== "lineTo") continue;
       if (!areOnSameLine(l1, l2, lp) || !areOnSameLine(l1, l2, p)) continue;
-      if (closed && !(
-        pointInsideLineBbox(lp, l1, l2) ||
-        pointInsideLineBbox(p, l1, l2) ||
-        pointInsideLineBbox(l1, lp, p) ||
-        pointInsideLineBbox(l2, lp, p)
-      )) continue;
+      if (
+        closed &&
+        !(
+          pointInsideLineBbox(lp, l1, l2) ||
+          pointInsideLineBbox(p, l1, l2) ||
+          pointInsideLineBbox(l1, lp, p) ||
+          pointInsideLineBbox(l2, lp, p)
+        )
+      )
+        continue;
       result.push(i);
     }
     return result;
@@ -1371,10 +1407,9 @@ export class Path {
   }
 
   bbox() {
-    // TODO this is ineficient
+    // TODO this is not exacty correct
     const bbox = new BBox();
-    for (let i = 0; i < 1; i += 1 / 100) {
-      const p = this.evaluateAnywhere(i);
+    for (const p of this.getPointsWithHalfArcs()) {
       bbox.include(p);
     }
     return bbox;

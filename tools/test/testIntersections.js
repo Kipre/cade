@@ -97,3 +97,22 @@ bro.test("intersect two halved circle", () => {
       "M 13.2664991614216 20 A 24 24 0 0 0 13.266499161421601 -20 L -13.2664991614216 -20 A 24 24 0 0 0 -13.266499161421601 20 Z",
     );
 });
+
+bro.test("cut on line", () => {
+  const p = new Path();
+  p.moveTo([0, 0]);
+  p.lineTo([0, 149]);
+  p.lineTo([93.93398282201788, 149]);
+  p.lineTo([200, 42.93398282201788]);
+  p.lineTo([200, 0]);
+  p.close();
+
+  const l1 = [200, 35];
+  const l2 = [199, 35];
+
+  bro
+    .expect(p.cutOnLine(l1, l2).toString())
+    .toBe(
+      "M 0 149 L 93.93398282201788 149 L 200 42.93398282201788 L 200 35 L 0 35 Z",
+    );
+});

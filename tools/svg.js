@@ -67,6 +67,9 @@ export class BBox {
     return Math.max(xSize, ySize, zSize);
   }
 
+  /**
+    * @returns {types.Point3 | types.Point}
+    */
   center() {
     const result = [(this.xMax + this.xMin) / 2, (this.yMax + this.yMin) / 2];
     if (Object.is(Number.POSITIVE_INFINITY, this.zMin)) return result;
