@@ -141,10 +141,23 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *const std.j
 
         if (std.mem.eql(u8, operation, "fuse")) {
             const shapeIndexes = step.get("shapes").?.array.items;
-            var currentShape = shapes[@intCast(shapeIndexes[0].integer)];
-            for (shapeIndexes, 0..) |idx, j| {
-                if (j == 0) continue;
-                currentShape = occ.fuseShapes(currentShape, shapes[@intCast(idx.integer)]).?;
+            // i dont know how to not initialize this
+            var currentShape = shapes[0];
+            for (shapeIndexes, 0..) |item, j| {
+                var shape = shapes[@intCast(item.object.get("shape").?.integer)];
+                if (item.object.get("placement")) |placement| {
+                    const transform = placement.array.items;
+                    var mat: Transform = undefined;
+                    for (0..15) |k| mat[k] = try getNumber(transform[j]);
+                    const trsf = occ.makeTransform(&mat[0]);
+                    shape = occ.applyShapeLocationTransform(shape, trsf).?;
+                }
+
+                if (j == 0) {
+                    currentShape = shape;
+                } else {
+                    currentShape = occ.fuseShapes(currentShape, shape).?;
+                }
             }
 
             shapes[i] = currentShape;
@@ -152,10 +165,18 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *const std.j
         }
 
         if (std.mem.eql(u8, operation, "cut")) {
-            const cutoutIndexes = step.get("cutouts").?.array.items;
             var currentShape = shapes[@intCast(step.get("shape").?.integer)];
-            for (cutoutIndexes) |idx| {
-                currentShape = occ.cutShape(currentShape, shapes[@intCast(idx.integer)]).?;
+            const cutoutIndexes = step.get("cutouts").?.array.items;
+            for (cutoutIndexes) |item| {
+                var shape = shapes[@intCast(item.object.get("shape").?.integer)];
+                if (item.object.get("placement")) |placement| {
+                    const transform = placement.array.items;
+                    var mat: Transform = undefined;
+                    for (0..15) |j| mat[j] = try getNumber(transform[j]);
+                    const trsf = occ.makeTransform(&mat[0]);
+                    shape = occ.applyShapeLocationTransform(shape, trsf).?;
+                }
+                currentShape = occ.cutShape(currentShape, shape).?;
             }
 
             shapes[i] = currentShape;
