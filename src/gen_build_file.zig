@@ -60,12 +60,13 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
+    std.debug.print("Generate build files\n", .{});
 
     const input_file_path = "OCCT/adm/templates/Standard_Version.hxx.in";
     const output_file_path = "inc/Standard_Version.hxx";
 
     _ = std.fs.cwd().makeDir("inc") catch |err| switch (err) {
-        error.PathAlreadyExists => return,
+        error.PathAlreadyExists => {},
         else => return err,
     };
 
