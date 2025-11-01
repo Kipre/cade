@@ -764,10 +764,15 @@ export class Path {
     return this.booleanDifference(toRemove);
   }
 
-  recenter() {
+  /**
+   * @param {{ onlyX?: boolean; onlyY?: boolean; }?} opts
+   */
+  recenter(opts = {}) {
     const bbox = this.bbox();
-    const center = bbox.center();
-    return this.translate(mult(center, -1));
+    const [x, y] = bbox.center();
+    if (opts?.onlyX) return this.translate([-x, 0]);
+    if (opts?.onlyY) return this.translate([0, -y]);
+    return this.translate([-x, -y]);
   }
 
   /**
