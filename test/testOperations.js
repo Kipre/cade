@@ -5,6 +5,7 @@ import { FlatPart } from "../lib/flat.js";
 import { Assembly } from "../lib/lib.js";
 import { cut, extrusion, fuse, retrieveOperations } from "../lib/operations.js";
 import { Part } from "../lib/part.js";
+import { makeFourDrills } from "../lib/utils.js";
 import { Path } from "../tools/path.js";
 import bro from "../tools/test/brotest/brotest.js";
 import { a2m } from "../tools/transform.js";
@@ -34,4 +35,24 @@ bro.test("retrieves operations", () => {
   bro
     .expect(part.shape.length)
     .toBe(5);
+});
+
+
+bro.test("retrieves operations for drilling", () => {
+  const holeSize = 5;
+  const chariotHoleDepth = 10;
+  const drillsTransform = a2m([0, 10, 20 / 2], y3);
+  const drills = makeFourDrills(
+    drillsTransform,
+    holeSize,
+    chariotHoleDepth,
+    [28 / 2, 26 / 2],
+  );
+  bro
+    .expect(retrieveOperations(drills))
+    .toHaveLength(5);
+
+  bro
+    .expect(retrieveOperations(drills))
+    .toHaveLength(5);
 });
