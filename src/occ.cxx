@@ -645,9 +645,11 @@ Shape *applyShapeLocationTransform(Shape *shape, Transform *trsf) {
 
   TopoDS_Shape s = shape->shape;
   TopLoc_Location loc(trsf->trsf);
+  TopLoc_Location existingLoc = s.Location();
+  TopLoc_Location combinedLoc = existingLoc.Multiplied(loc);
 
   Shape *result = new Shape;
-  result->shape = s.Located(loc);
+  result->shape = s.Located(combinedLoc);
 
   return result;
 }
