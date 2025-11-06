@@ -14,20 +14,19 @@ bro.test("make polygon from parallel lines", () => {
   bro
     .expect(makePolygonFromLines(lines, [15, 20]).toString())
     .toBe(
-      "M 600 -70 L 53.210678118654755 -70 L 53.210678118654755 -2.5 L 600 -2.5 Z",
+      "M 53.210678118654755 -67.5 L 53.210678118654755 0 L 600 0 L 600 -67.5 Z",
     );
 });
 
 bro.test("make polygon from three walls", () => {
   const lines = [
-    [[-7.5, -85], [-7.5, 500],],
-    [[-15, -7.5], [-97.0034898277757, -7.5],],
-    [[-107.5, -110], [-107.5, 500],],
+    [[1.3827732205958862e-15, -111.5], [350, -111.5]],
+    [[0, -7.5], [223.5, -7.5]],
   ];
 
   bro
-    .expect(makePolygonFromLines(lines, [15, 15, 15]).toString())
-    .toBe("M -15 500 L -15 0 L -100 0 L -100 500 Z");
+    .expect(makePolygonFromLines(lines, [15, 15]).toString())
+    .toBe("M 2.1245770866179924e-15 -15 L 223.5 -15 L 350 -104 L 3.5073503072138786e-15 -104 Z");
 });
 
 bro.test("clears spindle in angles", () => {
@@ -114,4 +113,16 @@ bro.test("clears spindle in angles with minimal angle", () => {
     .toBe(
       "M -10 -7.5 L 9 -7.5 A 3 3 0 0 1 15 -7.5 L 14.999999999999998 7.5 A 3 3 0 0 1 8.999999999999998 7.5 L -9.999999999999998 7.5 Z",
     );
+});
+
+bro.test("make polygon from two walls", () => {
+  const lines = [
+    [[-7.5, -85], [-7.5, 500],],
+    [[-15, -7.5], [-97.0034898277757, -7.5],],
+    [[-107.5, -110], [-107.5, 500],],
+  ];
+
+  bro
+    .expect(makePolygonFromLines(lines, [15, 15, 15]).toString())
+    .toBe("M -100 1.2363986669178672e-15 L -100 500 L -15 500 L -15 1.2363986669178672e-15 Z");
 });
