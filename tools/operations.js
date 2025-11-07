@@ -2,13 +2,14 @@
 
 import { minus } from "./2d.js";
 import { cross } from "./3d.js";
+import { keyToComparison2d } from "./utils.js";
 
 export function convexHull(...geometries) {
   const points = [];
   for (const geom of geometries) {
     points.push(...geom);
   }
-  points.sort((a, b) => a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1]);
+  points.sort(keyToComparison2d(v => v));
 
   const lower = [];
   for (const p of points) {

@@ -36,6 +36,9 @@ export function transformPoint3(m, p, noTranslation = false) {
   return [p2.x, p2.y, p2.z];
 }
 
+export const atm = applyTransformMatrix;
+export const atm3 = transformPoint3;
+
 export function makeTransformFunction(svgElement) {
   const matrix = svgElement.transform.baseVal.consolidate().matrix;
   return ([x, y]) => [
@@ -84,22 +87,10 @@ export function a2m(maybeOrigin = null, maybeUp = null, maybeDir = null) {
 
   // prettier-ignore
   const transform = new DOMMatrix([
-    x[0],
-    x[1],
-    x[2],
-    0,
-    y[0],
-    y[1],
-    y[2],
-    0,
-    z[0],
-    z[1],
-    z[2],
-    0,
-    origin[0],
-    origin[1],
-    origin[2],
-    1,
+    x[0], x[1], x[2], 0,
+    y[0], y[1], y[2], 0,
+    z[0], z[1], z[2], 0,
+    origin[0], origin[1], origin[2], 1,
   ]);
 
   return transform;
