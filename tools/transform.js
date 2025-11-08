@@ -1,8 +1,9 @@
 // @ts-check
 /** @import * as types from './types' */
 
-import { eps, norm } from "./2d.js";
-import { cross, minus3, norm3, normalize3 } from "./3d.js";
+import { eps, norm, rotatePoint } from "./2d.js";
+import { cross, dot3, minus3, mult3, norm3, normalize3, plus3 } from "./3d.js";
+import { x3, y3, z3, zero3 } from "./defaults.js";
 import { DOMMatrix, DOMPoint } from "./dom.js";
 import { w3svg } from "./svg.js";
 
@@ -119,4 +120,35 @@ export function computeTransformFromPoints(sourcePts, targetPts) {
 
   // The transformation matrix is target * inverse(source)
   return targetMatrix.multiply(sourceMatrix.inverse());
+}
+
+export function linearizationMatrix(p1, p2) {
+  return computeTransformFromPoints(
+    [p1, p2, rotatePoint(p1, p2, Math.PI / 2)],
+    [[0, 0], [1, 0], [0, 1]],
+  );
+}
+
+
+/**
+ * @param {{ from: DOMMatrix; to: DOMMatrix; }[]} constraints
+ */
+export function locateWithConstraints(...constraints) {
+  let loc = /** @type {types.Point3} */ ([0, 0, 0]);
+  let zee = null;
+  let eax = null;
+
+  for (const { from, to } of constraints) {
+    const combined = to.multiply(from.inverse());
+    const axisHere = atm3(to, z3, true);
+    const og = atm3(combined, zero3);
+    const axis = atm3(from, z3, true);
+
+    if (norm(axis, z3) < eps) zee = axisHere;
+    else if (norm(axis, x3) < eps) eax = axisHere;
+    else if (norm(axis, y3) < eps) throw new Error();
+
+    loc = plus3(mult3(axisHere, dot3(axisHere, og)), loc);
+  }
+  return a2m(loc, zee, eax);
 }
