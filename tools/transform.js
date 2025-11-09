@@ -146,7 +146,11 @@ export function locateWithConstraints(...constraints) {
 
     if (norm(axis, z3) < eps) zee = axisHere;
     else if (norm(axis, x3) < eps) eax = axisHere;
-    else if (norm(axis, y3) < eps) throw new Error();
+    else if (norm(axis, y3) < eps) {
+      zee = cross(atm3(to, x3, true), axisHere);
+      eax = cross(axisHere, zee);
+    }
+    else throw new Error();
 
     loc = plus3(mult3(axisHere, dot3(axisHere, og)), loc);
   }

@@ -11,14 +11,14 @@ export function normalize3(v) {
 }
 
 /**
- * @param {types.Point3} a
- * @param {types.Point3} b
+ * @param {types.Point3 | types.Point} a
+ * @param {types.Point3 | types.Point} b
  * @returns {types.Point3}
  */
 export function cross(a, b) {
   return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
+    a[1] * (b[2] ?? 0) - (a[2] ?? 0) * b[1],
+    (a[2] ?? 0) * b[0] - a[0] * (b[2] ?? 0),
     a[0] * b[1] - a[1] * b[0],
   ];
 }
