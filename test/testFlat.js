@@ -1,6 +1,8 @@
 // @ts-check
 
-import { makePolygonFromLines, spindleCleared2LineTo, spindleClearedLineTo } from "../lib/flat.js";
+import { spindleCleared2LineTo, spindleClearedLineTo } from "../lib/flat.js";
+import { findConvexZones, makePolygonFromLines } from "../lib/shelf.js";
+import { convexHull } from "../tools/operations.js";
 import { Path } from "../tools/path.js";
 import { debugGeometry } from "../tools/svg.js";
 import bro from "../tools/test/brotest/brotest.js";
@@ -125,4 +127,149 @@ bro.test("make polygon from two walls", () => {
   bro
     .expect(makePolygonFromLines(lines, [15, 15, 15]).toString())
     .toBe("M -100 1.2363986669178672e-15 L -100 500 L -15 500 L -15 1.2363986669178672e-15 Z");
+});
+
+bro.test("find convex zones", () => {
+  const lines = [
+    {
+      "pts": [[1103, 7.5], [-85, 7.5]],
+      "type": "cutting",
+      "thickness": 15
+    },
+    {
+      "pts": [[-7.5, 15], [-7.5, 100]],
+      "type": "cutting",
+      "thickness": 15
+    },
+    {
+      "pts": [[1128, 107.5], [-170.62276185659434, 107.5]],
+      "type": "cutting",
+      "thickness": 15
+    },
+    {
+      "pts": [[1025.5, 15], [1025.5, 100]],
+      "type": "cutting",
+      "thickness": 15
+    }
+  ]
+
+  const zones = findConvexZones(lines);
+  const hulls = zones.map(z => convexHull(...z.map(l => l.pts)))
+  bro.expect(hulls).toHaveLength(3);
+
+  bro
+    .expect(Path.fromPolyline(hulls[0]).toString())
+    .toBe("M -170.62276185659434 107.5 L -15 107.5 L -15 7.5 L -85 7.5 Z");
+
+  bro
+    .expect(Path.fromPolyline(hulls[1]).toString())
+    .toBe("M 0 15.000000000000002 L 0 100 L 9.769962616701378e-15 107.5 L 1018 107.50000000000001 L 1018 7.5 L 2.042810365310288e-14 7.5 Z");
+
+  bro
+    .expect(Path.fromPolyline(hulls[2]).toString())
+    .toBe("M 1033 7.5 L 1033 107.5 L 1128 107.5 L 1103 7.5 Z");
+});
+
+bro.test("find convex zones 2", () => {
+  const lines = [
+    {
+      "pts": [[-67.5, -72.5], [82.50000000000003, -72.5]],
+      "type": "cutting",
+      "thickness": 15
+    },
+    {
+      "pts": [[65, 27.5], [65, -72.5]],
+      "type": "cutting",
+      "thickness": 15
+    },
+    {
+      "pts": [[82.5, 27.5], [-67.50000000000001, 27.5]],
+      "type": "cutting",
+      "thickness": 15
+    },
+    {
+      "pts": [[-50, 27.5], [-50, -72.5]],
+      "type": "cutting",
+      "thickness": 15
+    }
+  ];
+
+  bro
+    .expect(findConvexZones(lines))
+    .toEqual([
+      [
+        {
+          "pts": [[72.5, -65], [82.50000000000003, -65]],
+          "type": "edge"
+        },
+        {
+          "pts": [[82.5, 20], [72.5, 20]],
+          "type": "edge"
+        },
+        {
+          "pts": [[72.5, 27.499999999999996], [72.5, -72.5]],
+          "type": "edge"
+        }
+      ],
+      [
+        {
+          "pts": [[-42.5, -65], [57.5, -65]],
+          "type": "edge"
+        },
+        {
+          "pts": [[57.5, 20.00000000000001], [-42.5, 20.00000000000001]],
+          "type": "edge"
+        },
+        {
+          "pts": [[57.5, 27.499999999999996], [57.5, -72.5]],
+          "type": "edge"
+        },
+        {
+          "pts": [[-42.5, 27.499999999999996], [-42.5, -72.5]],
+          "type": "edge"
+        }
+      ],
+      [
+        {
+          "pts": [[-67.5, -65], [-57.5, -65]],
+          "type": "edge"
+        },
+        {
+          "pts": [[-57.5, 20.00000000000001], [-67.50000000000001, 20.000000000000007]],
+          "type": "edge"
+        },
+        {
+          "pts": [[-57.5, 27.499999999999996], [-57.5, -72.5]],
+          "type": "edge"
+        }
+      ]
+    ]);
+});
+
+
+bro.test("shelf cutting", () => {
+  const cutLine = [[-15, 100], [-170.62276185659434, 100]];
+  const line = [[-15, 15], [-15, 100]];
+
+  bro
+    .expect(cut(cutLine, line, 0))
+    .toEqual({ up: [[-15, 15], [-15, 100]] });
+
+  bro
+    .expect(cut(
+      [[1025.5, 15], [1025.5, 100]],
+      [[1103, 7.5], [2.042810365310288e-14, 7.5]],
+      15
+    ))
+    .toEqual({
+      "up": [
+        [1103, 7.5],
+        [1033, 7.5]
+      ],
+      "down": [
+        [1018, 7.5],
+        [2.042810365310288e-14, 7.5]
+      ]
+    });
+
 });

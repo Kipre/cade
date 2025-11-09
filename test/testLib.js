@@ -5,6 +5,7 @@ import { FlatPart } from "../lib/flat.js";
 import { Assembly } from "../lib/lib.js";
 import { extrusion } from "../lib/operations.js";
 import { Part } from "../lib/part.js";
+import { cut } from "../lib/shelf.js";
 import { Path } from "../tools/path.js";
 import bro from "../tools/test/brotest/brotest.js";
 import { a2m } from "../tools/transform.js";
