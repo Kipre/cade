@@ -1,7 +1,7 @@
 // @ts-check
 
 import { spindleCleared2LineTo, spindleClearedLineTo } from "../lib/flat.js";
-import { findConvexZones, makePolygonFromLines } from "../lib/shelf.js";
+import { findConvexZones } from "../lib/shelf.js";
 import { convexHull } from "../tools/operations.js";
 import { Path } from "../tools/path.js";
 import { debugGeometry } from "../tools/svg.js";
