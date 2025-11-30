@@ -679,8 +679,10 @@ export class Path {
   booleanDifference(other) {
     const { loops, intersections } = this.#findIntersectionLoops(other);
 
-    if (!intersections.length)
+    if (!intersections.length) {
+      debugGeometry(this, other);
       throw new Error("difference is impossible because shapes don't overlap");
+    }
 
     let loop;
     let found = false;
@@ -1211,22 +1213,37 @@ export class Path {
       } else if (type === "lineTo" && nextType === "arc") {
         [p0, p1] = offsetSegment(lp, p, offset);
         [p2, p3, nr2] = offsetArc(p, np, r2, s2, nextOffset);
-        result.controls[i][1] = intersectLineAndArc(
-          ...[p0, p1, p2, p3, nr2, s2, true],
-        );
+        if (norm(lp, p) > eps) {
+          result.controls[i][1] = intersectLineAndArc(
+            ...[p0, p1, p2, p3, nr2, s2, true],
+          );
+        } else {
+          // previous line is a close
+          result.controls[i][1] = p2;
+        }
       } else if (type === "arc" && nextType === "lineTo") {
         [p0, p1, nr1] = offsetArc(lp, p, r1, s1, offset);
         [p2, p3] = offsetSegment(p, np, nextOffset);
-        result.controls[i][1] = intersectLineAndArc(
-          ...[p2, p3, p0, p1, nr1, s1, true],
-        );
+        if (norm(p, np) > eps) {
+          result.controls[i][1] = intersectLineAndArc(
+            ...[p2, p3, p0, p1, nr1, s1, true],
+          );
+        } else {
+          // next line is just a close
+          result.controls[i][1] = p1;
+        }
         result.controls[i][2] = nr1;
       } else if (type === "arc" && nextType === "arc") {
         [p0, p1, nr1] = offsetArc(lp, p, r1, s1, offset);
-        [p2, p3, nr2] = offsetArc(lp, p, r2, s2, nextOffset);
-        result.controls[i][1] = intersectTwoArcs(
-          ...[p0, p1, nr1, s1, p2, p3, nr2, s2],
-        );
+        [p2, p3, nr2] = offsetArc(p, np, r2, s2, nextOffset);
+
+        if (norm(p1, p2) < eps) {
+          result.controls[i][1] = p1;
+        } else {
+          result.controls[i][1] = intersectTwoArcs(
+            ...[p0, p1, nr1, s1, p2, p3, nr2, s2],
+          );
+        }
         result.controls[i][2] = nr1;
       } else throw new Error("couldn't offset segment");
 

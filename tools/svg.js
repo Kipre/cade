@@ -190,6 +190,13 @@ export function debugPolyline(poly, color = "red", strokeWidth = null) {
   return g;
 }
 
+export function debugArc(start, end, radius, sweep) {
+  const d = new Path();
+  d.moveTo(start);
+  d.arc(end, radius, sweep);
+  return d;
+}
+
 /**
  * @param {(types.Point[] | string | Path)[]} shapes
  */

@@ -10,8 +10,6 @@ import {
   pointInsideLineBbox,
   rotatePoint,
 } from "./2d.js";
-import { Path } from "./path.js";
-import { debugGeometry } from "./svg.js";
 import { modulo } from "./utils.js";
 
 const eps = 1e-5;

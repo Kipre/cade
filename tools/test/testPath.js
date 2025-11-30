@@ -332,6 +332,16 @@ bro.test("simple line thicken", () => {
     .toBe("M 0 400 L 500 400 L 500 300 L 0 300 Z");
 });
 
+bro.test("offset circle", () => {
+  const path = Path.makeCircle(10);
+
+  bro
+    .expect(path.offset(10).toString())
+    .toBe(
+      "M -20 0 A 20 20 0 0 0 20 0 A 20 20 0 0 0 -20 0 Z"
+    );
+});
+
 bro.test("thicken with rounding", () => {
   const doorSpace = new Path();
   doorSpace.moveTo([0, 400]);
