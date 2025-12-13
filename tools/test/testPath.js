@@ -129,7 +129,7 @@ bro.test("intersect arc", () => {
     {
       point: [426.11625991783626, 567.3883740082163],
       segment: 1,
-      x: 0.09249943128803638,
+      x: 0.08877625628188149,
       crossesFromTheRight: false,
     },
     {

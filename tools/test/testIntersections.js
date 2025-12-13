@@ -116,3 +116,37 @@ bro.test("cut on line", () => {
       "M 0 149 L 93.93398282201788 149 L 200 42.93398282201788 L 200 35 L 0 35 Z",
     );
 });
+
+bro.test("difference on round", () => {
+
+  const p = new Path();
+  p.moveTo([0, 35]);
+  p.lineTo([0, 130]);
+  p.lineTo([86, 130]);
+  p.lineTo([86, 35]);
+  p.lineTo([47.5, 35]);
+  p.lineTo([47.5, 40]);
+  p.arc([37.5, 50], 10, 1);
+  p.lineTo([27.5, 50]);
+  p.arc([17.5, 40], 10, 1);
+  p.lineTo([17.5, 35]);
+  p.close();
+
+  const other = new Path();
+  other.moveTo([1.5000000000000036, 20]);
+  other.arc([-8.5, 29.999999999999996], 10, 0);
+  other.lineTo([-8.5, 40]);
+  other.arc([1.5000000000000018, 50], 10, 0);
+  other.lineTo([11.500000000000004, 50]);
+  other.arc([21.5, 40], 10, 0);
+  other.lineTo([21.5, 30]);
+  other.arc([11.5, 20], 10, 0);
+  other.close();
+
+
+  bro
+    .expect(p.booleanDifference(other).toString())
+    .toBe(
+      "M 0 130 L 86 130 L 86 35 L 47.5 35 L 47.5 40 A 10 10 0 0 1 37.5 50 L 27.5 50 A 10 10 0 0 1 19.5 46 A 10 10 0 0 1 11.500000000000004 50 L 1.5000000000000018 50 A 10 10 0 0 1 -3.552713678800501e-15 49.886859966642604 Z",
+    );
+});

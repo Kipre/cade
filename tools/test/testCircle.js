@@ -115,6 +115,20 @@ bro.test("evaluate arc", () => {
     .toRoughlyEqual([1 - Math.SQRT1_2, 1 - Math.SQRT1_2], eps);
 });
 
+bro.test("evaluate arc bug", () => {
+  const eps = 1e-6;
+  const point = [19.5, 46];
+
+  const x = pointCoordinateOnArc(point, [11.500000000000004, 50], [21.5, 40], 10, 0);
+  bro
+    .expect(x)
+    .toRoughlyEqual(0.5903344706017327, eps);
+
+  bro
+    .expect(evaluateArc(0.5903344706017327, [11.500000000000004, 50], [21.5, 40], 10, 0))
+    .toRoughlyEqual(point, eps);
+});
+
 bro.test("find tangent", () => {
   const eps = 1e-6;
   bro.expect(arcTangentAt(0, [0, -1], [0, 1], 1, 0)).toRoughlyEqual(

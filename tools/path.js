@@ -420,7 +420,7 @@ export class Path {
             const selfTangent = arcTangentAt(xS, lastPoint, p, radius2, sweep2);
             const crossesFromTheRight = isToTheLeft(tOther, ...selfTangent);
 
-            result.push({ point, segment: i, x: xS, crossesFromTheRight });
+            result.push({ point, segment: i, x: xO, crossesFromTheRight });
           }
           break;
         }
@@ -698,7 +698,10 @@ export class Path {
       }
     }
 
-    if (!found) throw new Error("did not find the difference loop");
+    if (!found) {
+      debugGeometry(this, other);
+      throw new Error("did not find the difference loop");
+    }
 
     const result = this.#fromIntersectionLoop(other, loop, intersections);
     if (this.rotatesClockwise() !== result.rotatesClockwise())
