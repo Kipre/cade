@@ -631,42 +631,45 @@ export class Path {
     const maxIterations = 10;
 
     // walk loops
-    for (let idx = 0; idx < length; idx++) {
-      for (let side of ["self", "other"]) {
-        const loop = [];
+    for (const otherWay of [false, true]) {
+      for (let idx = 0; idx < length; idx++) {
+        for (let side of ["self", "other"]) {
+          const loop = [];
 
-        let i = idx;
-        let crossesFromTheRight = true;
-        let counter = 0;
+          let i = idx;
+          let crossesFromTheRight = true;
+          let counter = 0;
 
-        do {
-          const invert = !crossesFromTheRight;
-          const { segment, x } = intersections[i][side];
+          do {
+            const invert = otherWay ? crossesFromTheRight : !crossesFromTheRight;
+            // const invert = !crossesFromTheRight;
+            const { segment, x } = intersections[i][side];
 
-          const [here, there] = side === "self" ? [this, other] : [other, this];
-          const point = here.evaluate(segment, invert ? x - 1e-2 : x + 1e-2);
-          const entersOtherShape = there.isInside(point);
+            const [here, there] = side === "self" ? [this, other] : [other, this];
+            const point = here.evaluate(segment, invert ? x - 1e-2 : x + 1e-2);
+            const entersOtherShape = there.isInside(point);
 
-          const path = {
-            intersectionIdx: i,
-            side,
-            invert,
-            entersOtherShape,
-          };
+            const path = {
+              intersectionIdx: i,
+              side,
+              invert,
+              entersOtherShape,
+            };
 
-          loop.push(path);
-          const info = intersections[i][side];
-          i = crossesFromTheRight ? info.after : info.before;
+            loop.push(path);
+            const info = intersections[i][side];
+            i = !invert ? info.after : info.before;
 
-          const rot = rotation[side];
-          side = side === "self" ? "other" : "self";
-          crossesFromTheRight = rot === info.crossesFromTheRight;
-          counter++;
-        } while (i !== idx && counter < maxIterations);
+            const rot = rotation[side];
+            side = side === "self" ? "other" : "self";
+            crossesFromTheRight = rot === info.crossesFromTheRight;
+            counter++;
+          } while (i !== idx && counter < maxIterations);
 
-        if (counter === maxIterations) throw new Error("failed to find loop");
+          if (counter === maxIterations) throw new Error("failed to find loop");
 
-        if (loop.length) loops.push(loop);
+          if (loop.length) loops.push(loop);
+        }
       }
     }
 
@@ -721,6 +724,22 @@ export class Path {
     }
 
     if (loop === loops.at(-1) || loop == null) throw new Error();
+
+    return this.#fromIntersectionLoop(other, loop, intersections);
+  }
+
+  /**
+   * @param {Path} other
+   */
+  realBooleanUnion(other) {
+    const { loops, intersections } = this.#findIntersectionLoops(other);
+
+    let loop;
+    for (loop of loops) {
+      if (loop.every((c) => !c.entersOtherShape)) break;
+    }
+
+    if (loop == null) throw new Error();
 
     return this.#fromIntersectionLoop(other, loop, intersections);
   }

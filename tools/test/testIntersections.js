@@ -150,3 +150,12 @@ bro.test("difference on round", () => {
       "M 0 130 L 86 130 L 86 35 L 47.5 35 L 47.5 40 A 10 10 0 0 1 37.5 50 L 27.5 50 A 10 10 0 0 1 19.5 46 A 10 10 0 0 1 11.500000000000004 50 L 1.5000000000000018 50 A 10 10 0 0 1 -3.552713678800501e-15 49.886859966642604 Z",
     );
 });
+
+bro.test("simple union", () => {
+  const firstPath = Path.fromD("M 0 0 L 0 10 L 10 10 L 10 0 Z");
+  const secondPath = Path.fromD("M 5 5 L 5 20 L 8 20 L 8 5 Z");
+
+  bro
+    .expect(firstPath.realBooleanUnion(secondPath).toString())
+    .toBe("M 0 10 L 0 0 L 10 0 L 10 10 L 8 10 L 8 20 L 5 20 L 5 10 Z");
+});
