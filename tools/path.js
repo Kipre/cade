@@ -623,6 +623,8 @@ export class Path {
       }
     }
 
+    if (!intersections.length) return { loops, intersections };
+
     const maxIterations = 10;
 
     // walk loops
@@ -660,7 +662,6 @@ export class Path {
         }
 
       } while (i !== idx);
-
 
       if (loop.length) loops.push(loop);
     }
@@ -1277,20 +1278,24 @@ export class Path {
   /**
    * @param {types.Point} l1
    * @param {types.Point} l2
+   * @param {{ exact?: boolean; includedInSegment?: boolean; includedInLine?: boolean; } | undefined} [options]
    */
-  findSegmentsOnLine(l1, l2, closed = false) {
+  findSegmentsOnLine(l1, l2, options) {
+    const inside = pointInsideLineBbox;
     const result = [];
     for (const [i, lp, type, p] of this.iterateOverSegments()) {
       if (type !== "lineTo") continue;
       if (!areOnSameLine(l1, l2, lp) || !areOnSameLine(l1, l2, p)) continue;
-      if (
-        closed &&
-        !(
-          pointInsideLineBbox(lp, l1, l2) ||
-          pointInsideLineBbox(p, l1, l2) ||
-          pointInsideLineBbox(l1, lp, p) ||
-          pointInsideLineBbox(l2, lp, p)
-        )
+      if (options?.exact &&
+        !(inside(lp, l1, l2) || inside(p, l1, l2) || inside(l1, lp, p) || inside(l2, lp, p))
+      )
+        continue;
+      if (options?.includedInSegment &&
+        !(inside(l1, lp, p) || inside(l2, lp, p))
+      )
+        continue;
+      if (options?.includedInLine &&
+        !(inside(lp, l1, l2) || inside(p, l1, l2))
       )
         continue;
       result.push(i);
