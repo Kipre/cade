@@ -580,7 +580,7 @@ export class Path {
   /**
    * @param {Path} other
    */
-  #findIntersectionLoops(other) {
+  #findIntersectionLoops(other, strategy) {
     if (!this.isClosed() || !other.isClosed())
       throw new Error("boolean intersections require closed shapes");
 
@@ -623,54 +623,46 @@ export class Path {
       }
     }
 
-    const rotation = {
-      other: other.rotatesClockwise(),
-      self: this.rotatesClockwise(),
-    };
-
     const maxIterations = 10;
 
     // walk loops
-    for (const otherWay of [false, true]) {
-      for (let idx = 0; idx < length; idx++) {
-        for (let side of ["self", "other"]) {
-          const loop = [];
+    let idx = 0;
+    for (let side of ["self", "other"]) {
+      const loop = [];
 
-          let i = idx;
-          let crossesFromTheRight = true;
-          let counter = 0;
+      let i = idx;
+      let shouldEnterOtherShape = strategy();
 
-          do {
-            const invert = otherWay ? crossesFromTheRight : !crossesFromTheRight;
-            // const invert = !crossesFromTheRight;
-            const { segment, x } = intersections[i][side];
+      do {
+        const { segment, x, before, after } = intersections[i][side];
 
-            const [here, there] = side === "self" ? [this, other] : [other, this];
-            const point = here.evaluate(segment, invert ? x - 1e-2 : x + 1e-2);
-            const entersOtherShape = there.isInside(point);
+        const [here, there] = side === "self" ? [this, other] : [other, this];
+        const point = here.evaluate(segment, x + 1e-2);
+        const lineEntersThere = there.isInside(point);
+        const invert = lineEntersThere !== shouldEnterOtherShape;
 
-            const path = {
-              intersectionIdx: i,
-              side,
-              invert,
-              entersOtherShape,
-            };
+        const path = {
+          intersectionIdx: i,
+          side,
+          invert,
+          entersOtherShape: shouldEnterOtherShape,
+        };
 
-            loop.push(path);
-            const info = intersections[i][side];
-            i = !invert ? info.after : info.before;
+        loop.push(path);
+        i = invert ? before : after;
 
-            const rot = rotation[side];
-            side = side === "self" ? "other" : "self";
-            crossesFromTheRight = rot === info.crossesFromTheRight;
-            counter++;
-          } while (i !== idx && counter < maxIterations);
+        side = side === "self" ? "other" : "self";
+        shouldEnterOtherShape = strategy(shouldEnterOtherShape);
 
-          if (counter === maxIterations) throw new Error("failed to find loop");
-
-          if (loop.length) loops.push(loop);
+        if (loop.length === maxIterations) {
+          console.log(loop);
+          throw new Error("failed to find loop");
         }
-      }
+
+      } while (i !== idx);
+
+
+      if (loop.length) loops.push(loop);
     }
 
     return { loops, intersections };
@@ -680,7 +672,7 @@ export class Path {
    * @param {Path} other
    */
   booleanDifference(other) {
-    const { loops, intersections } = this.#findIntersectionLoops(other);
+    const { loops, intersections } = this.#findIntersectionLoops(other, (entered) => !entered);
 
     if (!intersections.length) {
       debugGeometry(this, other);
@@ -690,12 +682,7 @@ export class Path {
     let loop;
     let found = false;
     for (loop of loops) {
-      if (loop.length !== 2) continue;
-      const indexOrder = loop[0].side === "self" ? 0 : 1;
-      const { entersOtherShape: enters1 } = loop[indexOrder];
-      const { entersOtherShape: enters2 } = loop[1 - indexOrder];
-
-      if (!enters1 && enters2) {
+      if (loop.some(step => step.side === "other" && step.entersOtherShape)) {
         found = true;
         break;
       }
@@ -716,14 +703,12 @@ export class Path {
    * @param {Path} other
    */
   booleanIntersection(other) {
-    const { loops, intersections } = this.#findIntersectionLoops(other);
+    const { loops, intersections } = this.#findIntersectionLoops(other, () => true);
 
     let loop;
     for (loop of loops) {
-      if (loop.every((c) => c.entersOtherShape)) break;
+      if (loop.every((step) => step.side === "self" && !step.invert)) break;
     }
-
-    if (loop === loops.at(-1) || loop == null) throw new Error();
 
     return this.#fromIntersectionLoop(other, loop, intersections);
   }
@@ -732,7 +717,7 @@ export class Path {
    * @param {Path} other
    */
   realBooleanUnion(other) {
-    const { loops, intersections } = this.#findIntersectionLoops(other);
+    const { loops, intersections } = this.#findIntersectionLoops(other, () => false);
 
     let loop;
     for (loop of loops) {
