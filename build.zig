@@ -18,6 +18,7 @@ const sources_TKXSBase = @import("TKXSBase_generated-build-config.zig").sources;
 const sources_TKShHealing = @import("TKShHealing_generated-build-config.zig").sources;
 const sources_TKBO = @import("TKBO_generated-build-config.zig").sources;
 const sources_TKMesh = @import("TKMesh_generated-build-config.zig").sources;
+const sources_TKHLR = @import("TKHLR_generated-build-config.zig").sources;
 
 fn addOCCTModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, name: []const u8, sources: []const []const u8) *std.Build.Step.Compile {
     const lib = b.addLibrary(.{
@@ -80,12 +81,13 @@ pub fn build(b: *std.Build) void {
     const lib_TKShHealing = addOCCTModule(b, target, optimize, "TKShHealing", &sources_TKShHealing);
     const lib_TKBO = addOCCTModule(b, target, optimize, "TKBO", &sources_TKBO);
     const lib_TKMesh = addOCCTModule(b, target, optimize, "TKMesh", &sources_TKMesh);
+    const lib_TKHLR = addOCCTModule(b, target, optimize, "TKHLR", &sources_TKHLR);
 
     const occt_libs = [_]*std.Build.Step.Compile{
         lib_TKernel,     lib_TKMath,     lib_TKG2d,     lib_TKG3d,    lib_TKGeomBase,
         lib_TKBRep,      lib_TKGeomAlgo, lib_TKTopAlgo, lib_TKPrim,   lib_TKFillet,
         lib_TKOffset,    lib_TKFeat,     lib_TKBool,    lib_TKDESTEP, lib_TKXSBase,
-        lib_TKShHealing, lib_TKBO,       lib_TKMesh,
+        lib_TKShHealing, lib_TKBO,       lib_TKMesh,    lib_TKHLR,
     };
 
     // main module
@@ -109,6 +111,7 @@ pub fn build(b: *std.Build) void {
     exe.addIncludePath(b.path("src"));
     exe.addIncludePath(b.path("inc"));
     exe.addCSourceFile(.{ .file = b.path("src/occ.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
+    exe.addCSourceFile(.{ .file = b.path("src/svg.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
 
     for (occt_libs) |lib| {
         exe.linkLibrary(lib);

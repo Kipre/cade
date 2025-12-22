@@ -69,6 +69,7 @@
 #include <TopExp.hxx>
 
 #include "occ.hxx"
+#include "opaque.hxx"
 
 
 gp_Dir getWireStartTangent(const TopoDS_Wire& wire) {
@@ -532,20 +533,6 @@ TopoDS_Face makeFaceFromSegments(const PathSegment *segments, size_t size) {
 
   return face;
 }
-
-struct Shape {
-  TopoDS_Shape shape;
-};
-
-struct Compound {
-  TopoDS_Compound compound;
-  BRep_Builder builder;
-  Compound() { builder.MakeCompound(compound); }
-};
-
-struct Transform {
-  gp_Trsf trsf;
-};
 
 extern "C" {
 

@@ -207,3 +207,26 @@ pub fn exportAsSTEP(allocator: std.mem.Allocator, definition: *CompactPartDefini
     var filepath = "C:/Users/kipr/Downloads/test.step";
     occ.saveToSTEP(compound, &filepath[0]);
 }
+
+pub fn projectSVG(allocator: std.mem.Allocator, definition: *CompactPartDefinition) !void {
+    const compound = occ.makeCompound();
+    defer occ.freeCompound(compound);
+
+    for (definition.geometries) |geom| {
+        const shape = try executeShapeRecipe(allocator, &geom.part);
+
+        // var filepath = "C:/Users/kipr/Downloads/test.svg";
+        var segments: std.ArrayList(PathSegment) = .empty;
+        const max_capacity = 1e3;
+        try segments.ensureTotalCapacity(allocator, max_capacity);
+            const array = try segments.toOwnedSlice(allocator);
+        const length = occ.shapeToSVGSegments(shape, array.ptr, max_capacity);
+        try parse.writeSegmentsToSVG(array, length);
+
+        // for (geom.instances) |instance| {
+        //     var mat: Transform = instance;
+        //     const transform = occ.makeTransform(&mat[0]);
+        //     occ.addShapeToCompound(compound, shape, transform);
+        // }
+    }
+}

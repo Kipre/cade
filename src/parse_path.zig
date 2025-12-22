@@ -125,6 +125,39 @@ pub const SVGPathIterator = struct {
     }
 };
 
+pub fn writeSegmentsToPath(segments: []PathSegment, length: usize, writer: *std.io.Writer) !usize {
+    _ = try writer.write("<path d=\"");
+    var i: usize = 0;
+    for (segments) |seg| {
+        if (i > length or (seg.command == 'M' and i != 0)) break;
+        _ = try writer.print("{c} {d} {d} ", .{ seg.command, seg.x, seg.y });
+        i += 1;
+    }
+    _ = try writer.write("\"/>");
+    return i;
+}
+
+pub fn writeSegmentsToGroup(segments: []PathSegment, length: usize, writer: *std.io.Writer) !void {
+    _ = try writer.write("<g>");
+    var pos: usize = 0;
+    while (pos < length) {
+        pos += try writeSegmentsToPath(segments[pos..], length, writer);
+    }
+    _ = try writer.write("</g>");
+}
+
+pub fn writeSegmentsToSVG(segments: []PathSegment, length: usize) !void {
+    const file = try std.fs.cwd().createFile("C:/Users/kipr/Downloads/test.svg", .{});
+    defer file.close(); // Ensure the file is closed when the scope ends
+
+    // 2. Get the writer from the file
+    var writer = file.writer(&.{}).interface;
+
+    _ = try writer.write("<svg>");
+    try writeSegmentsToGroup(segments, length, &writer);
+    _ = try writer.write("</svg>");
+}
+
 // test "SVG path parsing" {
 //     const path_string = "M 10 20 L 30 40 A 50 50 0 1 0 60 70 Z";
 //     var segments = try parsePath(std.testing.allocator, path_string);
