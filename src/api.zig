@@ -190,10 +190,7 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *const std.j
     return shapes[nbSteps - 1];
 }
 
-pub fn exportAsSTEP(allocator: std.mem.Allocator, definition: *CompactPartDefinition) !void {
-    const compound = occ.makeCompound();
-    defer occ.freeCompound(compound);
-
+pub fn assembleCompound(allocator: std.mem.Allocator, compound: *occ.Compound, definition: * const CompactPartDefinition) !void {
     for (definition.geometries) |geom| {
         const shape = try executeShapeRecipe(allocator, &geom.part);
 
@@ -203,7 +200,65 @@ pub fn exportAsSTEP(allocator: std.mem.Allocator, definition: *CompactPartDefini
             occ.addShapeToCompound(compound, shape, transform);
         }
     }
+}
+
+pub fn exportAsSTEP(allocator: std.mem.Allocator, definition: *CompactPartDefinition) !void {
+    const compound = occ.makeCompound().?;
+    defer occ.freeCompound(compound);
+
+    try assembleCompound(allocator, compound, definition);
 
     var filepath = "C:/Users/kipr/Downloads/test.step";
     occ.saveToSTEP(compound, &filepath[0]);
+}
+
+pub fn projectSVG(allocator: std.mem.Allocator, definition: * const CompactPartDefinition) !void {
+    const compound = occ.makeCompound().?;
+    defer occ.freeCompound(compound);
+
+    try assembleCompound(allocator, compound, definition);
+
+    const filepath = "./schema.svg";
+    const max_capacity = 1e5;
+
+    var items: [max_capacity]PathSegment = @splat(.{});
+    const array = items[0..];
+
+    const length = occ.shapeToSVGSegments(compound, array.ptr, max_capacity);
+
+    const file = try std.fs.cwd().createFile(filepath, .{});
+    defer file.close();
+
+    var file_writer = file.writer(&.{});
+    const writer = &file_writer.interface;
+
+    try parse.writeSegmentsToSVG(writer, array[0..length]);
+    try writer.flush();
+    std.debug.print("successfully wrote svg file with {d} segments\n", .{length});
+}
+
+test "simple" {
+    try std.testing.expect(1 + 1 == 2);
+    // std.debug.print("hello word", .{});
+}
+
+test "projects a definition" {
+    const allocator = std.testing.allocator;
+
+    const json = 
+    \\ {"geometries":[
+    \\   {"part":{"shape":[{"type":"extrusion","placement":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],"length":15,"outsides":["M -75 0 L -75 300 L 75 300 L 75 0 Z"],"insides":["M 16.2 20 A 3.1 3.1 0 0 0 10 20 L 10.000000000000005 35 A 3.1 3.1 0 0 0 16.200000000000003 35 L 33.79999999999999 35.00000000000001 A 3.1 3.1 0 0 0 39.999999999999986 34.99999999999999 L 40 19.999999999999993 A 3.1 3.1 0 0 0 33.8 19.999999999999996 Z","M -33.8 20 A 3.1 3.1 0 0 0 -40 20 L -39.99999999999999 35 A 3.1 3.1 0 0 0 -33.8 35 L -16.200000000000003 35.00000000000001 A 3.1 3.1 0 0 0 -10.000000000000009 34.99999999999999 L -9.999999999999996 19.999999999999993 A 3.1 3.1 0 0 0 -16.199999999999996 19.999999999999996 Z"]}],"name":"page"},"instances":[[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]]},
+    \\   {"part":{"shape":[{"type":"extrusion","placement":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],"length":15,"outsides":["M 0 -50 L -1.9013438260070653e-15 -46.199999999999996 A 3.1 3.1 0 0 1 -1.5217033182713861e-15 -40 L -12 -40 A 3 3 0 0 0 -15 -36.99999999999999 L -15.000000000000009 -12.999999999999995 A 3 3 0 0 0 -11.999999999999998 -9.999999999999996 L 3.1526688044964397e-16 -9.999999999999996 A 3.1 3.1 0 0 1 6.949073881853234e-16 -3.799999999999997 L -1.2981256070961944e-15 3.8000000000000007 A 3.1 3.1 0 0 1 -9.18485099360515e-16 10 L -12 10 A 3 3 0 0 0 -15 13.000000000000002 L -15.000000000000009 37 A 3 3 0 0 0 -11.999999999999998 40 L 9.18485099360515e-16 40 A 3.1 3.1 0 0 1 1.2981256070961944e-15 46.2 L 0 50 L 50 50 L 50 -50 Z"],"insides":[]}],"name":0},"instances":[[0,0,1,0,1,0,0,0,0,1,0,0,0,20,15,1]]}
+    \\ ]}
+    ;
+
+    const parsed = try std.json.parseFromSlice(
+        CompactPartDefinition,
+        allocator,
+        json,
+        .{.ignore_unknown_fields = true},
+    );
+    defer parsed.deinit();
+
+    try projectSVG(allocator, &parsed.value);
 }

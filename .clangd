@@ -1,3 +1,4 @@
 CompileFlags:
   Add:
     - "--include-directory=C:/Users/kipr/repos/cade/inc"
+    - "--include-directory=/home/kipr/cnc2/cade/inc"

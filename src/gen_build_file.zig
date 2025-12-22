@@ -138,6 +138,7 @@ pub fn main() !void {
     try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKMesh");
     try generateSourceLists(allocator, "OCCT/src/DataExchange/TKDESTEP");
     try generateSourceLists(allocator, "OCCT/src/DataExchange/TKXSBase");
+    try generateSourceLists(allocator, "OCCT/src/ModelingAlgorithms/TKHLR");
 }
 
 pub fn fatal(comptime format: []const u8, args: anytype) noreturn {

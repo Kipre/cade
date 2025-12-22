@@ -7,10 +7,10 @@ typedef struct Transform Transform;
 
 Shape *extrudePathWithHoles(const struct PathSegment *segments, size_t size,
                             double thickness);
-Shape *revolvePath(const struct PathSegment *segments, size_t size, Transform *trsf,
-                            double rotation);
-Shape *sweepPathAlong3DPath(const struct PathSegment *segments, size_t directrixSize,
-                            size_t size);
+Shape *revolvePath(const struct PathSegment *segments, size_t size,
+                   Transform *trsf, double rotation);
+Shape *sweepPathAlong3DPath(const struct PathSegment *segments,
+                            size_t directrixSize, size_t size);
 void freeShape(Shape *shape);
 
 int writeToOBJ(Shape *shape, char *buffer);
@@ -29,3 +29,6 @@ Shape *applyShapeLocationTransform(Shape *shape, Transform *trsf);
 Shape *fuseShapes(Shape *shape1, Shape *shape2);
 
 Shape *cutShape(Shape *toCut, Shape *cutout);
+
+size_t shapeToSVGSegments(const Compound *compound, struct PathSegment *segments,
+                          size_t maxLength);
