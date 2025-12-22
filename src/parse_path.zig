@@ -6,6 +6,8 @@ const Allocator = std.mem.Allocator;
 
 const PathSegment = occ.PathSegment;
 
+// TODO rename to SVG io
+
 // const PathSegment = extern struct {
 //     command: u8,
 //     x: f32,
@@ -120,10 +122,80 @@ pub const SVGPathIterator = struct {
             else => {
                 std.debug.print("{c}", .{command});
                 return ParseError.InvalidCommand;
-            }
+            },
         }
     }
 };
+
+const Bbox = struct {
+    xMin: f32 = 1e10,
+    yMin: f32 = 1e10,
+    xMax: f32 = 0,
+    yMax: f32 = 0,
+
+    fn update(self: *Bbox, x: f32, y: f32) void {
+        self.xMin = @min(self.xMin, x);
+        self.yMin = @min(self.yMin, y);
+        self.xMax = @max(self.xMax, x);
+        self.yMax = @max(self.yMax, y);
+    }
+
+    // fn combineWith(self: *Bbox, other: Bbox) void {
+    //     self.xMin = std.math.min(self.xMin, other.xMin);
+    //     self.yMin = std.math.min(self.yMin, other.yMin);
+    //     self.xMax = std.math.max(self.xMax, other.xMax);
+    //     self.yMax = std.math.max(self.yMax, other.yMax);
+    // }
+};
+
+pub fn writeSegmentsToPath(segments: []PathSegment, writer: *std.io.Writer) !usize {
+    _ = try writer.write("<path d=\"");
+    var i: usize = 0;
+    for (segments) |seg| {
+        if ((seg.command == 'M' and i != 0) or seg.command == 0) break;
+        switch (seg.command) {
+            'M', 'L' => _ = try writer.print("{c} {d} {d} ", .{ seg.command, seg.x, seg.y }),
+            'A' => {
+                const large_arc = if (seg.large_arc == 0) '0' else seg.large_arc;
+                const radius2 = if (seg.radius2 == 0) seg.radius else seg.radius2;
+                _ = try writer.print(
+                    "A {d} {d} {d} {c} {c} {d} {d}",
+                    .{ seg.radius, radius2, seg.axis_rotation, large_arc, seg.sweep, seg.x, seg.y },
+                );
+            },
+            else => {
+                std.debug.print("unknown command {c}\n", .{seg.command});
+                break;
+            },
+        }
+        i += 1;
+    }
+    _ = try writer.write("\"/>\n");
+    return i;
+}
+
+pub fn writeSegmentsToGroup(segments: []PathSegment, writer: *std.io.Writer) !void {
+    _ = try writer.write("<g fill=\"none\" stroke-width=\"1px\" stroke=\"black\">\n");
+    var pos: usize = 0;
+    while (pos < segments.len) {
+        pos += try writeSegmentsToPath(segments[pos..], writer);
+    }
+    _ = try writer.write("</g>\n");
+}
+
+pub fn writeSegmentsToSVG(writer: *std.io.Writer, segments: []PathSegment) !void {
+    var bbox: Bbox = .{};
+    for (segments) |seg| bbox.update(seg.x, seg.y);
+    const width = bbox.xMax - bbox.xMin;
+    const height = bbox.yMax - bbox.yMin;
+
+    _ = try writer.print(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" transform=\"scale(1, -1)\" viewBox=\"{d} {d} {d} {d}\" >\n",
+        .{ bbox.xMin, bbox.yMin, width, height },
+    );
+    try writeSegmentsToGroup(segments, writer);
+    _ = try writer.write("</svg>");
+}
 
 // test "SVG path parsing" {
 //     const path_string = "M 10 20 L 30 40 A 50 50 0 1 0 60 70 Z";

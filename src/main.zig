@@ -7,3 +7,7 @@ pub fn main() !void {
 
     try server.serve(allocator);
 }
+
+test {
+    std.testing.refAllDecls(@This());
+}
