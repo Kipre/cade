@@ -390,10 +390,15 @@ class KindaDOMMatrix {
     return `matrix3d(${Array.from(this.values).join(", ")})`;
   }
 }
-//const Matrix = DOMMatrix;
-//const Point = DOMPoint;
-const Matrix = KindaDOMMatrix;
-const Point = KindaDOMPoint;
+
+let Matrix, Point;
+if (typeof window === "undefined") {
+  Matrix = KindaDOMMatrix;
+  Point = KindaDOMPoint;
+} else {
+  Matrix = DOMMatrix;
+  Point = DOMPoint;
+}
 
 export { KindaDOMMatrix, KindaDOMPoint };
 export { Matrix as DOMMatrix, Point as DOMPoint };

@@ -725,7 +725,10 @@ export class Path {
       if (loop.every((c) => !c.entersOtherShape)) break;
     }
 
-    if (loop == null) throw new Error();
+    if (loop == null) {
+      debugGeometry(this, other);
+      throw new Error();
+    }
 
     return this.#fromIntersectionLoop(other, loop, intersections);
   }
