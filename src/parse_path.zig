@@ -6,6 +6,8 @@ const Allocator = std.mem.Allocator;
 
 const PathSegment = occ.PathSegment;
 
+// TODO rename to SVG io
+
 // const PathSegment = extern struct {
 //     command: u8,
 //     x: f32,
@@ -138,7 +140,7 @@ pub fn writeSegmentsToPath(segments: []PathSegment, length: usize, writer: *std.
 }
 
 pub fn writeSegmentsToGroup(segments: []PathSegment, length: usize, writer: *std.io.Writer) !void {
-    _ = try writer.write("<g>");
+    _ = try writer.write("<g fill=\"none\" stroke-width=\"1px\" stroke=\"black\">");
     var pos: usize = 0;
     while (pos < length) {
         pos += try writeSegmentsToPath(segments[pos..], length, writer);
@@ -146,15 +148,9 @@ pub fn writeSegmentsToGroup(segments: []PathSegment, length: usize, writer: *std
     _ = try writer.write("</g>");
 }
 
-pub fn writeSegmentsToSVG(segments: []PathSegment, length: usize) !void {
-    const file = try std.fs.cwd().createFile("C:/Users/kipr/Downloads/test.svg", .{});
-    defer file.close(); // Ensure the file is closed when the scope ends
-
-    // 2. Get the writer from the file
-    var writer = file.writer(&.{}).interface;
-
+pub fn writeSegmentsToSVG(writer: *std.io.Writer, segments: []PathSegment, length: usize) !void {
     _ = try writer.write("<svg>");
-    try writeSegmentsToGroup(segments, length, &writer);
+    try writeSegmentsToGroup(segments, length, writer);
     _ = try writer.write("</svg>");
 }
 

@@ -18,14 +18,14 @@
 
 extern "C" {
 
-size_t shapeToSVGSegments(const Shape *shape, PathSegment *segments,
+size_t shapeToSVGSegments(const Compound *compound, PathSegment *segments,
                         size_t maxLength) {
   // 1. HLR algorithm
   Handle(HLRBRep_Algo) hlr = new HLRBRep_Algo();
-  hlr->Add(shape->shape);
+  hlr->Add(compound->compound);
 
   // Projection direction (Z axis → XY plane)
-  auto projector = new HLRAlgo_Projector(gp_Ax2(gp_Pnt(), gp_Dir(0, 0, 1)));
+  auto projector = new HLRAlgo_Projector(gp_Ax2(gp_Pnt(), gp_Dir(0.2, 0.2, 1)));
   hlr->Projector(*projector);
   hlr->Update();
   hlr->Hide();
@@ -56,7 +56,7 @@ size_t shapeToSVGSegments(const Shape *shape, PathSegment *segments,
 
       double t = f + (l - f) * i / steps;
       gp_Pnt p = curve.Value(t);
-      PathSegment segment = segments[writeLoc];
+      PathSegment segment;
       segment.x = p.X();
       segment.y = p.Y();
 
@@ -64,6 +64,9 @@ size_t shapeToSVGSegments(const Shape *shape, PathSegment *segments,
         segment.command = 'M';
       else
         segment.command = 'L';
+
+      segments[writeLoc] = segment;
+      writeLoc += 1;
     }
   }
   return writeLoc;

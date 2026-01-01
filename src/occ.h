@@ -30,5 +30,5 @@ Shape *fuseShapes(Shape *shape1, Shape *shape2);
 
 Shape *cutShape(Shape *toCut, Shape *cutout);
 
-size_t shapeToSVGSegments(const Shape *shape, struct PathSegment *segments,
+size_t shapeToSVGSegments(const Compound *compound, struct PathSegment *segments,
                           size_t maxLength);

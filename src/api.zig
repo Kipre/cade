@@ -190,10 +190,7 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *const std.j
     return shapes[nbSteps - 1];
 }
 
-pub fn exportAsSTEP(allocator: std.mem.Allocator, definition: *CompactPartDefinition) !void {
-    const compound = occ.makeCompound();
-    defer occ.freeCompound(compound);
-
+pub fn assembleCompound(allocator: std.mem.Allocator, compound: *occ.Compound, definition: *CompactPartDefinition) !void {
     for (definition.geometries) |geom| {
         const shape = try executeShapeRecipe(allocator, &geom.part);
 
@@ -203,30 +200,38 @@ pub fn exportAsSTEP(allocator: std.mem.Allocator, definition: *CompactPartDefini
             occ.addShapeToCompound(compound, shape, transform);
         }
     }
+}
+
+pub fn exportAsSTEP(allocator: std.mem.Allocator, definition: *CompactPartDefinition) !void {
+    const compound = occ.makeCompound().?;
+    defer occ.freeCompound(compound);
+
+    try assembleCompound(allocator, compound, definition);
 
     var filepath = "C:/Users/kipr/Downloads/test.step";
     occ.saveToSTEP(compound, &filepath[0]);
 }
 
 pub fn projectSVG(allocator: std.mem.Allocator, definition: *CompactPartDefinition) !void {
-    const compound = occ.makeCompound();
+    const compound = occ.makeCompound().?;
     defer occ.freeCompound(compound);
 
-    for (definition.geometries) |geom| {
-        const shape = try executeShapeRecipe(allocator, &geom.part);
+    try assembleCompound(allocator, compound, definition);
 
-        // var filepath = "C:/Users/kipr/Downloads/test.svg";
-        var segments: std.ArrayList(PathSegment) = .empty;
-        const max_capacity = 1e3;
-        try segments.ensureTotalCapacity(allocator, max_capacity);
-            const array = try segments.toOwnedSlice(allocator);
-        const length = occ.shapeToSVGSegments(shape, array.ptr, max_capacity);
-        try parse.writeSegmentsToSVG(array, length);
+    const filepath = "./out/test.svg";
+    const max_capacity = 1e5;
 
-        // for (geom.instances) |instance| {
-        //     var mat: Transform = instance;
-        //     const transform = occ.makeTransform(&mat[0]);
-        //     occ.addShapeToCompound(compound, shape, transform);
-        // }
-    }
+    var items: [max_capacity]PathSegment = @splat(.{});
+    const array = items[0..];
+
+    const length = occ.shapeToSVGSegments(compound, array.ptr, max_capacity);
+    std.debug.print("compound to svg length: {} \n", .{length});
+
+    const file = try std.fs.cwd().createFile(filepath, .{});
+    defer file.close(); // Ensure the file is closed when the scope ends
+    var buf: [1024]u8 = undefined;
+    var writer = file.writer(&buf).interface;
+
+    try parse.writeSegmentsToSVG(&writer, array, length);
+    try writer.flush();
 }
