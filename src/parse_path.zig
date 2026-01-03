@@ -127,30 +127,30 @@ pub const SVGPathIterator = struct {
     }
 };
 
-pub fn writeSegmentsToPath(segments: []PathSegment, length: usize, writer: *std.io.Writer) !usize {
+pub fn writeSegmentsToPath(segments: []PathSegment, writer: *std.io.Writer) !usize {
     _ = try writer.write("<path d=\"");
     var i: usize = 0;
     for (segments) |seg| {
-        if (i > length or (seg.command == 'M' and i != 0)) break;
+        if ((seg.command == 'M' and i != 0) or seg.command == 0) break;
         _ = try writer.print("{c} {d} {d} ", .{ seg.command, seg.x, seg.y });
         i += 1;
     }
-    _ = try writer.write("\"/>");
+    _ = try writer.write("\"/>\n");
     return i;
 }
 
-pub fn writeSegmentsToGroup(segments: []PathSegment, length: usize, writer: *std.io.Writer) !void {
-    _ = try writer.write("<g fill=\"none\" stroke-width=\"1px\" stroke=\"black\">");
+pub fn writeSegmentsToGroup(segments: []PathSegment, writer: *std.io.Writer) !void {
+    _ = try writer.write("<g fill=\"none\" stroke-width=\"1px\" stroke=\"black\">\n");
     var pos: usize = 0;
-    while (pos < length) {
-        pos += try writeSegmentsToPath(segments[pos..], length, writer);
+    while (pos < segments.len) {
+        pos += try writeSegmentsToPath(segments[pos..], writer);
     }
-    _ = try writer.write("</g>");
+    _ = try writer.write("</g>\n");
 }
 
-pub fn writeSegmentsToSVG(writer: *std.io.Writer, segments: []PathSegment, length: usize) !void {
-    _ = try writer.write("<svg>");
-    try writeSegmentsToGroup(segments, length, writer);
+pub fn writeSegmentsToSVG(writer: *std.io.Writer, segments: []PathSegment) !void {
+    _ = try writer.write("<svg>\n");
+    try writeSegmentsToGroup(segments, writer);
     _ = try writer.write("</svg>");
 }
 

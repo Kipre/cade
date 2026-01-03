@@ -218,20 +218,21 @@ pub fn projectSVG(allocator: std.mem.Allocator, definition: *CompactPartDefiniti
 
     try assembleCompound(allocator, compound, definition);
 
-    const filepath = "./out/test.svg";
-    const max_capacity = 1e5;
+    const filepath = "./schema.svg";
+    const max_capacity = 1e6;
 
     var items: [max_capacity]PathSegment = @splat(.{});
     const array = items[0..];
 
     const length = occ.shapeToSVGSegments(compound, array.ptr, max_capacity);
-    std.debug.print("compound to svg length: {} \n", .{length});
 
     const file = try std.fs.cwd().createFile(filepath, .{});
-    defer file.close(); // Ensure the file is closed when the scope ends
-    var buf: [1024]u8 = undefined;
-    var writer = file.writer(&buf).interface;
+    defer file.close();
 
-    try parse.writeSegmentsToSVG(&writer, array, length);
+    var file_writer = file.writer(&.{});
+    const writer = &file_writer.interface;
+
+    try parse.writeSegmentsToSVG(writer, array[0..length]);
     try writer.flush();
+    std.debug.print("successfully wrote svg file with {d} segments\n", .{length});
 }
