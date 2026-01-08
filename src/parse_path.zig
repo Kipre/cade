@@ -190,7 +190,7 @@ pub fn writeSegmentsToSVG(writer: *std.io.Writer, segments: []PathSegment) !void
     const height = bbox.yMax - bbox.yMin;
 
     _ = try writer.print(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" transform=\"scale(1, -1)\" viewBox=\"{d} {d} {d} {d}\" >\n",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" transform=\"scale(1, -1)\" viewBox=\"{d} {d} {d} {d}\" style=\"background: #3392e6\">\n",
         .{ bbox.xMin, bbox.yMin, width, height },
     );
     try writeSegmentsToGroup(segments, writer);
