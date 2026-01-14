@@ -1,50 +1,34 @@
 const std = @import("std");
 
-const sources_TKernel = @import("TKernel_generated-build-config.zig").sources;
-const sources_TKMath = @import("TKMath_generated-build-config.zig").sources;
-const sources_TKG2d = @import("TKG2d_generated-build-config.zig").sources;
-const sources_TKG3d = @import("TKG3d_generated-build-config.zig").sources;
-const sources_TKGeomBase = @import("TKGeomBase_generated-build-config.zig").sources;
-const sources_TKBRep = @import("TKBRep_generated-build-config.zig").sources;
-const sources_TKGeomAlgo = @import("TKGeomAlgo_generated-build-config.zig").sources;
-const sources_TKTopAlgo = @import("TKTopAlgo_generated-build-config.zig").sources;
-const sources_TKPrim = @import("TKPrim_generated-build-config.zig").sources;
-const sources_TKFillet = @import("TKFillet_generated-build-config.zig").sources;
-const sources_TKOffset = @import("TKOffset_generated-build-config.zig").sources;
-const sources_TKFeat = @import("TKFeat_generated-build-config.zig").sources;
-const sources_TKBool = @import("TKBool_generated-build-config.zig").sources;
-const sources_TKDESTEP = @import("TKDESTEP_generated-build-config.zig").sources;
-const sources_TKXSBase = @import("TKXSBase_generated-build-config.zig").sources;
-const sources_TKShHealing = @import("TKShHealing_generated-build-config.zig").sources;
-const sources_TKBO = @import("TKBO_generated-build-config.zig").sources;
-const sources_TKMesh = @import("TKMesh_generated-build-config.zig").sources;
-const sources_TKHLR = @import("TKHLR_generated-build-config.zig").sources;
-
-fn addOCCTModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, name: []const u8, sources: []const []const u8) *std.Build.Step.Compile {
-    const lib = b.addLibrary(.{
-        .root_module = b.createModule(.{
-            .target = target,
-            .optimize = optimize,
-        }),
-        .name = name,
-    });
-
-    lib.addCSourceFiles(.{ .files = sources, .flags = &.{"-fno-sanitize=undefined"} });
-    lib.addIncludePath(b.path("inc"));
-    lib.linkLibCpp();
-    b.installArtifact(lib);
-    return lib;
-}
+const modules = [_][]const u8{
+    "OCCT/src/FoundationClasses/TKernel",
+    "OCCT/src/FoundationClasses/TKMath",
+    "OCCT/src/ModelingData/TKG2d",
+    "OCCT/src/ModelingData/TKG3d",
+    "OCCT/src/ModelingData/TKGeomBase",
+    "OCCT/src/ModelingData/TKBRep",
+    "OCCT/src/ModelingAlgorithms/TKGeomAlgo",
+    "OCCT/src/ModelingAlgorithms/TKTopAlgo",
+    "OCCT/src/ModelingAlgorithms/TKPrim",
+    "OCCT/src/ModelingAlgorithms/TKFillet",
+    "OCCT/src/ModelingAlgorithms/TKOffset",
+    "OCCT/src/ModelingAlgorithms/TKFeat",
+    "OCCT/src/ModelingAlgorithms/TKBool",
+    "OCCT/src/ModelingAlgorithms/TKShHealing",
+    "OCCT/src/ModelingAlgorithms/TKBO",
+    "OCCT/src/ModelingAlgorithms/TKMesh",
+    "OCCT/src/DataExchange/TKDESTEP",
+    "OCCT/src/DataExchange/TKXSBase",
+    "OCCT/src/ModelingAlgorithms/TKHLR",
+};
 
 fn addDependencies(b: *std.Build, target: std.Build.ResolvedTarget, occt_libs: []const *std.Build.Step.Compile, exe: *std.Build.Step.Compile) void {
     if (target.result.os.tag == .windows) {
         exe.linkSystemLibrary("Ws2_32");
     }
 
-    // link with the standard library libcpp
     exe.linkLibCpp();
     exe.addIncludePath(b.path("src"));
-    exe.addIncludePath(b.path("inc"));
     exe.addCSourceFile(.{ .file = b.path("src/occ.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
     exe.addCSourceFile(.{ .file = b.path("src/svg.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
 
@@ -53,59 +37,71 @@ fn addDependencies(b: *std.Build, target: std.Build.ResolvedTarget, occt_libs: [
     }
 }
 
+pub fn addOCCTModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, name: []const u8) *std.Build.Step.Compile {
+    const module_name = std.fs.path.stem(name);
+    const lib = b.addLibrary(.{
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
+        .name = module_name,
+    });
+
+    addCSourceFilesRecursive(b, lib, name, &.{"-fno-sanitize=undefined"}) catch |err| {
+        std.debug.print("Failed to add source files: {}\n", .{err});
+    };
+
+    lib.linkLibCpp();
+    b.installArtifact(lib);
+    return lib;
+}
+
+fn addCSourceFilesRecursive(b: *std.Build, exe: *std.Build.Step.Compile, path: []const u8, flags: []const []const u8) !void {
+    var dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
+    defer dir.close();
+
+    var it = dir.iterate();
+    while (try it.next()) |entry| {
+        const full_path = try std.fs.path.join(b.allocator, &.{ path, entry.name });
+
+        if (std.mem.indexOf(u8, full_path, "GTests") != null) continue;
+
+        if (entry.kind == .directory) {
+            try addCSourceFilesRecursive(b, exe, full_path, flags);
+        } else if (entry.kind == .file) {
+            const ext = std.fs.path.extension(entry.name);
+            if (std.mem.eql(u8, ext, ".cpp") or std.mem.eql(u8, ext, ".cxx") or std.mem.eql(u8, ext, ".c")) {
+                exe.addCSourceFile(.{
+                    .file = b.path(full_path),
+                    .flags = flags,
+                });
+            }
+        }
+    }
+}
+
 pub fn build(b: *std.Build) void {
-    const only_gen_tool = b.option(
-        bool,
-        "only_tools",
-        "Only build the generator tool executable",
-    ) orelse false;
+    const flatten_step = FlattenHeadersStep.create(b, .{
+        .src_dir = b.path("OCCT/src"),
+    });
+
+    const fill_step = FillStandardVersion.create(b, .{
+        .output_path = flatten_step.dst_dir,
+    });
+
+    fill_step.step.dependOn(&flatten_step.step);
 
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const exe_mod = b.createModule(.{
-        .root_source_file = b.path("src/gen_build_file.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
+    var occt_libs: [19]*std.Build.Step.Compile = undefined;
 
-    // Create a tool that generates the source list
-    const gen_sources = b.addExecutable(.{
-        .name = "gen_build_file",
-        .root_module = exe_mod,
-    });
-
-    b.installArtifact(gen_sources);
-
-    if (only_gen_tool) return;
-
-    // libraries
-    const lib_TKernel = addOCCTModule(b, target, optimize, "TKernel", &sources_TKernel);
-    const lib_TKMath = addOCCTModule(b, target, optimize, "TKMath", &sources_TKMath);
-    const lib_TKG2d = addOCCTModule(b, target, optimize, "TKG2d", &sources_TKG2d);
-    const lib_TKG3d = addOCCTModule(b, target, optimize, "TKG3d", &sources_TKG3d);
-    const lib_TKGeomBase = addOCCTModule(b, target, optimize, "TKGeomBase", &sources_TKGeomBase);
-    const lib_TKBRep = addOCCTModule(b, target, optimize, "TKBRep", &sources_TKBRep);
-    const lib_TKGeomAlgo = addOCCTModule(b, target, optimize, "TKGeomAlgo", &sources_TKGeomAlgo);
-    const lib_TKTopAlgo = addOCCTModule(b, target, optimize, "TKTopAlgo", &sources_TKTopAlgo);
-    const lib_TKPrim = addOCCTModule(b, target, optimize, "TKPrim", &sources_TKPrim);
-    const lib_TKFillet = addOCCTModule(b, target, optimize, "TKFillet", &sources_TKFillet);
-    const lib_TKOffset = addOCCTModule(b, target, optimize, "TKOffset", &sources_TKOffset);
-    const lib_TKFeat = addOCCTModule(b, target, optimize, "TKFeat", &sources_TKFeat);
-    const lib_TKBool = addOCCTModule(b, target, optimize, "TKBool", &sources_TKBool);
-    const lib_TKDESTEP = addOCCTModule(b, target, optimize, "TKDESTEP", &sources_TKDESTEP);
-    const lib_TKXSBase = addOCCTModule(b, target, optimize, "TKXSBase", &sources_TKXSBase);
-    const lib_TKShHealing = addOCCTModule(b, target, optimize, "TKShHealing", &sources_TKShHealing);
-    const lib_TKBO = addOCCTModule(b, target, optimize, "TKBO", &sources_TKBO);
-    const lib_TKMesh = addOCCTModule(b, target, optimize, "TKMesh", &sources_TKMesh);
-    const lib_TKHLR = addOCCTModule(b, target, optimize, "TKHLR", &sources_TKHLR);
-
-    const occt_libs = [_]*std.Build.Step.Compile{
-        lib_TKernel,     lib_TKMath,     lib_TKG2d,     lib_TKG3d,    lib_TKGeomBase,
-        lib_TKBRep,      lib_TKGeomAlgo, lib_TKTopAlgo, lib_TKPrim,   lib_TKFillet,
-        lib_TKOffset,    lib_TKFeat,     lib_TKBool,    lib_TKDESTEP, lib_TKXSBase,
-        lib_TKShHealing, lib_TKBO,       lib_TKMesh,    lib_TKHLR,
-    };
+    for (modules, 0..) |module, i| {
+        occt_libs[i] = addOCCTModule(b, target, optimize, module);
+        occt_libs[i].step.dependOn(&flatten_step.step);
+        occt_libs[i].step.dependOn(&fill_step.step);
+        occt_libs[i].addIncludePath(b.path(flatten_step.dst_dir));
+    }
 
     // main module
     const mod = b.createModule(.{
@@ -130,8 +126,169 @@ pub fn build(b: *std.Build) void {
         .name = "cade",
         .root_module = mod,
     });
+    exe.addIncludePath(b.path(flatten_step.dst_dir));
 
     addDependencies(b, target, &occt_libs, exe);
     b.installArtifact(exe);
-
 }
+
+const FlattenHeadersStep = struct {
+    step: std.Build.Step,
+    b: *std.Build,
+    src_dir: std.Build.LazyPath,
+    dst_dir: []const u8,
+
+    pub fn create(b: *std.Build, options: struct { src_dir: std.Build.LazyPath }) *FlattenHeadersStep {
+        const self = b.allocator.create(FlattenHeadersStep) catch unreachable;
+        var step = std.Build.Step.init(.{
+            .id = .custom,
+            .name = "copy-and-flatten-headers",
+            .owner = b,
+            .makeFn = make,
+        });
+        self.* = .{
+            .step = step,
+            .b = b,
+            .src_dir = options.src_dir,
+            .dst_dir = b.pathJoin(&.{ b.cache_root.path.?, "flattened-headers" }),
+        };
+        // step.addDirectoryWatchInput(self.src_dir);
+        return self;
+    }
+
+    fn make(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
+        const self: *FlattenHeadersStep = @fieldParentPtr("step", step);
+        const b = self.b;
+
+        // Create the output directory in the zig-cache
+        const output_dir_path = b.pathFromRoot(self.dst_dir);
+
+        try std.fs.cwd().makePath(output_dir_path);
+
+        const src_path = self.src_dir.getPath(b);
+        var dir = try std.fs.cwd().openDir(src_path, .{ .iterate = true });
+        defer dir.close();
+
+        // Perform the recursive walk here
+        try walkAndCopy(b, src_path, output_dir_path);
+    }
+
+    fn walkAndCopy(b: *std.Build, src: []const u8, dest: []const u8) !void {
+        var dir = try std.fs.cwd().openDir(src, .{ .iterate = true });
+        defer dir.close();
+
+        var it = dir.iterate();
+        while (try it.next()) |entry| {
+            const full_src = try std.fs.path.join(b.allocator, &.{ src, entry.name });
+            if (std.mem.indexOf(u8, full_src, "GTests") != null) continue;
+
+            if (entry.kind == .directory) {
+                try walkAndCopy(b, full_src, dest);
+                continue;
+            }
+            if (entry.kind != .file) continue;
+            if (std.mem.eql(u8, std.fs.path.extension(entry.name), ".hxx") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".h") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".lxx") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".pxx") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".gxx")) {
+                const full_dest = try std.fs.path.join(b.allocator, &.{ dest, entry.name });
+                // Only copy if the file is different/newer
+                try std.fs.cwd().copyFile(full_src, std.fs.cwd(), full_dest, .{});
+            }
+        }
+    }
+};
+
+const FillStandardVersion = struct {
+    step: std.Build.Step,
+    b: *std.Build,
+    output_path: []const u8,
+    name: []const u8,
+
+    pub fn create(b: *std.Build, options: struct { output_path: []const u8 }) *FillStandardVersion {
+        const self = b.allocator.create(FillStandardVersion) catch unreachable;
+        const step = std.Build.Step.init(.{
+            .id = .custom,
+            .name = "fill-standard-version",
+            .owner = b,
+            .makeFn = make,
+        });
+        self.* = .{
+            .step = step,
+            .b = b,
+            .output_path = options.output_path,
+            .name = "Standard_Version.hxx",
+        };
+        // step.addDirectoryWatchInput(options.src_dir);
+        return self;
+    }
+
+    fn make(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
+        const self: *FillStandardVersion = @fieldParentPtr("step", step);
+        const b = self.b;
+
+        // const input_file_path = "OCCT/adm/templates/Standard_Version.hxx.in";
+        const input_file_path = b.pathJoin(&.{ "OCCT/adm/templates/", b.fmt("{s}.in", .{self.name}) });
+        const output_file_path = b.pathJoin(&.{ self.output_path, self.name });
+
+        // --- Hardcoded Replacements ---
+        var replacements = std.StringHashMap([]const u8).init(b.allocator);
+        defer replacements.deinit();
+
+        try replacements.put("OCC_VERSION_MAJOR", "7");
+        try replacements.put("OCC_VERSION_MINOR", "9");
+        try replacements.put("OCC_VERSION_MAINTENANCE", "1");
+        try replacements.put("SET_OCC_VERSION_DEVELOPMENT", "");
+
+        const file_content = try std.fs.cwd().readFileAlloc(b.allocator, input_file_path, 10 * 1024 * 1024); // Max 10MB file
+        defer b.allocator.free(file_content);
+
+        const modified_content = try replacePlaceholders(b.allocator, file_content, &replacements);
+        defer b.allocator.free(modified_content);
+
+        // --- Write Output File ---
+        const output_file = try std.fs.cwd().createFile(output_file_path, .{ .read = true });
+        defer output_file.close();
+
+        try output_file.writeAll(modified_content);
+    }
+
+    fn replacePlaceholders(
+        allocator: std.mem.Allocator,
+        content: []const u8,
+        replacements: *std.StringHashMap([]const u8),
+    ) ![]u8 {
+        var builder = std.array_list.Managed(u8).init(allocator);
+        defer builder.deinit();
+
+        var current_index: usize = 0;
+        while (current_index < content.len) {
+            const start_marker = std.mem.indexOf(u8, content[current_index..], "@");
+            if (start_marker == null) {
+                // No more '@' symbols, append the rest of the content
+                try builder.appendSlice(content[current_index..]);
+                break;
+            }
+
+            // Append content before the first '@'
+            try builder.appendSlice(content[current_index .. current_index + start_marker.?]);
+            current_index += start_marker.? + 1; // Move past the first '@'
+
+            const end_marker = std.mem.indexOf(u8, content[current_index..], "@");
+            if (end_marker == null) {
+                // Unmatched '@', treat the rest as literal
+                try builder.appendSlice(content[current_index - 1 ..]); // Include the unmatched '@'
+                break;
+            }
+
+            const placeholder_name = content[current_index .. current_index + end_marker.?];
+            if (replacements.get(placeholder_name)) |value| {
+                // Found a replacement, append its value
+                try builder.appendSlice(value);
+            } else {
+                // Placeholder not found in map, append it as is (including '@' symbols)
+                try builder.appendSlice(content[current_index - 1 .. current_index + end_marker.? + 1]);
+            }
+            current_index += end_marker.? + 1; // Move past the second '@'
+        }
+
+        return builder.toOwnedSlice();
+    }
+};
