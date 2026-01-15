@@ -86,7 +86,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const fill_step = FillStandardVersion.create(b, .{
-        .output_path = flatten_step.dst_dir,
+        .output_path = flatten_step.getOutput(),
     });
 
     fill_step.step.dependOn(&flatten_step.step);
@@ -97,13 +97,13 @@ pub fn build(b: *std.Build) void {
     var occt_libs: [19]*std.Build.Step.Compile = undefined;
 
     for (modules, 0..) |module, i| {
-        occt_libs[i] = addOCCTModule(b, target, optimize, module);
-        occt_libs[i].step.dependOn(&flatten_step.step);
-        occt_libs[i].step.dependOn(&fill_step.step);
-        occt_libs[i].addIncludePath(b.path(flatten_step.dst_dir));
+        var lib = addOCCTModule(b, target, optimize, module);
+        lib.step.dependOn(&flatten_step.step);
+        lib.step.dependOn(&fill_step.step);
+        lib.addIncludePath(flatten_step.getOutput());
+        occt_libs[i] = lib;
     }
 
-    // main module
     const mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
@@ -126,7 +126,7 @@ pub fn build(b: *std.Build) void {
         .name = "cade",
         .root_module = mod,
     });
-    exe.addIncludePath(b.path(flatten_step.dst_dir));
+    exe.addIncludePath(flatten_step.getOutput());
 
     addDependencies(b, target, &occt_libs, exe);
     b.installArtifact(exe);
@@ -136,11 +136,11 @@ const FlattenHeadersStep = struct {
     step: std.Build.Step,
     b: *std.Build,
     src_dir: std.Build.LazyPath,
-    dst_dir: []const u8,
+    dst_dir: std.Build.GeneratedFile,
 
     pub fn create(b: *std.Build, options: struct { src_dir: std.Build.LazyPath }) *FlattenHeadersStep {
         const self = b.allocator.create(FlattenHeadersStep) catch unreachable;
-        var step = std.Build.Step.init(.{
+        const step = std.Build.Step.init(.{
             .id = .custom,
             .name = "copy-and-flatten-headers",
             .owner = b,
@@ -150,18 +150,28 @@ const FlattenHeadersStep = struct {
             .step = step,
             .b = b,
             .src_dir = options.src_dir,
-            .dst_dir = b.pathJoin(&.{ b.cache_root.path.?, "flattened-headers" }),
+            .dst_dir = .{ .step = &self.step },
         };
-        // step.addDirectoryWatchInput(self.src_dir);
+        // _ = step.addDirectoryWatchInput(self.src_dir) catch {
+        //     @panic("cannot watch directory");
+        // };
+        self.src_dir.addStepDependencies(&self.step);
         return self;
     }
 
-    fn make(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
+    pub fn getOutput(self: *FlattenHeadersStep) std.Build.LazyPath {
+        return .{ .generated = .{ .file = &self.dst_dir } };
+    }
+
+    fn make(step: *std.Build.Step, make_options: std.Build.Step.MakeOptions) !void {
+        std.debug.print("{any}", .{make_options});
+
         const self: *FlattenHeadersStep = @fieldParentPtr("step", step);
         const b = self.b;
 
+        self.dst_dir.path = b.pathJoin(&.{ b.cache_root.path.?, "flattened-headers" });
         // Create the output directory in the zig-cache
-        const output_dir_path = b.pathFromRoot(self.dst_dir);
+        const output_dir_path = b.pathFromRoot(self.dst_dir.path.?);
 
         try std.fs.cwd().makePath(output_dir_path);
 
@@ -199,10 +209,10 @@ const FlattenHeadersStep = struct {
 const FillStandardVersion = struct {
     step: std.Build.Step,
     b: *std.Build,
-    output_path: []const u8,
+    output_path: std.Build.LazyPath,
     name: []const u8,
 
-    pub fn create(b: *std.Build, options: struct { output_path: []const u8 }) *FillStandardVersion {
+    pub fn create(b: *std.Build, options: struct { output_path: std.Build.LazyPath }) *FillStandardVersion {
         const self = b.allocator.create(FillStandardVersion) catch unreachable;
         const step = std.Build.Step.init(.{
             .id = .custom,
@@ -217,6 +227,7 @@ const FillStandardVersion = struct {
             .name = "Standard_Version.hxx",
         };
         // step.addDirectoryWatchInput(options.src_dir);
+        options.output_path.addStepDependencies(&self.step);
         return self;
     }
 
@@ -226,7 +237,7 @@ const FillStandardVersion = struct {
 
         // const input_file_path = "OCCT/adm/templates/Standard_Version.hxx.in";
         const input_file_path = b.pathJoin(&.{ "OCCT/adm/templates/", b.fmt("{s}.in", .{self.name}) });
-        const output_file_path = b.pathJoin(&.{ self.output_path, self.name });
+        const output_file_path = try self.output_path.join(b.allocator, self.name);
 
         // --- Hardcoded Replacements ---
         var replacements = std.StringHashMap([]const u8).init(b.allocator);
@@ -244,7 +255,7 @@ const FillStandardVersion = struct {
         defer b.allocator.free(modified_content);
 
         // --- Write Output File ---
-        const output_file = try std.fs.cwd().createFile(output_file_path, .{ .read = true });
+        const output_file = try std.fs.cwd().createFile(try output_file_path.getPath3(b, &self.step).toString(b.allocator), .{ .read = true });
         defer output_file.close();
 
         try output_file.writeAll(modified_content);
