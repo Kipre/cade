@@ -81,15 +81,18 @@ fn addCSourceFilesRecursive(b: *std.Build, exe: *std.Build.Step.Compile, path: [
 }
 
 pub fn build(b: *std.Build) void {
-    const flatten_step = FlattenHeadersStep.create(b, .{
-        .src_dir = b.path("OCCT/src"),
+    const standard_version_h = b.addConfigHeader(.{
+        .style = .{ .cmake = b.path("OCCT/adm/templates/Standard_Version.hxx.in") },
+        .include_path = ".zig-cache/flattened-headers/Standard_Version.hxx",
+    }, .{
+        .OCCT_VERSION_DATE = "16/01/2026",
+        .OCC_VERSION_MAJOR = "7",
+        .OCC_VERSION_MINOR = "9",
+        .OCC_VERSION_MAINTENANCE = "1",
+        .SET_OCC_VERSION_DEVELOPMENT = "",
     });
 
-    const fill_step = FillStandardVersion.create(b, .{
-        .output_path = flatten_step.getOutput(),
-    });
-
-    fill_step.step.dependOn(&flatten_step.step);
+    const flatten_step = FlattenHeadersStep.create(b, "OCCT/src");
 
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -99,8 +102,8 @@ pub fn build(b: *std.Build) void {
     for (modules, 0..) |module, i| {
         var lib = addOCCTModule(b, target, optimize, module);
         lib.step.dependOn(&flatten_step.step);
-        lib.step.dependOn(&fill_step.step);
         lib.addIncludePath(flatten_step.getOutput());
+        lib.addConfigHeader(standard_version_h);
         occt_libs[i] = lib;
     }
 
@@ -127,6 +130,7 @@ pub fn build(b: *std.Build) void {
         .root_module = mod,
     });
     exe.addIncludePath(flatten_step.getOutput());
+    exe.addConfigHeader(standard_version_h);
 
     addDependencies(b, target, &occt_libs, exe);
     b.installArtifact(exe);
@@ -135,37 +139,68 @@ pub fn build(b: *std.Build) void {
 const FlattenHeadersStep = struct {
     step: std.Build.Step,
     b: *std.Build,
-    src_dir: std.Build.LazyPath,
+    src_dir: []const u8,
     dst_dir: std.Build.GeneratedFile,
+    // We store the resolved path to the internal HEAD
+    internal_head: std.Build.LazyPath,
 
-    pub fn create(b: *std.Build, options: struct { src_dir: std.Build.LazyPath }) *FlattenHeadersStep {
+    pub fn create(b: *std.Build, sub_path: []const u8) *FlattenHeadersStep {
         const self = b.allocator.create(FlattenHeadersStep) catch unreachable;
-        const step = std.Build.Step.init(.{
-            .id = .custom,
-            .name = "copy-and-flatten-headers",
-            .owner = b,
-            .makeFn = make,
-        });
+
+        // 1. Resolve the internal git directory
+        const dot_git_file_path = b.pathJoin(&.{ sub_path, "../.git" });
+
+        const internal_head_path = resolveInternalHead(b, dot_git_file_path) catch |err| {
+            std.debug.print("Warning: Could not resolve submodule gitdir, falling back to .git file: {}\n", .{err});
+            @panic("ok");
+            // return self.initFallback(b, sub_path, dot_git_file_path);
+        };
+
         self.* = .{
-            .step = step,
+            .step = std.Build.Step.init(.{
+                .id = .custom,
+                .name = "flatten-submodule-headers",
+                .owner = b,
+                .makeFn = make,
+            }),
             .b = b,
-            .src_dir = options.src_dir,
+            .src_dir = sub_path,
+            .internal_head = b.path(internal_head_path),
             .dst_dir = .{ .step = &self.step },
         };
-        // _ = step.addDirectoryWatchInput(self.src_dir) catch {
-        //     @panic("cannot watch directory");
-        // };
-        self.src_dir.addStepDependencies(&self.step);
+
+        // 2. Watch the actual HEAD of the submodule
+        self.step.addWatchInput(self.internal_head) catch |err| {
+            std.debug.print("Error could not watch input {}", .{err});
+            @panic("ok");
+        };
+
         return self;
+    }
+
+    fn resolveInternalHead(b: *std.Build, dot_git_path: []const u8) ![]const u8 {
+        const file = try std.fs.cwd().openFile(dot_git_path, .{ .mode = .read_only });
+        defer file.close();
+
+        var buf: [1024]u8 = undefined;
+        const bytes_read = try file.readAll(&buf);
+        const content = std.mem.trim(u8, buf[0..bytes_read], " \n\r\t");
+
+        if (std.mem.startsWith(u8, content, "gitdir: ")) {
+            const rel_git_dir = content[8..];
+            // The path in the file is relative to the submodule folder
+            const sub_dir = std.fs.path.dirname(dot_git_path) orelse ".";
+            const absolute_git_dir = try std.fs.path.resolve(b.allocator, &.{ sub_dir, rel_git_dir });
+            return try std.fs.path.join(b.allocator, &.{ absolute_git_dir, "HEAD" });
+        }
+        return error.NotASubmoduleFile;
     }
 
     pub fn getOutput(self: *FlattenHeadersStep) std.Build.LazyPath {
         return .{ .generated = .{ .file = &self.dst_dir } };
     }
 
-    fn make(step: *std.Build.Step, make_options: std.Build.Step.MakeOptions) !void {
-        std.debug.print("{any}", .{make_options});
-
+    fn make(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
         const self: *FlattenHeadersStep = @fieldParentPtr("step", step);
         const b = self.b;
 
@@ -175,7 +210,7 @@ const FlattenHeadersStep = struct {
 
         try std.fs.cwd().makePath(output_dir_path);
 
-        const src_path = self.src_dir.getPath(b);
+        const src_path = self.src_dir;
         var dir = try std.fs.cwd().openDir(src_path, .{ .iterate = true });
         defer dir.close();
 
@@ -206,100 +241,3 @@ const FlattenHeadersStep = struct {
     }
 };
 
-const FillStandardVersion = struct {
-    step: std.Build.Step,
-    b: *std.Build,
-    output_path: std.Build.LazyPath,
-    name: []const u8,
-
-    pub fn create(b: *std.Build, options: struct { output_path: std.Build.LazyPath }) *FillStandardVersion {
-        const self = b.allocator.create(FillStandardVersion) catch unreachable;
-        const step = std.Build.Step.init(.{
-            .id = .custom,
-            .name = "fill-standard-version",
-            .owner = b,
-            .makeFn = make,
-        });
-        self.* = .{
-            .step = step,
-            .b = b,
-            .output_path = options.output_path,
-            .name = "Standard_Version.hxx",
-        };
-        // step.addDirectoryWatchInput(options.src_dir);
-        options.output_path.addStepDependencies(&self.step);
-        return self;
-    }
-
-    fn make(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
-        const self: *FillStandardVersion = @fieldParentPtr("step", step);
-        const b = self.b;
-
-        // const input_file_path = "OCCT/adm/templates/Standard_Version.hxx.in";
-        const input_file_path = b.pathJoin(&.{ "OCCT/adm/templates/", b.fmt("{s}.in", .{self.name}) });
-        const output_file_path = try self.output_path.join(b.allocator, self.name);
-
-        // --- Hardcoded Replacements ---
-        var replacements = std.StringHashMap([]const u8).init(b.allocator);
-        defer replacements.deinit();
-
-        try replacements.put("OCC_VERSION_MAJOR", "7");
-        try replacements.put("OCC_VERSION_MINOR", "9");
-        try replacements.put("OCC_VERSION_MAINTENANCE", "1");
-        try replacements.put("SET_OCC_VERSION_DEVELOPMENT", "");
-
-        const file_content = try std.fs.cwd().readFileAlloc(b.allocator, input_file_path, 10 * 1024 * 1024); // Max 10MB file
-        defer b.allocator.free(file_content);
-
-        const modified_content = try replacePlaceholders(b.allocator, file_content, &replacements);
-        defer b.allocator.free(modified_content);
-
-        // --- Write Output File ---
-        const output_file = try std.fs.cwd().createFile(try output_file_path.getPath3(b, &self.step).toString(b.allocator), .{ .read = true });
-        defer output_file.close();
-
-        try output_file.writeAll(modified_content);
-    }
-
-    fn replacePlaceholders(
-        allocator: std.mem.Allocator,
-        content: []const u8,
-        replacements: *std.StringHashMap([]const u8),
-    ) ![]u8 {
-        var builder = std.array_list.Managed(u8).init(allocator);
-        defer builder.deinit();
-
-        var current_index: usize = 0;
-        while (current_index < content.len) {
-            const start_marker = std.mem.indexOf(u8, content[current_index..], "@");
-            if (start_marker == null) {
-                // No more '@' symbols, append the rest of the content
-                try builder.appendSlice(content[current_index..]);
-                break;
-            }
-
-            // Append content before the first '@'
-            try builder.appendSlice(content[current_index .. current_index + start_marker.?]);
-            current_index += start_marker.? + 1; // Move past the first '@'
-
-            const end_marker = std.mem.indexOf(u8, content[current_index..], "@");
-            if (end_marker == null) {
-                // Unmatched '@', treat the rest as literal
-                try builder.appendSlice(content[current_index - 1 ..]); // Include the unmatched '@'
-                break;
-            }
-
-            const placeholder_name = content[current_index .. current_index + end_marker.?];
-            if (replacements.get(placeholder_name)) |value| {
-                // Found a replacement, append its value
-                try builder.appendSlice(value);
-            } else {
-                // Placeholder not found in map, append it as is (including '@' symbols)
-                try builder.appendSlice(content[current_index - 1 .. current_index + end_marker.? + 1]);
-            }
-            current_index += end_marker.? + 1; // Move past the second '@'
-        }
-
-        return builder.toOwnedSlice();
-    }
-};
