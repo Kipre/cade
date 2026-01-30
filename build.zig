@@ -81,18 +81,25 @@ fn addCSourceFilesRecursive(b: *std.Build, exe: *std.Build.Step.Compile, path: [
 }
 
 pub fn build(b: *std.Build) void {
+    // ideally we should read the values from version.cmake
     const standard_version_h = b.addConfigHeader(.{
         .style = .{ .cmake = b.path("OCCT/adm/templates/Standard_Version.hxx.in") },
         .include_path = ".zig-cache/flattened-headers/Standard_Version.hxx",
     }, .{
-        .OCCT_VERSION_DATE = "16/01/2026",
-        .OCC_VERSION_MAJOR = "7",
-        .OCC_VERSION_MINOR = "9",
-        .OCC_VERSION_MAINTENANCE = "1",
+        .OCCT_VERSION_DATE = "01/01/2026", // hardcoding to avoid cache misses
+        .OCC_VERSION_MAJOR = "8",
+        .OCC_VERSION_MINOR = "0",
+        .OCC_VERSION_MAINTENANCE = "0",
         .SET_OCC_VERSION_DEVELOPMENT = "",
     });
 
-    const flatten_step = FlattenHeadersStep.create(b, "OCCT/src");
+    const skip_header_flattening = b.option(
+        bool,
+        "skip-headers",
+        "Skip headers flattening (default is false)",
+    ) orelse false;
+
+    const flatten_step = FlattenHeadersStep.create(b, "OCCT/src", skip_header_flattening);
 
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -141,20 +148,10 @@ const FlattenHeadersStep = struct {
     b: *std.Build,
     src_dir: []const u8,
     dst_dir: std.Build.GeneratedFile,
-    // We store the resolved path to the internal HEAD
-    internal_head: std.Build.LazyPath,
+    skip: bool,
 
-    pub fn create(b: *std.Build, sub_path: []const u8) *FlattenHeadersStep {
+    pub fn create(b: *std.Build, sub_path: []const u8, skip: bool) *FlattenHeadersStep {
         const self = b.allocator.create(FlattenHeadersStep) catch unreachable;
-
-        // 1. Resolve the internal git directory
-        const dot_git_file_path = b.pathJoin(&.{ sub_path, "../.git" });
-
-        const internal_head_path = resolveInternalHead(b, dot_git_file_path) catch |err| {
-            std.debug.print("Warning: Could not resolve submodule gitdir, falling back to .git file: {}\n", .{err});
-            @panic("ok");
-            // return self.initFallback(b, sub_path, dot_git_file_path);
-        };
 
         self.* = .{
             .step = std.Build.Step.init(.{
@@ -165,35 +162,11 @@ const FlattenHeadersStep = struct {
             }),
             .b = b,
             .src_dir = sub_path,
-            .internal_head = b.path(internal_head_path),
             .dst_dir = .{ .step = &self.step },
-        };
-
-        // 2. Watch the actual HEAD of the submodule
-        self.step.addWatchInput(self.internal_head) catch |err| {
-            std.debug.print("Error could not watch input {}", .{err});
-            @panic("ok");
+            .skip = skip,
         };
 
         return self;
-    }
-
-    fn resolveInternalHead(b: *std.Build, dot_git_path: []const u8) ![]const u8 {
-        const file = try std.fs.cwd().openFile(dot_git_path, .{ .mode = .read_only });
-        defer file.close();
-
-        var buf: [1024]u8 = undefined;
-        const bytes_read = try file.readAll(&buf);
-        const content = std.mem.trim(u8, buf[0..bytes_read], " \n\r\t");
-
-        if (std.mem.startsWith(u8, content, "gitdir: ")) {
-            const rel_git_dir = content[8..];
-            // The path in the file is relative to the submodule folder
-            const sub_dir = std.fs.path.dirname(dot_git_path) orelse ".";
-            const absolute_git_dir = try std.fs.path.resolve(b.allocator, &.{ sub_dir, rel_git_dir });
-            return try std.fs.path.join(b.allocator, &.{ absolute_git_dir, "HEAD" });
-        }
-        return error.NotASubmoduleFile;
     }
 
     pub fn getOutput(self: *FlattenHeadersStep) std.Build.LazyPath {
@@ -202,9 +175,12 @@ const FlattenHeadersStep = struct {
 
     fn make(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
         const self: *FlattenHeadersStep = @fieldParentPtr("step", step);
-        const b = self.b;
 
+        const b = self.b;
         self.dst_dir.path = b.pathJoin(&.{ b.cache_root.path.?, "flattened-headers" });
+
+        if (self.skip) return;
+
         // Create the output directory in the zig-cache
         const output_dir_path = b.pathFromRoot(self.dst_dir.path.?);
 
@@ -240,4 +216,3 @@ const FlattenHeadersStep = struct {
         }
     }
 };
-
