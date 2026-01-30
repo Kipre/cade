@@ -84,7 +84,7 @@ pub fn build(b: *std.Build) void {
     // ideally we should read the values from version.cmake
     const standard_version_h = b.addConfigHeader(.{
         .style = .{ .cmake = b.path("OCCT/adm/templates/Standard_Version.hxx.in") },
-        .include_path = ".zig-cache/flattened-headers/Standard_Version.hxx",
+        .include_path = "Standard_Version.hxx",
     }, .{
         .OCCT_VERSION_DATE = "01/01/2026", // hardcoding to avoid cache misses
         .OCC_VERSION_MAJOR = "8",
