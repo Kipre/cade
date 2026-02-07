@@ -262,8 +262,19 @@ export function evaluateArc(x, start, end, radius, sweep) {
 export function arcTangentAt(x, start, end, radius, sweep) {
   const point = evaluateArc(x, start, end, radius, sweep);
   const center = getCircleCenter(start, end, radius, sweep);
-  const t2 = rotatePoint(point, center, ((1 - 2 * sweep) * Math.PI) / 2);
-  const t1 = rotatePoint(point, center, ((2 * sweep - 1) * Math.PI) / 2);
+  const [t1, t2] = circleTangentAt(point, center);
+  if (sweep) return [t2, t1];
+  return [t1, t2];
+}
+
+/**
+ * @param {types.Point} point
+ * @param {types.Point} center
+ * @returns {[types.Point, types.Point]}
+ */
+export function circleTangentAt(point, center) {
+  const t2 = rotatePoint(point, center, Math.PI / 2);
+  const t1 = rotatePoint(point, center, -Math.PI / 2);
   return [t1, t2];
 }
 

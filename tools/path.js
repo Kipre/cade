@@ -368,10 +368,29 @@ export class Path {
    * @returns {SimpleIntersection[]}
    */
   intersectArc(start, end, radius, sweep) {
+    const center = getCircleCenter(start, end, radius, sweep);
+    const intersections = this.intersectCircle(center, radius);
+    const result = [];
+    for (const { tangent, ...int } of intersections) {
+      const { point } = int;
+      const x = pointCoordinateOnArc(point, start, end, radius, sweep);
+      if (!(0 < x && x < 1)) continue;
+
+      const [, arcTangent] = arcTangentAt(x, start, end, radius, sweep);
+      const crossesFromTheRight = isToTheLeft(arcTangent, ...tangent);
+      result.push({ ...int, crossesFromTheRight });
+    }
+    return result;
+  }
+
+  /**
+   * @param {types.Point} center
+   * @param {number} radius
+   * @returns {(SimpleIntersection & {tangent: [types.Point, types.Point]})[]}
+   */
+  intersectCircle(center, radius) {
     const result = [];
     let lastPoint;
-
-    const center = getCircleCenter(start, end, radius, sweep);
 
     const nbControls = this.controls.length;
     for (let i = 0; i < nbControls; i++) {
@@ -390,15 +409,10 @@ export class Path {
           const roots = intersectLineAndCircle(lastPoint, p, center, radius);
 
           for (const point of roots) {
-            const xA = pointCoordinateOnArc(point, start, end, radius, sweep);
             const xL = pointCoordinateOnLine(point, lastPoint, p);
 
-            if (!(0 < xA && xA < 1 && 0 < xL && xL < 1)) continue;
-
-            const [, tangent] = arcTangentAt(xA, start, end, radius, sweep);
-            const crossesFromTheRight = isToTheLeft(tangent, lastPoint, p);
-
-            result.push({ point, segment: i, x: xL, crossesFromTheRight });
+            if (!(0 < xL && xL < 1)) continue;
+            result.push({ point, segment: i, x: xL, tangent: [lastPoint, p] });
           }
           break;
         }
@@ -411,16 +425,19 @@ export class Path {
 
           for (const point of roots) {
             // for self and other
-            const xS = pointCoordinateOnArc(point, lastPoint, p, radius, sweep);
-            const xO = pointCoordinateOnArc(point, start, end, radius, sweep);
+            const xS = pointCoordinateOnArc(
+              point,
+              lastPoint,
+              p,
+              radius2,
+              sweep2,
+            );
 
-            if (!(0 < xS && xS < 1 && 0 < xO && xO < 1)) continue;
+            if (!(0 < xS && xS < 1)) continue;
 
-            const [, tOther] = arcTangentAt(xO, start, end, radius, sweep);
             const selfTangent = arcTangentAt(xS, lastPoint, p, radius2, sweep2);
-            const crossesFromTheRight = isToTheLeft(tOther, ...selfTangent);
 
-            result.push({ point, segment: i, x: xO, crossesFromTheRight });
+            result.push({ point, segment: i, x: xS, tangent: selfTangent });
           }
           break;
         }
@@ -660,7 +677,6 @@ export class Path {
           console.log(loop);
           throw new Error("failed to find loop");
         }
-
       } while (i !== idx);
 
       if (loop.length) loops.push(loop);
@@ -673,7 +689,10 @@ export class Path {
    * @param {Path} other
    */
   booleanDifference(other) {
-    const { loops, intersections } = this.#findIntersectionLoops(other, (entered) => !entered);
+    const { loops, intersections } = this.#findIntersectionLoops(
+      other,
+      (entered) => !entered,
+    );
 
     if (!intersections.length) {
       debugGeometry(this, other);
@@ -683,7 +702,7 @@ export class Path {
     let loop;
     let found = false;
     for (loop of loops) {
-      if (loop.some(step => step.side === "other" && step.entersOtherShape)) {
+      if (loop.some((step) => step.side === "other" && step.entersOtherShape)) {
         found = true;
         break;
       }
@@ -704,7 +723,10 @@ export class Path {
    * @param {Path} other
    */
   booleanIntersection(other) {
-    const { loops, intersections } = this.#findIntersectionLoops(other, () => true);
+    const { loops, intersections } = this.#findIntersectionLoops(
+      other,
+      () => true,
+    );
 
     let loop;
     for (loop of loops) {
@@ -718,7 +740,10 @@ export class Path {
    * @param {Path} other
    */
   realBooleanUnion(other) {
-    const { loops, intersections } = this.#findIntersectionLoops(other, () => false);
+    const { loops, intersections } = this.#findIntersectionLoops(
+      other,
+      () => false,
+    );
 
     let loop;
     for (loop of loops) {
@@ -800,6 +825,32 @@ export class Path {
       }
       points.push(p2);
     }
+    return points;
+  }
+
+  /**
+   * Very inefficient and naive implementation
+   * TODO: optimize
+   * Fails if one points falls on a control point
+   * @param {number} distance
+   * @returns {types.Point[]}
+   */
+  getEquidistantPoints(distance) {
+    const points = [];
+
+    let sub = this;
+    let currentPoint = sub.evaluate(1, 0);
+
+    while (true) {
+      const [int] = sub.intersectCircle(currentPoint, distance);
+      points.push(currentPoint);
+      if (int == null) break;
+
+      const { point, segment, x } = int;
+      sub = sub.subpath(segment, x, sub.controls.length - 1, 1);
+      currentPoint = point;
+    }
+
     return points;
   }
 
@@ -1289,17 +1340,22 @@ export class Path {
     for (const [i, lp, type, p] of this.iterateOverSegments()) {
       if (type !== "lineTo") continue;
       if (!areOnSameLine(l1, l2, lp) || !areOnSameLine(l1, l2, p)) continue;
-      if (options?.exact &&
-        !(inside(lp, l1, l2) || inside(p, l1, l2) || inside(l1, lp, p) || inside(l2, lp, p))
+      if (
+        options?.exact &&
+        !(
+          inside(lp, l1, l2) ||
+          inside(p, l1, l2) ||
+          inside(l1, lp, p) ||
+          inside(l2, lp, p)
+        )
       )
         continue;
-      if (options?.includedInSegment &&
+      if (
+        options?.includedInSegment &&
         !(inside(l1, lp, p) || inside(l2, lp, p))
       )
         continue;
-      if (options?.includedInLine &&
-        !(inside(lp, l1, l2) || inside(p, l1, l2))
-      )
+      if (options?.includedInLine && !(inside(lp, l1, l2) || inside(p, l1, l2)))
         continue;
       result.push(i);
     }

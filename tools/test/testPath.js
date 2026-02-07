@@ -112,24 +112,25 @@ bro.test("intersect arc", () => {
   const end = plus(center, [50, radius]);
   const sweep = 0;
 
-  const s = new Path();
-  s.moveTo(start);
-  s.arc(end, radius, sweep);
-  s.close();
-
   const intersections = loop.intersectArc(start, end, radius, sweep);
 
+  // const s = new Path();
+  // s.moveTo(start);
+  // s.arc(end, radius, sweep);
+  // const { segment, x } = intersections[0];
   // debugGeometry(
   //   loop.toString(),
   //   s.toString(),
-  //   intersections.map(int => int.point)
+  //   intersections.map(int => int.point),
+  //   [[0, 0], s.evaluate(segment, x)],
+  //   [[0, 0], loop.evaluate(segment, x)],
   // );
 
   bro.expect(intersections).toEqual([
     {
       point: [426.11625991783626, 567.3883740082163],
       segment: 1,
-      x: 0.08877625628188149,
+      x: 0.2646248550445464,
       crossesFromTheRight: false,
     },
     {
@@ -708,4 +709,15 @@ bro.test("inserts feature as expected", () => {
   p.insertFeature(tenon, 1, { fromStart: 50 });
 
   bro.expect(p.toString()).toEqual("M 0 0 L -1.2858791391047208e-15 29 A 3 3 0 0 1 -9.18485099360515e-16 35 L -12 35 A 3 3 0 0 0 -15 38 L -15.000000000000009 62 A 3 3 0 0 0 -11.999999999999998 65 L 9.18485099360515e-16 65 A 3 3 0 0 1 1.2858791391047208e-15 71 L 0 100 L 12 100 A 3 3 0 0 1 18 100 L 18 112 A 3 3 0 0 0 21 115 L 45 115.00000000000001 A 3 3 0 0 0 48 112 L 48 100 A 3 3 0 0 1 54 100 L 100 100 L 100 0 Z");
+});
+
+bro.test("gets equidistant points", () => {
+  const directrix = new Path();
+  directrix.moveTo([0, 0]);
+  directrix.lineTo([100, 0]);
+  directrix.arc([100, 100], 50, 1);
+  directrix.lineTo([0, 100]);
+
+  bro.expect(directrix.getEquidistantPoints(21)).toEqual([
+    [0, 0], [21, 0], [42, 0], [63, 0], [84, 0], [104.9985061553517, 0.25047803028745896], [124.9865120751614, 6.690945354143135], [140.5668972649126, 20.771129917527947], [148.9912817771333, 40.00728716346076], [148.77360418386763, 61.00615895375924], [139.95226281256777, 80.06354430461454], [124.08334228113098, 93.8177204401358], [103.96612017130268, 99.84245069001715], [82.96671117450174, 100], [61.96671117450174, 100], [40.96671117450174, 100], [19.96671117450174, 100]]);
 });
