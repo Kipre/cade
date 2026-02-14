@@ -1,17 +1,22 @@
 // @ts-check
 
+import { FlatPart, getFaceOnLocatedFlatPart } from "../lib/flat.js";
+import { Assembly } from "../lib/lib.js";
+import { y3 } from "../tools/defaults.js";
+import { Path } from "../tools/path.js";
 import bro from "../tools/test/brotest/brotest.js";
+import { a2m } from "../tools/transform.js";
 
 bro.test("test simple location", () => {
-  const lines = [
-    [[53.210678118654755, 7.5], [600, 7.5],],
-    [[53.210678118654755, -77.5], [600, -77.5],],
-  ];
+  const path = Path.fromPolyline([[10, 50], [40, 100], [0, 200]]);
+  const part = new FlatPart("test", 10, path);
+  const assy = new Assembly("assy");
+  assy.addChild(part, a2m([10, 20, 30], y3));
 
   bro
-    .expect(makePolygonFromLines(lines, [15, 20]).toString())
+    .expect(getFaceOnLocatedFlatPart(assy.findChild(part), x => x[2]).toString())
     .toBe(
-      "M 53.210678118654755 -67.5 L 53.210678118654755 0 L 600 0 L 600 -67.5 Z",
+      "matrix3d(0.5144957554275266, 0, -0.8574929257125442, 0, 0, -1, 0, 0, -0.8574929257125442, 0, -0.5144957554275266, 0, 20, 20, -20, 1)"
     );
 });
 
