@@ -333,6 +333,14 @@ bro.test("simple line thicken", () => {
     .toBe("M 0 400 L 500 400 L 500 300 L 0 300 Z");
 });
 
+bro.test("another simple line thicken", () => {
+  const path = Path.fromPolyline([[53.210678118654755, 7.5], [600, 7.5]], false)
+    .thickenAndClose(15);
+  bro
+    .expect(path.toString())
+    .toBe("M 53.210678118654755 7.5 L 600 7.5 L 600 -7.500000000000114 L 53.210678118654755 -7.500000000000114 Z");
+});
+
 bro.test("offset circle", () => {
   const path = Path.makeCircle(10);
 
