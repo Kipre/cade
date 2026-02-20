@@ -20,5 +20,6 @@ pub const makeTransform = occ.makeTransform;
 pub const freeTransform = occ.freeTransform;
 pub const applyShapeLocationTransform = occ.applyShapeLocationTransform;
 pub const fuseShapes = occ.fuseShapes;
+pub const intersectShapes = occ.intersectShapes;
 pub const cutShape = occ.cutShape;
 pub const shapeToSVGSegments = occ.shapeToSVGSegments;
