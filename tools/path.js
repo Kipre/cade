@@ -124,6 +124,7 @@ export class Path {
 
   /**
    * @param {number} radius
+   * @param {number?} maybeIndex
    */
   roundFillet(radius, maybeIndex = null) {
     const length = this.controls.length;
@@ -1439,6 +1440,25 @@ export class Path {
     }
 
     throw new Error("did not find a common line");
+  }
+
+  /**
+   * @param {(x: types.Point) => boolean} finder
+   */
+  deletePoints(finder) {
+    const newControls = [];
+
+    for (const control of this.controls) {
+      const p = control[1];
+      if (finder(p)) continue;
+      if (newControls.length === 0) {
+        newControls.push(["moveTo", p]);
+        continue;
+      }
+      newControls.push(control);
+    }
+
+    this.controls = newControls;
   }
 
   /**
