@@ -22,18 +22,16 @@ const modules = [_][]const u8{
     "OCCT/src/ModelingAlgorithms/TKHLR",
 };
 
-fn addDependencies(b: *std.Build, target: std.Build.ResolvedTarget, occt_libs: []const *std.Build.Step.Compile, exe: *std.Build.Step.Compile) void {
-    if (target.result.os.tag == .windows) {
-        exe.linkSystemLibrary("Ws2_32");
-    }
-
-    exe.linkLibCpp();
-    exe.addIncludePath(b.path("src"));
-    exe.addCSourceFile(.{ .file = b.path("src/occ.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
-    exe.addCSourceFile(.{ .file = b.path("src/svg.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
-
+fn addOCCTLibs(occt_libs: []const *std.Build.Step.Compile, exe: *std.Build.Step.Compile) void {
     for (occt_libs) |lib| {
         exe.linkLibrary(lib);
+    }
+}
+
+fn addStaticOCCTLibs(b: *std.Build, path: []const u8, exe: *std.Build.Step.Compile) void {
+    for (modules) |mod| {
+        const module_name = std.fs.path.stem(mod);
+        exe.addObjectFile(b.path(b.fmt("{s}/{s}.lib", .{ path, module_name })));
     }
 }
 
@@ -52,7 +50,6 @@ pub fn addOCCTModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: 
     };
 
     lib.linkLibCpp();
-    b.installArtifact(lib);
     return lib;
 }
 
@@ -99,6 +96,13 @@ pub fn build(b: *std.Build) void {
         "Skip headers flattening (default is false)",
     ) orelse false;
 
+    const staticOCCT = b.option(
+        []const u8,
+        "static-occt",
+        "Path to a folder with static OCCT libs",
+    ) orelse "";
+    const buildOCCTLibs = std.mem.eql(u8, staticOCCT, "");
+
     const flatten_step = FlattenHeadersStep.create(b, "OCCT/src", skip_header_flattening);
 
     const target = b.standardTargetOptions(.{});
@@ -111,6 +115,8 @@ pub fn build(b: *std.Build) void {
         lib.step.dependOn(&flatten_step.step);
         lib.addIncludePath(flatten_step.getOutput());
         lib.addConfigHeader(standard_version_h);
+        if (buildOCCTLibs)
+            b.installArtifact(lib);
         occt_libs[i] = lib;
     }
 
@@ -139,7 +145,21 @@ pub fn build(b: *std.Build) void {
     exe.addIncludePath(flatten_step.getOutput());
     exe.addConfigHeader(standard_version_h);
 
-    addDependencies(b, target, &occt_libs, exe);
+    if (target.result.os.tag == .windows) {
+        exe.linkSystemLibrary("Ws2_32");
+    }
+
+    exe.linkLibCpp();
+    exe.addIncludePath(b.path("src"));
+    exe.addCSourceFile(.{ .file = b.path("src/occ.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
+    exe.addCSourceFile(.{ .file = b.path("src/svg.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
+
+    if (buildOCCTLibs) {
+        addOCCTLibs(&occt_libs, exe);
+    } else {
+        addStaticOCCTLibs(b, staticOCCT, exe);
+    }
+
     b.installArtifact(exe);
 }
 
