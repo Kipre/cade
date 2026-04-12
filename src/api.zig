@@ -7,6 +7,7 @@ const expect = std.testing.expect;
 const PathSegment = occ.PathSegment;
 
 pub const Transform = [16]f64;
+const fixOrient: Transform = .{ 0, 0, 1, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1 };
 
 pub const GeometryInstances = struct {
     part: std.json.Value,
@@ -103,8 +104,14 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *const std.j
                 const transform = placement.array.items;
                 var mat2: Transform = undefined;
                 for (0..15) |j| mat2[j] = try getNumber(transform[j]);
-                const trsf = occ.makeTransform(&mat2[0]);
-                result = occ.applyShapeLocationTransform(result, trsf);
+                result = occ.applyShapeLocationTransform(
+                    result,
+                    occ.makeTransform(&mat2[0]),
+                );
+                result = occ.applyShapeLocationTransform(
+                    result,
+                    occ.makeTransform(&fixOrient[0]),
+                );
             }
 
             shapes[i] = result.?;
