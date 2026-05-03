@@ -24,18 +24,18 @@ const modules = [_][]const u8{
 
 fn addOCCTLibs(occt_libs: []const *std.Build.Step.Compile, exe: *std.Build.Step.Compile) void {
     for (occt_libs) |lib| {
-        exe.linkLibrary(lib);
+        exe.root_module.linkLibrary(lib);
     }
 }
 
 fn addStaticOCCTLibs(b: *std.Build, path: []const u8, exe: *std.Build.Step.Compile) void {
     for (modules) |mod| {
         const module_name = std.fs.path.stem(mod);
-        exe.addObjectFile(b.path(b.fmt("{s}/{s}.lib", .{ path, module_name })));
+        exe.root_module.addObjectFile(b.path(b.fmt("{s}/{s}.lib", .{ path, module_name })));
     }
 }
 
-pub fn addOCCTModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, name: []const u8) *std.Build.Step.Compile {
+pub fn addOCCTModule(b: *std.Build, io: std.Io, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, name: []const u8) *std.Build.Step.Compile {
     const module_name = std.fs.path.stem(name);
     const lib = b.addLibrary(.{
         .root_module = b.createModule(.{
@@ -45,30 +45,31 @@ pub fn addOCCTModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: 
         .name = module_name,
     });
 
-    addCSourceFilesRecursive(b, lib, name, &.{"-fno-sanitize=undefined"}) catch |err| {
+    addCSourceFilesRecursive(b, io, lib, name, &.{"-fno-sanitize=undefined"}) catch |err| {
         std.debug.print("Failed to add source files: {}\n", .{err});
     };
 
-    lib.linkLibCpp();
+    lib.root_module.link_libcpp = true;
+    b.installArtifact(lib);
     return lib;
 }
 
-fn addCSourceFilesRecursive(b: *std.Build, exe: *std.Build.Step.Compile, path: []const u8, flags: []const []const u8) !void {
-    var dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
-    defer dir.close();
+fn addCSourceFilesRecursive(b: *std.Build, io: std.Io, exe: *std.Build.Step.Compile, path: []const u8, flags: []const []const u8) !void {
+    var dir = try std.Io.Dir.cwd().openDir(io, path, .{ .iterate = true });
+    defer dir.close(io);
 
     var it = dir.iterate();
-    while (try it.next()) |entry| {
+    while (try it.next(io)) |entry| {
         const full_path = try std.fs.path.join(b.allocator, &.{ path, entry.name });
 
         if (std.mem.indexOf(u8, full_path, "GTests") != null) continue;
 
         if (entry.kind == .directory) {
-            try addCSourceFilesRecursive(b, exe, full_path, flags);
+            try addCSourceFilesRecursive(b, io, exe, full_path, flags);
         } else if (entry.kind == .file) {
             const ext = std.fs.path.extension(entry.name);
             if (std.mem.eql(u8, ext, ".cpp") or std.mem.eql(u8, ext, ".cxx") or std.mem.eql(u8, ext, ".c")) {
-                exe.addCSourceFile(.{
+                exe.root_module.addCSourceFile(.{
                     .file = b.path(full_path),
                     .flags = flags,
                 });
@@ -103,7 +104,12 @@ pub fn build(b: *std.Build) void {
     ) orelse "";
     const buildOCCTLibs = std.mem.eql(u8, staticOCCT, "");
 
-    const flatten_step = FlattenHeadersStep.create(b, "OCCT/src", skip_header_flattening);
+    var threaded: std.Io.Threaded = .init_single_threaded;
+    defer threaded.deinit();
+
+    const io = threaded.io();
+
+    const flatten_step = FlattenHeadersStep.create(b, io, "OCCT/src", skip_header_flattening);
 
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -111,10 +117,10 @@ pub fn build(b: *std.Build) void {
     var occt_libs: [19]*std.Build.Step.Compile = undefined;
 
     for (modules, 0..) |module, i| {
-        var lib = addOCCTModule(b, target, optimize, module);
+        var lib = addOCCTModule(b, io, target, optimize, module);
         lib.step.dependOn(&flatten_step.step);
-        lib.addIncludePath(flatten_step.getOutput());
-        lib.addConfigHeader(standard_version_h);
+        lib.root_module.addIncludePath(flatten_step.getOutput());
+        lib.root_module.addIncludePath(standard_version_h.getOutputDir());
         if (buildOCCTLibs)
             b.installArtifact(lib);
         occt_libs[i] = lib;
@@ -142,17 +148,17 @@ pub fn build(b: *std.Build) void {
         .name = "cade",
         .root_module = mod,
     });
-    exe.addIncludePath(flatten_step.getOutput());
-    exe.addConfigHeader(standard_version_h);
+    exe.root_module.addIncludePath(flatten_step.getOutput());
+    exe.root_module.addIncludePath(standard_version_h.getOutputDir());
 
     if (target.result.os.tag == .windows) {
-        exe.linkSystemLibrary("Ws2_32");
+        exe.root_module.linkSystemLibrary("Ws2_32", .{});
     }
 
-    exe.linkLibCpp();
-    exe.addIncludePath(b.path("src"));
-    exe.addCSourceFile(.{ .file = b.path("src/occ.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
-    exe.addCSourceFile(.{ .file = b.path("src/svg.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
+    exe.root_module.link_libcpp = true;
+    exe.root_module.addIncludePath(b.path("src"));
+    exe.root_module.addCSourceFile(.{ .file = b.path("src/occ.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
+    exe.root_module.addCSourceFile(.{ .file = b.path("src/svg.cxx"), .flags = &.{"-fno-sanitize=undefined"} });
 
     if (buildOCCTLibs) {
         addOCCTLibs(&occt_libs, exe);
@@ -166,11 +172,12 @@ pub fn build(b: *std.Build) void {
 const FlattenHeadersStep = struct {
     step: std.Build.Step,
     b: *std.Build,
+    io: std.Io,
     src_dir: []const u8,
     dst_dir: std.Build.GeneratedFile,
     skip: bool,
 
-    pub fn create(b: *std.Build, sub_path: []const u8, skip: bool) *FlattenHeadersStep {
+    pub fn create(b: *std.Build, io: std.Io, sub_path: []const u8, skip: bool) *FlattenHeadersStep {
         const self = b.allocator.create(FlattenHeadersStep) catch unreachable;
 
         self.* = .{
@@ -181,6 +188,7 @@ const FlattenHeadersStep = struct {
                 .makeFn = make,
             }),
             .b = b,
+            .io = io,
             .src_dir = sub_path,
             .dst_dir = .{ .step = &self.step },
             .skip = skip,
@@ -197,6 +205,7 @@ const FlattenHeadersStep = struct {
         const self: *FlattenHeadersStep = @fieldParentPtr("step", step);
 
         const b = self.b;
+        const io = self.io;
         self.dst_dir.path = b.pathJoin(&.{ b.cache_root.path.?, "flattened-headers" });
 
         if (self.skip) return;
@@ -204,34 +213,37 @@ const FlattenHeadersStep = struct {
         // Create the output directory in the zig-cache
         const output_dir_path = b.pathFromRoot(self.dst_dir.path.?);
 
-        try std.fs.cwd().makePath(output_dir_path);
+        const cwd = std.Io.Dir.cwd();
+
+        try cwd.createDirPath(io, output_dir_path);
 
         const src_path = self.src_dir;
-        var dir = try std.fs.cwd().openDir(src_path, .{ .iterate = true });
-        defer dir.close();
+        var dir = try cwd.openDir(io, src_path, .{ .iterate = true });
+        defer dir.close(io);
 
         // Perform the recursive walk here
-        try walkAndCopy(b, src_path, output_dir_path);
+        try walkAndCopy(b, io, src_path, output_dir_path);
     }
 
-    fn walkAndCopy(b: *std.Build, src: []const u8, dest: []const u8) !void {
-        var dir = try std.fs.cwd().openDir(src, .{ .iterate = true });
-        defer dir.close();
+    fn walkAndCopy(b: *std.Build, io: std.Io, src: []const u8, dest: []const u8) !void {
+        const cwd = std.Io.Dir.cwd();
+        var dir = try cwd.openDir(io, src, .{ .iterate = true });
+        defer dir.close(io);
 
         var it = dir.iterate();
-        while (try it.next()) |entry| {
+        while (try it.next(io)) |entry| {
             const full_src = try std.fs.path.join(b.allocator, &.{ src, entry.name });
             if (std.mem.indexOf(u8, full_src, "GTests") != null) continue;
 
             if (entry.kind == .directory) {
-                try walkAndCopy(b, full_src, dest);
+                try walkAndCopy(b, io, full_src, dest);
                 continue;
             }
             if (entry.kind != .file) continue;
             if (std.mem.eql(u8, std.fs.path.extension(entry.name), ".hxx") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".h") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".lxx") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".pxx") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".gxx")) {
                 const full_dest = try std.fs.path.join(b.allocator, &.{ dest, entry.name });
                 // Only copy if the file is different/newer
-                try std.fs.cwd().copyFile(full_src, std.fs.cwd(), full_dest, .{});
+                try cwd.copyFile(full_src, cwd, full_dest, io, .{});
             }
         }
     }
