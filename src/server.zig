@@ -1,12 +1,10 @@
 const builtin = @import("builtin");
 const std = @import("std");
 const mem = std.mem;
-const io = std.io;
 const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 const Cache = std.Build.Cache;
 const http = std.http;
-const net = std.net;
 const print = std.debug.print;
 const fs = std.fs;
 
@@ -32,41 +30,43 @@ const MIME_TYPES = std.StaticStringMap([]const u8).initComptime(.{
 
 const Context = struct {
     gpa: Allocator,
+    io: std.Io,
 };
 
 const serve_dir = "./";
 
-pub fn serve(allocator: Allocator) !void {
+pub fn serve(allocator: Allocator, io: std.Io) !void {
     const listen_port = 8111;
 
-    const address = std.net.Address.parseIp("127.0.0.1", listen_port) catch unreachable;
-    var http_server = try address.listen(.{ .reuse_address = true });
+    const address = std.Io.net.IpAddress.parseIp4("127.0.0.1", listen_port) catch unreachable;
+    var http_server = try address.listen(io, .{ .reuse_address = true });
     print("server started at 127.0.0.1:{d}\n", .{listen_port});
 
     var context: Context = .{
         .gpa = allocator,
+        .io = io,
     };
 
     while (true) {
-        const connection = try http_server.accept();
-        _ = std.Thread.spawn(.{}, accept, .{ &context, connection }) catch |err| {
+        const stream = try http_server.accept(io);
+        _ = std.Thread.spawn(.{}, accept, .{ &context, stream }) catch |err| {
             std.log.err("unable to accept connection: {s}", .{@errorName(err)});
-            connection.stream.close();
+            stream.close(io);
             continue;
         };
     }
 }
 
-fn accept(context: *Context, connection: std.net.Server.Connection) void {
-    defer connection.stream.close();
+fn accept(context: *Context, stream: std.Io.net.Stream) void {
+    defer stream.close(context.io);
 
     var path_buf: [std.fs.max_path_bytes]u8 = undefined;
 
     var recv_buffer: [4000]u8 = undefined;
     var send_buffer: [4000]u8 = undefined;
-    var conn_reader = connection.stream.reader(&recv_buffer);
-    var conn_writer = connection.stream.writer(&send_buffer);
-    var server = std.http.Server.init(conn_reader.interface(), &conn_writer.interface);
+    var conn_reader = stream.reader(context.io, &recv_buffer);
+    var conn_writer = stream.writer(context.io, &send_buffer);
+    var server = std.http.Server.init(&conn_reader.interface, &conn_writer.interface);
 
     while (server.reader.state == .ready) {
         var request = server.receiveHead() catch |err| switch (err) {
@@ -90,7 +90,7 @@ fn accept(context: *Context, connection: std.net.Server.Connection) void {
 
         // Handle the request
         _ = switch (method) {
-            .GET => serveFileOrDirectory(&request, context.gpa, path),
+            .GET => serveFileOrDirectory(&request, context.gpa, context.io, path),
             .POST => handlePostRequest(&request, context.gpa, path),
             else => sendError(&request, .method_not_allowed, context.gpa, "Method not allowed"),
         } catch |err| {
@@ -99,51 +99,58 @@ fn accept(context: *Context, connection: std.net.Server.Connection) void {
     }
 }
 
-fn serveFileOrDirectory(req: *http.Server.Request, allocator: std.mem.Allocator, path: []const u8) !void {
+fn serveFileOrDirectory(req: *http.Server.Request, allocator: std.mem.Allocator, io: std.Io, path: []const u8) !void {
 
     // Construct full path
     const full_path = try fs.path.join(allocator, &.{ serve_dir, path });
     defer allocator.free(full_path);
 
-    // Check if path exists and get file info
-    const stat = fs.cwd().statFile(full_path) catch |err| switch (err) {
-        error.FileNotFound => {
-            try sendError(req, .not_found, allocator, "File not found");
-            return;
-        },
-        // windows throws error
-        error.IsDir => fs.File.Stat{
-            .kind = .directory,
-            .inode = 0,
-            .size = 0,
-            .mode = 0,
-            .atime = 0,
-            .mtime = 0,
-            .ctime = 0,
-        },
-        else => {
-            try sendError(req, .internal_server_error, allocator, "Internal server error");
-            return err;
-        },
+    const cwd = std.Io.Dir.cwd();
+
+    const Kind = enum {
+        file,
+        directory,
     };
 
-    if (stat.kind == .directory) {
-        if (!std.mem.endsWith(u8, full_path, "/")) {
-            const with_trailing_slash = try std.fmt.allocPrint(allocator, "{s}/", .{full_path});
-            defer allocator.free(with_trailing_slash);
+    const kind: Kind = blk: {
+        const stat = cwd.statFile(io, full_path, .{}) catch |err| switch (err) {
+            error.IsDir => break :blk .directory,
+            error.FileNotFound => {
+                try sendError(req, .not_found, allocator, "File not found");
+                return;
+            },
+            else => {
+                try sendError(req, .internal_server_error, allocator, "Internal server error");
+                return err;
+            },
+        };
 
-            try sendRedirect(req, with_trailing_slash[1..]);
-            return;
+        if (stat.kind == .directory) {
+            break :blk .directory;
         }
-        try serveDirectory(req, allocator, full_path);
-        return;
-    }
 
-    try serveFile(req, allocator, full_path);
+        break :blk .file;
+    };
+
+    switch (kind) {
+        .directory => {
+            // serve directory
+            try serveDirectory(req, allocator, io, full_path);
+        },
+        .file => {
+            // serve file
+            try serveFile(req, allocator, io, full_path);
+        },
+    } 
 }
 
-fn serveFile(req: *http.Server.Request, allocator: std.mem.Allocator, file_path: []const u8) !void {
-    const content = try fs.cwd().readFileAlloc(allocator, file_path, 10 * 1024 * 1024);
+fn serveFile(req: *http.Server.Request, allocator: std.mem.Allocator, io: std.Io, file_path: []const u8) !void {
+    const content = try std.Io.Dir.cwd().readFileAlloc(
+        io,
+        file_path, 
+        allocator, 
+        .limited(10 * 1024 * 1024),
+    );
     defer allocator.free(content);
 
     // Determine content type
@@ -154,19 +161,19 @@ fn serveFile(req: *http.Server.Request, allocator: std.mem.Allocator, file_path:
     } });
 }
 
-fn serveDirectory(req: *http.Server.Request, allocator: std.mem.Allocator, full_path: []const u8) !void {
+fn serveDirectory(req: *http.Server.Request, allocator: std.mem.Allocator, io: std.Io, full_path: []const u8) !void {
     // Try to serve index.html if it exists
     const index_path = try fs.path.join(allocator, &[_][]const u8{ full_path, "index.html" });
     defer allocator.free(index_path);
 
     print("full path {s}", .{full_path});
 
-    if (fs.cwd().statFile(index_path)) |_| {
-        try serveFile(req, allocator, index_path);
+    if (std.Io.Dir.cwd().statFile(io, index_path, .{})) |_| {
+        try serveFile(req, allocator, io, index_path);
         return;
     } else |_| {
         if (std.mem.eql(u8, full_path, "./")) {
-            try serveFile(req, allocator, "./cade/lib/index.html");
+            try serveFile(req, allocator, io, "./cade/lib/index.html");
             return;
         }
         try sendError(req, .not_found, allocator, "index.html file not found");

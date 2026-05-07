@@ -148,7 +148,7 @@ const Bbox = struct {
     // }
 };
 
-pub fn writeSegmentsToPath(segments: []PathSegment, writer: *std.io.Writer) !usize {
+pub fn writeSegmentsToPath(segments: []PathSegment, writer: *std.Io.Writer) !usize {
     _ = try writer.write("<path d=\"");
     var i: usize = 0;
     for (segments) |seg| {
@@ -174,7 +174,7 @@ pub fn writeSegmentsToPath(segments: []PathSegment, writer: *std.io.Writer) !usi
     return i;
 }
 
-pub fn writeSegmentsToGroup(segments: []PathSegment, writer: *std.io.Writer) !void {
+pub fn writeSegmentsToGroup(segments: []PathSegment, writer: *std.Io.Writer) !void {
     _ = try writer.write("<g fill=\"none\" stroke-width=\"1px\" stroke=\"black\">\n");
     var pos: usize = 0;
     while (pos < segments.len) {
@@ -183,7 +183,7 @@ pub fn writeSegmentsToGroup(segments: []PathSegment, writer: *std.io.Writer) !vo
     _ = try writer.write("</g>\n");
 }
 
-pub fn writeSegmentsToSVG(writer: *std.io.Writer, segments: []PathSegment) !void {
+pub fn writeSegmentsToSVG(writer: *std.Io.Writer, segments: []PathSegment) !void {
     var bbox: Bbox = .{};
     for (segments) |seg| bbox.update(seg.x, seg.y);
     const width = bbox.xMax - bbox.xMin;
