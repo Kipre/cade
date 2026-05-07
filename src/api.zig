@@ -257,10 +257,12 @@ pub fn projectSVG(allocator: std.mem.Allocator, definition: *const CompactPartDe
 
     const length = occ.shapeToSVGSegments(compound, array.ptr, max_capacity);
 
-    const file = try std.fs.cwd().createFile(filepath, .{});
-    defer file.close();
+    var threaded: std.Io.Threaded = .init_single_threaded;
+    const io = threaded.io();
+    const file = try std.Io.Dir.cwd().createFile(io, filepath, .{});
+    defer file.close(io);
 
-    var file_writer = file.writer(&.{});
+    var file_writer = file.writer(io, &.{});
     const writer = &file_writer.interface;
 
     try parse.writeSegmentsToSVG(writer, array[0..length]);
