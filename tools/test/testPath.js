@@ -748,3 +748,18 @@ bro.test("deletes unnecessary points", () => {
 
   bro.expect(path.toString()).toEqual("M 305 60 L 305 -32.7755905511811 L 340 -50 L 340 -100 L 207 -100 L 207 0 L 238.4 0 Z");
 });
+
+bro.test("checks recentering", () => {
+  const p = Path.makeRect(50, 40);
+
+  bro.expect(p.toString()).toEqual("M 0 0 L 0 40 L 50 40 L 50 0 Z");
+  bro.expect(p.recenter().toString()).toEqual("M -25 -20 L -25 20 L 25 20 L 25 -20 Z");
+  bro.expect(p.recenter({x: "start"}).toString()).toEqual("M 0 0 L 0 40 L 50 40 L 50 0 Z");
+  bro.expect(p.recenter({x: "center"}).toString()).toEqual("M -25 0 L -25 40 L 25 40 L 25 0 Z");
+  bro.expect(p.recenter({onlyX: true}).toString()).toEqual("M -25 0 L -25 40 L 25 40 L 25 0 Z");
+  bro.expect(p.recenter({x: "end"}).toString()).toEqual("M -50 0 L -50 40 L 0 40 L 0 0 Z");
+  bro.expect(p.recenter({y: "start"}).toString()).toEqual("M 0 0 L 0 40 L 50 40 L 50 0 Z");
+  bro.expect(p.recenter({y: "center"}).toString()).toEqual("M 0 -20 L 0 20 L 50 20 L 50 -20 Z");
+  bro.expect(p.recenter({onlyY: true}).toString()).toEqual("M 0 -20 L 0 20 L 50 20 L 50 -20 Z");
+  bro.expect(p.recenter({y: "end"}).toString()).toEqual("M 0 -40 L 0 0 L 50 0 L 50 -40 Z");
+});

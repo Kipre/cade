@@ -804,14 +804,27 @@ export class Path {
   }
 
   /**
-   * @param {{ onlyX?: boolean; onlyY?: boolean; }?} opts
+   * @typedef { "start" | "center" | "end" } Loc
    */
-  recenter(opts = {}) {
+
+  /**
+   * @param {{ x?: Loc, y?: Loc, onlyX?: boolean; onlyY?: boolean; }?} opts
+   */
+  recenter(opts = null) {
     const bbox = this.bbox();
+    const [[xMin, yMin], [xMax, yMax]] = bbox.extrema();
     const [x, y] = bbox.center();
+    const result = [0, 0]
+    if (!opts) return this.translate([-x, -y]);
     if (opts?.onlyX) return this.translate([-x, 0]);
     if (opts?.onlyY) return this.translate([0, -y]);
-    return this.translate([-x, -y]);
+    if (opts?.x == "start") result[0] = -xMin;
+    if (opts?.x == "center") result[0] = -x;
+    if (opts?.x == "end") result[0] = -xMax;
+    if (opts?.y == "start") result[1] = -yMin;
+    if (opts?.y == "center") result[1] = -y;
+    if (opts?.y == "end") result[1] = -yMax;
+    return this.translate(result);
   }
 
   /**
