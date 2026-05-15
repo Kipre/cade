@@ -128,18 +128,12 @@ fn main(
     }
 
     // Normalize inputs
-    let N = normalize(normal);
     let L = normalize(vec3<f32>(0.0, 0.0, 1.0));
 
-    let diffuse = sqrt(abs(dot(N, L)));
-    let ambient = 0.2;
-    let intensity = diffuse * 0.8 + ambient;
+    let diffuse = sqrt(abs(dot(normal, L)));
+    let ambient = 0.4;
+    let intensity = diffuse + ambient;
     let shadedColor = uBaseColor * intensity;
-
-    // Optional: emphasize edges by reducing intensity at grazing angles
-    // (for silhouette enhancement, useful in CAD-like views)
-    // let edgeFactor = pow(1.0 - abs(dot(N, vec3<f32>(0.0, 0.0, 1.0))), 2.0);
-    // let finalColor = mix(shadedColor, shadedColor * 0.5, edgeFactor * 0.5);
 
     return vec4<f32>(shadedColor, 1.0);
 }
