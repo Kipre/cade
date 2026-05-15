@@ -176,6 +176,8 @@ export class Path {
   }
 
   /**
+   * Connects a tangent arc between two last and next points
+   *
    * @param {types.Point} p
    * @param {number} radius
    */
@@ -185,11 +187,33 @@ export class Path {
   }
 
   /**
+   * Classic SVG arc definition: start, end radius and sweep flag
+   *
    * @param {types.Point} p
    * @param {number} radius
    * @param {number} sweepFlag
    */
   arc(p, radius, sweepFlag) {
+    this.controls.push(["arc", p, radius, sweepFlag]);
+  }
+
+  /**
+   * Arc defined by start, end and distance off the straignt line
+   *
+   * TODO: ensure positive of remove sweep flag
+   * @param {types.Point} p
+   * @param {number} sagitta
+   * @param {number} sweepFlag
+   */
+  bulgeArc(p, sagitta, sweepFlag) {
+    const [, lastPoint] = this.controls.at(-1);
+
+    const length = norm(lastPoint, p);
+    const lengthToCenterpoint = Math.sqrt((length / 2) ** 2 + sagitta ** 2);
+    const halfPerimeter = length / 2 + lengthToCenterpoint
+    const divider = (4 * Math.sqrt(halfPerimeter * (halfPerimeter - length) * (halfPerimeter - lengthToCenterpoint) ** 2));
+    const radius = length * lengthToCenterpoint ** 2 / divider;
+
     this.controls.push(["arc", p, radius, sweepFlag]);
   }
 

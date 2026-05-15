@@ -74,6 +74,7 @@ export function transformOnlyOrigin(mat, transform) {
  * @param {types.Point3?} maybeOrigin
  * @param {types.Point3?} maybeUp
  * @param {types.Point3?} maybeDir
+ * @returns {DOMMatrix}
  */
 export function a2m(maybeOrigin = null, maybeUp = null, maybeDir = null) {
   const origin = maybeOrigin ?? [0, 0, 0];
