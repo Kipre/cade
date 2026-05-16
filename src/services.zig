@@ -77,6 +77,28 @@ fn export_step(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
 }
 
 fn project(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
+    std.debug.print("target: {s}\n", .{req.head.target});
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const decoded_path = std.Uri.percentDecodeBackwards(&path_buf, req.head.target);
+    const query = if (std.mem.indexOf(u8, decoded_path, "?")) |idx| decoded_path[idx..] else "";
+
+    var it = std.mem.splitScalar(u8, query, '&');
+
+    var file: ?[]const u8 = null;
+
+    while (it.next()) |pair| {
+        var kv = std.mem.splitScalar(u8, pair, '=');
+
+        const key = kv.next() orelse continue;
+        const value = kv.next() orelse "";
+        if (std.mem.eql(u8, key, "file")) {
+            file = value[0..];
+        } else if (std.mem.eql(u8, key, "")) {
+            std.debug.print("hello", .{});
+        }
+    }
+
     const body = readRequestBody(req, allocator, reqBodySize) catch |err| {
         try sendJsonError(req, "Failed to read request body", 400);
         return err;
@@ -95,11 +117,27 @@ fn project(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     };
     defer input.deinit();
 
-    try api.projectSVG(allocator, &input.value);
+    if (file) |f| {
+        try api.projectSVG(allocator, &input.value, f);
 
-    try req.respond("wrote successfully", .{ .extra_headers = &.{
-        .{ .name = "content-type", .value = "application/text" },
-    } });
+        try req.respond("wrote successfully", .{ .extra_headers = &.{
+            .{ .name = "content-type", .value = "application/text" },
+        } });
+        return;
+    }
+
+    var buf: [1e5]u8 = undefined;
+    var bodyWriter = try req.respondStreaming(&buf, .{
+        .respond_options = .{
+            .extra_headers = &.{
+                .{ .name = "content-type", .value = "application/text" },
+            },
+        },
+    });
+
+    try api.projectSVGInMemory(allocator, &input.value, &bodyWriter.writer);
+    try bodyWriter.flush();
+    try bodyWriter.end();
 }
 
 pub fn handlePostRequest(req: *http.Server.Request, allocator: std.mem.Allocator, path: []const u8) !void {

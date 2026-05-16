@@ -243,13 +243,13 @@ pub fn exportAsSTEP(allocator: std.mem.Allocator, definition: *CompactPartDefini
     occ.saveToSTEP(compound, &filepath[0]);
 }
 
-pub fn projectSVG(allocator: std.mem.Allocator, definition: *const CompactPartDefinition) !void {
+pub fn projectSVG(allocator: std.mem.Allocator, definition: *const CompactPartDefinition, filepath: []const u8) !void {
     const compound = occ.makeCompound().?;
     defer occ.freeCompound(compound);
 
     try assembleCompound(allocator, compound, definition);
 
-    const filepath = "./schema.svg";
+    // const filepath = "./schema.svg";
     const max_capacity = 1e5;
 
     var items: [max_capacity]PathSegment = @splat(.{});
@@ -268,6 +268,24 @@ pub fn projectSVG(allocator: std.mem.Allocator, definition: *const CompactPartDe
     try parse.writeSegmentsToSVG(writer, array[0..length]);
     try writer.flush();
     std.debug.print("successfully wrote svg file with {d} segments\n", .{length});
+}
+
+pub fn projectSVGInMemory(allocator: std.mem.Allocator, definition: *const CompactPartDefinition, writer: *std.Io.Writer) !void {
+    const compound = occ.makeCompound().?;
+    defer occ.freeCompound(compound);
+
+    try assembleCompound(allocator, compound, definition);
+
+    const max_capacity = 1e5;
+
+    var items: [max_capacity]PathSegment = @splat(.{});
+    const array = items[0..];
+
+    const length = occ.shapeToSVGSegments(compound, array.ptr, max_capacity);
+
+    try parse.writeSegmentsToSVG(writer, array[0..length]);
+
+    std.debug.print("successfully wrote svg with {d} segments\n", .{length});
 }
 
 test "simple" {
