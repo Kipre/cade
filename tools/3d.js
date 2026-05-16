@@ -1,6 +1,8 @@
 // @ts-check
 /** @import * as types from './types' */
 
+import { eps } from './2d.js';
+
 /**
  * @param {types.Point3} v
  * @returns {types.Point3}
@@ -21,6 +23,24 @@ export function cross(a, b) {
     (a[2] ?? 0) * b[0] - a[0] * (b[2] ?? 0),
     a[0] * b[1] - a[1] * b[0],
   ];
+}
+
+/**
+ * @param {types.Point3} point
+ * @param {types.Point3} vector
+ * @returns {types.Point3}
+ */
+export function project3(point, vector) {
+  return mult3(vector, dot3(point, vector) * norm3(vector) ** 2);
+}
+
+/**
+ * @param {types.Point3} v1
+ * @param {types.Point3} v2
+ * @returns {boolean}
+ */
+export function collinear3(v1, v2) {
+  return norm3(project3(v1, v2), v2) < eps;
 }
 
 /**

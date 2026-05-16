@@ -1,7 +1,7 @@
 // @ts-check
-import { ny3, y3, zero3 } from "../defaults.js";
+import { ny3, y3, z3, zero3 } from "../defaults.js";
 import { Path } from "../path.js";
-import { a2m, locateWithConstraints } from "../transform.js";
+import { a2m, atm, atm3, intersectPlanes, locateWithConstraints } from "../transform.js";
 import bro from "./brotest/brotest.js";
 
 bro.test("two simple constraints", () => {
@@ -26,5 +26,16 @@ bro.test("one constraint", () => {
   });
 
   bro.expect(m.toString()).toBe("matrix3d(0, 0, 1, 0, -1, 0, 0, 0, 0, -1, 0, 0, -15, 0, 0, 1)");
+});
+
+bro.test("intersect two planes", () => {
+  const result = intersectPlanes(a2m(), a2m([0, 0, 10], [0, 0.5, 1]));
+
+  const point = atm3(result, zero3);
+  const normal = atm3(result, z3, true);
+  bro.expect([point, normal]).toEqual([
+    [0, 20, 0],
+    [-1, 0, 0]
+  ]);
 });
 

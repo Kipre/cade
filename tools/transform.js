@@ -2,7 +2,7 @@
 /** @import * as types from './types' */
 
 import { eps, norm, rotatePoint } from "./2d.js";
-import { cross, dot3, minus3, mult3, norm3, normalize3, plus3 } from "./3d.js";
+import { collinear3, cross, dot3, minus3, mult3, norm3, normalize3, plus3 } from "./3d.js";
 import { x3, y3, z3, zero3 } from "./defaults.js";
 import { DOMMatrix, DOMPoint } from "./dom.js";
 import { w3svg } from "./svg.js";
@@ -96,6 +96,53 @@ export function a2m(maybeOrigin = null, maybeUp = null, maybeDir = null) {
   ]);
 
   return transform;
+}
+
+/**
+ * @param {types.Point3} v1
+ * @param {types.Point3} v2
+ */
+export function computeAngleBetweenVectors(v1, v2) {
+  return Math.acos(dot3(v1, v2) / (norm3(v1) * norm3(v2)));
+}
+
+/**
+ * @param {DOMMatrix} plane1
+ * @param {DOMMatrix} plane2
+ * @returns {DOMMatrix}
+ */
+export function intersectPlanes(plane1, plane2) {
+  const n1 = atm3(plane1, z3, true);
+  const n2 = atm3(plane2, z3, true);
+
+  const p1 = atm3(plane1, zero3);
+  const p2 = atm3(plane2, zero3);
+
+  // Direction of the intersection line
+  const direction = cross(n1, n2);
+  const dirLength = norm3(direction);
+
+  // Parallel or coincident planes
+  if (dirLength < eps) throw new Error("cannot intersect planes");
+
+  const dir = normalize3(direction);
+
+  // Plane equations:
+  // n1 · x = d1
+  // n2 · x = d2
+  const d1 = dot3(n1, p1);
+  const d2 = dot3(n2, p2);
+
+  // Formula:
+  // point = ((d1 * n2 - d2 * n1) × direction) / |direction|²
+  const temp = minus3(mult3(n2, d1), mult3(n1, d2));
+
+  const point = mult3(
+    cross(temp, direction),
+    1 / (dirLength * dirLength)
+  );
+
+  return a2m(point, dir);
 }
 
 export function computeTransformFromPoints(sourcePts, targetPts) {
