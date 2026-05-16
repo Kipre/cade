@@ -49,15 +49,17 @@ pub fn serve(allocator: Allocator, io: std.Io) !void {
 
     while (true) {
         const stream = try http_server.accept(io);
-        _ = std.Thread.spawn(.{}, accept, .{ &context, stream }) catch |err| {
+        _ = std.Thread.spawn(.{}, accept, .{ &context, stream })
+            catch |err| {
             std.log.err("unable to accept connection: {s}", .{@errorName(err)});
             stream.close(io);
-            continue;
+            return err;
+            // continue;
         };
     }
 }
 
-fn accept(context: *Context, stream: std.Io.net.Stream) void {
+fn accept(context: *Context, stream: std.Io.net.Stream) !void {
     defer stream.close(context.io);
 
     var path_buf: [std.fs.max_path_bytes]u8 = undefined;
@@ -95,6 +97,7 @@ fn accept(context: *Context, stream: std.Io.net.Stream) void {
             else => sendError(&request, .method_not_allowed, context.gpa, "Method not allowed"),
         } catch |err| {
             std.log.err("unable to accept connection: {s}", .{@errorName(err)});
+            return err;
         };
     }
 }

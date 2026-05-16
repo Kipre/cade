@@ -175,7 +175,7 @@ pub fn writeSegmentsToPath(segments: []PathSegment, writer: *std.Io.Writer) !usi
 }
 
 pub fn writeSegmentsToGroup(segments: []PathSegment, writer: *std.Io.Writer) !void {
-    _ = try writer.write("<g fill=\"none\" stroke-width=\"1px\" stroke=\"black\">\n");
+    _ = try writer.write("<g fill=\"none\" stroke-width=\"1px\">\n");
     var pos: usize = 0;
     while (pos < segments.len) {
         pos += try writeSegmentsToPath(segments[pos..], writer);

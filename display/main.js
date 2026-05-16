@@ -22,6 +22,7 @@ const MAX_U16 = 65_535;
 const buf = new ArrayBuffer(4);
 const f32 = new Float32Array(buf);
 const u32 = new Uint32Array(buf);
+let camera;
 
 /**
  * @param {number} u
@@ -43,7 +44,12 @@ let hoveredInstance = MAX_U16;
 
 
 window.addEventListener("keydown", (event) => {
+  if (event.code === "KeyP") {
+    console.log(camera.getPosition());
+  };
+
   if (hoveredGeometry === MAX_U16) return;
+
   if (event.code !== "KeyH") return;
 
   const objId = pairToObjId[hoveredGeometry][hoveredInstance];
@@ -430,7 +436,7 @@ export async function displayScene(items) {
 
   const objectSize = bbox.size();
   const center = vec3.create(...bbox.center());
-  const camera = new CADOrthoCamera(
+  camera = new CADOrthoCamera(
     utils.degToRad(-40),
     utils.degToRad(10),
     objectSize,
@@ -601,8 +607,8 @@ export async function displayScene(items) {
 
   canvas.addEventListener("mousemove", (event) => {
     if (camera.isPanning || camera.isDragging || event.shiftKey) return;
-    const x = event.clientX;
-    const y = event.clientY;
+    const x = event.offsetX;
+    const y = event.offsetY;
     pickObjectAt(x, y);
   });
 
