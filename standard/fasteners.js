@@ -1,6 +1,6 @@
 // @ts-check
 
-import { nz3, x3, zero2 } from "../lib/defaults.js";
+import { nz3, x3, y3, zero2, zero3 } from "../lib/defaults.js";
 import { Assembly } from "../lib/lib.js";
 import { blackMetalMaterial, metalMaterial } from "../lib/materials.js";
 import { cut, extrusion, fuse } from "../lib/operations.js";
@@ -108,7 +108,7 @@ function makeBolt(size, length) {
 
   const bolt = new Part(`${size} bolt ${length}`, fuse(head, shank));
   bolt.material = metalMaterial;
-  bolt.symmetries = [0, 0, NaN];
+  bolt.addSymmetries(a2m(zero3, x3), a2m(zero3, y3))
   return bolt;
 }
 
@@ -136,7 +136,7 @@ function makeHexBolt(size, length) {
 
   const bolt = new Part(`${size} hex bolt ${length}`, fuse(head, shank));
   bolt.material = blackMetalMaterial;
-  bolt.symmetries = [0, 0, NaN];
+  bolt.addSymmetries(a2m(zero3, x3), a2m(zero3, y3))
   return bolt;
 }
 
@@ -160,7 +160,7 @@ function makeNut(size) {
 
   const nut = new Part(`${size} nut`, head);
   nut.material = metalMaterial;
-  nut.symmetries = [0, 0, NaN];
+  nut.addSymmetries(a2m(zero3, x3), a2m(zero3, y3))
   return nut;
 }
 
@@ -206,7 +206,7 @@ function makeWasher(size) {
 
   const washer = new Part(`${size} washer`, washerShape);
   washer.material = metalMaterial;
-  washer.symmetries = [0, 0, NaN];
+  washer.addSymmetries(a2m(zero3, x3), a2m(zero3, y3))
   return washer;
 }
 
@@ -245,7 +245,7 @@ export function getFastenerKit(size, length, addLengthForNut = true) {
     bottom = new Assembly(`iso bottom ${mSize}`);
     bottom.addChild(nut, a2m([0, 0, -washerThickness]));
     bottom.addChild(washer);
-    bottom.symmetries = [0, 0, NaN];
+    bottom.addSymmetries(a2m(zero3, x3), a2m(zero3, y3))
     bottoms[mSize] = bottom;
   }
 
@@ -256,7 +256,7 @@ export function getFastenerKit(size, length, addLengthForNut = true) {
     top = new Assembly(`iso top ${key}`);
     top.addChild(bolt, a2m([0, 0, -washerThickness]));
     top.addChild(washer);
-    top.symmetries = [0, 0, NaN];
+    top.addSymmetries(a2m(zero3, x3), a2m(zero3, y3))
     tops[key] = top;
   }
 
