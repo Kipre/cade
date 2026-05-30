@@ -146,6 +146,21 @@ pub fn executeShapeRecipe(allocator: std.mem.Allocator, definition: *const std.j
             continue;
         }
 
+        if (std.mem.eql(u8, operation, "locate")) {
+            var shape = shapes[@intCast(step.get("shape").?.integer)];
+
+            const placement = step.get("placement").?;
+            const transform = placement.array.items;
+
+            var mat: Transform = undefined;
+            for (0..15) |j| mat[j] = try getNumber(transform[j]);
+            const trsf = occ.makeTransform(&mat[0]);
+            shape = occ.applyShapeLocationTransform(shape, trsf).?;
+
+            shapes[i] = shape;
+            continue;
+        }
+
         if (std.mem.eql(u8, operation, "fuse")) {
             const shapeIndexes = step.get("shapes").?.array.items;
             // i dont know how to not initialize this
