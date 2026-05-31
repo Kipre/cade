@@ -8,23 +8,29 @@ const defaultMarginPercents = 5;
 
 export class BBox {
   constructor(marginPercents = defaultMarginPercents) {
-    this.xMin = Number.POSITIVE_INFINITY;
-    this.yMin = Number.POSITIVE_INFINITY;
+    this.left = [Number.POSITIVE_INFINITY, 0];
+    this.bottom = [0, Number.POSITIVE_INFINITY];
+    this.right = [Number.NEGATIVE_INFINITY, 0];
+    this.top = [0, Number.NEGATIVE_INFINITY];
+
     this.zMin = Number.POSITIVE_INFINITY;
-    this.xMax = Number.NEGATIVE_INFINITY;
-    this.yMax = Number.NEGATIVE_INFINITY;
     this.zMax = Number.NEGATIVE_INFINITY;
+
     this.marginPercents = marginPercents;
+    this.metadata = {};
   }
 
   /**
-   * @param {types.Point | types.Point3 } point
+   * @param { types.Point | types.Point3 } point
+   * @param { any } metadata
    */
-  include(point) {
-    this.xMin = Math.min(this.xMin, point[0]);
-    this.xMax = Math.max(this.xMax, point[0]);
-    this.yMin = Math.min(this.yMin, point[1]);
-    this.yMax = Math.max(this.yMax, point[1]);
+  include(point, metadata = null) {
+    if (metadata) this.metadata[point.toString()] = metadata;
+
+    if (this.left[0] > point[0]) this.left = point;
+    if (this.right[0] < point[0]) this.right = point;
+    if (this.bottom[1] > point[1]) this.bottom = point;
+    if (this.top[1] < point[1]) this.top = point;
 
     if (point[2] != null) {
       this.zMin = Math.min(this.zMin, point[2]);
@@ -38,12 +44,12 @@ export class BBox {
   extrema() {
     if (Number.isFinite(this.zMin))
       return [
-        [this.xMin, this.yMin, this.zMin],
-        [this.xMax, this.yMax, this.zMax],
+        [this.left[0], this.bottom[1], this.zMin],
+        [this.right[0], this.top[1], this.zMax],
       ];
     return [
-      [this.xMin, this.yMin],
-      [this.xMax, this.yMax],
+      [this.left[0], this.bottom[1]],
+      [this.right[0], this.top[1]],
     ];
   }
 
@@ -51,9 +57,31 @@ export class BBox {
    * @param {BBox} other
    */
   combine(other) {
-    for (const point of other.extrema()) {
+    for (const point of other.toPoints()) {
       this.include(point);
     }
+    this.metadata = { ...this.metadata, ...other.metadata };
+
+    if (Number.isFinite(other.zMax))
+      for (const point of other.extrema()) {
+        this.include(point);
+      }
+  }
+
+  get xMax() {
+    return this.right[0];
+  }
+
+  get xMin() {
+    return this.left[0];
+  }
+
+  get yMax() {
+    return this.top[1];
+  }
+
+  get yMin() {
+    return this.bottom[1];
   }
 
   /** Returns the longest dimension in the cube */
@@ -102,14 +130,20 @@ export class BBox {
     element.dataset.yMax = this.yMax;
   };
 
+  toPoints = () => [this.bottom, this.right, this.top, this.left];
+
   static fromDataset(element) {
     const self = new BBox();
-    self.xMin =
-      Number.parseFloat(element.dataset.xMin) || Number.POSITIVE_INFINITY;
-    self.yMin =
-      Number.parseFloat(element.dataset.yMin) || Number.POSITIVE_INFINITY;
-    self.xMax = Number.parseFloat(element.dataset.xMax) || 0;
-    self.yMax = Number.parseFloat(element.dataset.yMax) || 0;
+    self.left = [
+      Number.parseFloat(element.dataset.xMin) || Number.POSITIVE_INFINITY,
+      0,
+    ];
+    self.bottom = [
+      Number.parseFloat(element.dataset.yMin) || Number.POSITIVE_INFINITY,
+      0,
+    ];
+    self.right = [Number.parseFloat(element.dataset.xMax) || 0, 0];
+    self.top = [0, Number.parseFloat(element.dataset.yMax) || 0];
     return self;
   }
 
@@ -122,13 +156,13 @@ export class BBox {
     const self = new BBox();
     if (!viewBox) return self;
 
-    let xDistance;
-    let yDistance;
-    [self.xMin, self.yMin, xDistance, yDistance] = viewBox
+    const [xMin, yMin, xDistance, yDistance] = viewBox
       .split(" ")
       .map(Number.parseFloat);
-    self.xMax = xDistance + self.xMin;
-    self.yMax = yDistance + self.yMin;
+    self.left = [xMin, 0];
+    self.right = [xDistance + xMin, 0];
+    self.bottom = [0, yMin];
+    self.top = [0, yDistance + self.yMin];
     return self;
   }
 }

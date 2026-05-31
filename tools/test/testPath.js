@@ -334,11 +334,18 @@ bro.test("simple line thicken", () => {
 });
 
 bro.test("another simple line thicken", () => {
-  const path = Path.fromPolyline([[53.210678118654755, 7.5], [600, 7.5]], false)
-    .thickenAndClose(15);
+  const path = Path.fromPolyline(
+    [
+      [53.210678118654755, 7.5],
+      [600, 7.5],
+    ],
+    false,
+  ).thickenAndClose(15);
   bro
     .expect(path.toString())
-    .toBe("M 53.210678118654755 7.5 L 600 7.5 L 600 -7.500000000000114 L 53.210678118654755 -7.500000000000114 Z");
+    .toBe(
+      "M 53.210678118654755 7.5 L 600 7.5 L 600 -7.500000000000114 L 53.210678118654755 -7.500000000000114 Z",
+    );
 });
 
 bro.test("offset circle", () => {
@@ -346,9 +353,7 @@ bro.test("offset circle", () => {
 
   bro
     .expect(path.offset(10).toString())
-    .toBe(
-      "M -20 0 A 20 20 0 0 0 20 0 A 20 20 0 0 0 -20 0 Z"
-    );
+    .toBe("M -20 0 A 20 20 0 0 0 20 0 A 20 20 0 0 0 -20 0 Z");
 });
 
 bro.test("thicken with rounding", () => {
@@ -468,6 +473,20 @@ bro.test("rounded fillet", () => {
     );
 });
 
+bro.test("more complex rounded fillet with radius limiting", () => {
+  const endCapPath = Path.makeRect(30, 50)
+    .recenter()
+    .offset(5)
+    .realBooleanUnion(Path.makeCircle(7.5).drag([30 / 2 + 7.5, 0]));
+
+  endCapPath.roundFilletAll(5, true);
+
+  bro
+    .expect(endCapPath.toString())
+    .toBe(
+      "M 20 25 A 5 5 0 0 1 15 30 L -14.999999999999998 30 A 5 5 0 0 1 -20.000000000000004 25.000000000000004 L -20 -25 A 5 5 0 0 1 -15.000000000000005 -30 L 15.000000000000004 -30 A 5 5 0 0 1 20 -24.999999999999996 L 20 -10.000000000000002 A 2.5 2.5 0 0 0 22.5 -7.5 A 7.5 7.5 0 0 1 30 0 A 7.5 7.5 0 0 1 22.5 7.5 A 2.5 2.5 0 0 0 20.000000000000004 10 Z",
+    );
+});
 bro.test("segment getter", () => {
   const path = new Path();
   path.moveTo([0, 0]);
@@ -700,7 +719,9 @@ bro.test("point is inside", () => {
 bro.test("simplify small arcs that for a big arc", () => {
   const p = Path.makeCircle(30);
   p.simplify();
-  bro.expect(p.toString()).toEqual("M -30 0 A 30 30 0 0 0 30 0 A 30 30 0 0 0 -30 0 Z");
+  bro
+    .expect(p.toString())
+    .toEqual("M -30 0 A 30 30 0 0 0 30 0 A 30 30 0 0 0 -30 0 Z");
 });
 
 bro.test("inserts feature as expected", () => {
@@ -716,7 +737,11 @@ bro.test("inserts feature as expected", () => {
   p.insertFeature(tenon, 2, { fraction: 0.33 });
   p.insertFeature(tenon, 1, { fromStart: 50 });
 
-  bro.expect(p.toString()).toEqual("M 0 0 L -1.2858791391047208e-15 29 A 3 3 0 0 1 -9.18485099360515e-16 35 L -12 35 A 3 3 0 0 0 -15 38 L -15.000000000000009 62 A 3 3 0 0 0 -11.999999999999998 65 L 9.18485099360515e-16 65 A 3 3 0 0 1 1.2858791391047208e-15 71 L 0 100 L 12 100 A 3 3 0 0 1 18 100 L 18 112 A 3 3 0 0 0 21 115 L 45 115.00000000000001 A 3 3 0 0 0 48 112 L 48 100 A 3 3 0 0 1 54 100 L 100 100 L 100 0 Z");
+  bro
+    .expect(p.toString())
+    .toEqual(
+      "M 0 0 L -1.2858791391047208e-15 29 A 3 3 0 0 1 -9.18485099360515e-16 35 L -12 35 A 3 3 0 0 0 -15 38 L -15.000000000000009 62 A 3 3 0 0 0 -11.999999999999998 65 L 9.18485099360515e-16 65 A 3 3 0 0 1 1.2858791391047208e-15 71 L 0 100 L 12 100 A 3 3 0 0 1 18 100 L 18 112 A 3 3 0 0 0 21 115 L 45 115.00000000000001 A 3 3 0 0 0 48 112 L 48 100 A 3 3 0 0 1 54 100 L 100 100 L 100 0 Z",
+    );
 });
 
 bro.test("gets equidistant points", () => {
@@ -727,11 +752,27 @@ bro.test("gets equidistant points", () => {
   directrix.lineTo([0, 100]);
 
   bro.expect(directrix.getEquidistantPoints(21)).toEqual([
-    [0, 0], [21, 0], [42, 0], [63, 0], [84, 0], [104.9985061553517, 0.25047803028745896], [124.9865120751614, 6.690945354143135], [140.5668972649126, 20.771129917527947], [148.9912817771333, 40.00728716346076], [148.77360418386763, 61.00615895375924], [139.95226281256777, 80.06354430461454], [124.08334228113098, 93.8177204401358], [103.96612017130268, 99.84245069001715], [82.96671117450174, 100], [61.96671117450174, 100], [40.96671117450174, 100], [19.96671117450174, 100]]);
+    [0, 0],
+    [21, 0],
+    [42, 0],
+    [63, 0],
+    [84, 0],
+    [104.9985061553517, 0.25047803028745896],
+    [124.9865120751614, 6.690945354143135],
+    [140.5668972649126, 20.771129917527947],
+    [148.9912817771333, 40.00728716346076],
+    [148.77360418386763, 61.00615895375924],
+    [139.95226281256777, 80.06354430461454],
+    [124.08334228113098, 93.8177204401358],
+    [103.96612017130268, 99.84245069001715],
+    [82.96671117450174, 100],
+    [61.96671117450174, 100],
+    [40.96671117450174, 100],
+    [19.96671117450174, 100],
+  ]);
 });
 
 bro.test("deletes unnecessary points", () => {
-
   const path = new Path();
   path.moveTo([265, -13.090551181102345]);
   path.lineTo([265, 60]);
@@ -744,22 +785,58 @@ bro.test("deletes unnecessary points", () => {
   path.lineTo([238.4, 0]);
   path.close();
 
-  path.deletePoints(p => Math.abs(p[0] - 265) < 1);
+  path.deletePoints((p) => Math.abs(p[0] - 265) < 1);
 
-  bro.expect(path.toString()).toEqual("M 305 60 L 305 -32.7755905511811 L 340 -50 L 340 -100 L 207 -100 L 207 0 L 238.4 0 Z");
+  bro
+    .expect(path.toString())
+    .toEqual(
+      "M 305 60 L 305 -32.7755905511811 L 340 -50 L 340 -100 L 207 -100 L 207 0 L 238.4 0 Z",
+    );
 });
 
 bro.test("checks recentering", () => {
   const p = Path.makeRect(50, 40);
 
   bro.expect(p.toString()).toEqual("M 0 0 L 0 40 L 50 40 L 50 0 Z");
-  bro.expect(p.recenter().toString()).toEqual("M -25 -20 L -25 20 L 25 20 L 25 -20 Z");
-  bro.expect(p.recenter({x: "start"}).toString()).toEqual("M 0 0 L 0 40 L 50 40 L 50 0 Z");
-  bro.expect(p.recenter({x: "center"}).toString()).toEqual("M -25 0 L -25 40 L 25 40 L 25 0 Z");
-  bro.expect(p.recenter({onlyX: true}).toString()).toEqual("M -25 0 L -25 40 L 25 40 L 25 0 Z");
-  bro.expect(p.recenter({x: "end"}).toString()).toEqual("M -50 0 L -50 40 L 0 40 L 0 0 Z");
-  bro.expect(p.recenter({y: "start"}).toString()).toEqual("M 0 0 L 0 40 L 50 40 L 50 0 Z");
-  bro.expect(p.recenter({y: "center"}).toString()).toEqual("M 0 -20 L 0 20 L 50 20 L 50 -20 Z");
-  bro.expect(p.recenter({onlyY: true}).toString()).toEqual("M 0 -20 L 0 20 L 50 20 L 50 -20 Z");
-  bro.expect(p.recenter({y: "end"}).toString()).toEqual("M 0 -40 L 0 0 L 50 0 L 50 -40 Z");
+  bro
+    .expect(p.recenter().toString())
+    .toEqual("M -25 -20 L -25 20 L 25 20 L 25 -20 Z");
+  bro
+    .expect(p.recenter({ x: "start" }).toString())
+    .toEqual("M 0 0 L 0 40 L 50 40 L 50 0 Z");
+  bro
+    .expect(p.recenter({ x: "center" }).toString())
+    .toEqual("M -25 0 L -25 40 L 25 40 L 25 0 Z");
+  bro
+    .expect(p.recenter({ onlyX: true }).toString())
+    .toEqual("M -25 0 L -25 40 L 25 40 L 25 0 Z");
+  bro
+    .expect(p.recenter({ x: "end" }).toString())
+    .toEqual("M -50 0 L -50 40 L 0 40 L 0 0 Z");
+  bro
+    .expect(p.recenter({ y: "start" }).toString())
+    .toEqual("M 0 0 L 0 40 L 50 40 L 50 0 Z");
+  bro
+    .expect(p.recenter({ y: "center" }).toString())
+    .toEqual("M 0 -20 L 0 20 L 50 20 L 50 -20 Z");
+  bro
+    .expect(p.recenter({ onlyY: true }).toString())
+    .toEqual("M 0 -20 L 0 20 L 50 20 L 50 -20 Z");
+  bro
+    .expect(p.recenter({ y: "end" }).toString())
+    .toEqual("M 0 -40 L 0 0 L 50 0 L 50 -40 Z");
+});
+
+bro.test("drag drags", () => {
+  bro
+    .expect(Path.makeCircle(7.5).drag([20, 0]).toString())
+    .toEqual(
+      "M 4.592425496802575e-16 -7.5 A 7.5 7.5 0 0 0 -7.5 0 A 7.5 7.5 0 0 0 -4.592425496802575e-16 7.5 L 20 7.5 A 7.5 7.5 0 0 0 27.5 0 A 7.5 7.5 0 0 0 20 -7.5 Z",
+    );
+
+  bro
+    .expect(Path.makeCircle(7.5).drag([10, 10]).toString())
+    .toEqual(
+      "M 5.303300858899102 -5.303300858899111 A 7.5 7.5 0 0 0 -7.5 0 A 7.5 7.5 0 0 0 -5.303300858899102 5.303300858899111 L 4.696699141100898 15.30330085889911 A 7.5 7.5 0 0 0 17.5 10 A 7.5 7.5 0 0 0 15.303300858899103 4.696699141100889 Z",
+    );
 });

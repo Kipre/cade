@@ -21,6 +21,7 @@ import {
   signedArea,
 } from "./2d.js";
 import {
+  arcExtrema,
   arcTangentAt,
   areOnSameCircle,
   evaluateArc,
@@ -36,6 +37,8 @@ import {
 import { BBox, debugGeometry } from "./svg.js";
 import { applyTransformMatrix } from "./transform.js";
 import { modulo } from "./utils.js";
+
+class RoundFilletError extends TypeError { }
 
 const eps = 1e-5;
 
@@ -125,15 +128,29 @@ export class Path {
   /**
    * @param {number} radius
    * @param {number?} maybeIndex
+   * @param {boolean} limitToShortestEdge
    */
-  roundFillet(radius, maybeIndex = null) {
+  roundFillet(radius, maybeIndex = null, limitToShortestEdge = false) {
     const length = this.controls.length;
     const index = maybeIndex ?? length - 1;
 
     const [[, p1, preType, p2], [, , type, p3]] = this.getJunctionAt(index - 1);
 
     if (type !== "lineTo" || preType !== "lineTo")
-      throw new Error("round fillets need lines to operate");
+      throw new RoundFilletError("round fillets need lines to operate");
+
+    // limit rounding on edges that aren't long enough
+    if (limitToShortestEdge) {
+      const n1 = norm(p1, p2);
+      const n2 = norm(p2, p3);
+
+      const angle1 = Math.atan2(...minus(p2, p1).toReversed());
+      const angle2 = Math.atan2(...minus(p3, p2).toReversed());
+
+      const angle = normalizeAngle(angle2 - angle1);
+      const requiredLength = Math.abs(radius * Math.tan(angle / 2));
+      if (n1 < requiredLength || n2 < requiredLength) radius = Math.min(n1, n2);
+    }
 
     let [oStart, center] = offsetPolyline([p1, p2, p3], radius);
     if (norm(oStart, center) > norm(p1, p2))
@@ -166,12 +183,17 @@ export class Path {
 
   /**
    * @param {number} radius
+   * @param {boolean} limitToShortestEdge
    */
-  roundFilletAll(radius) {
+  roundFilletAll(radius, limitToShortestEdge = false) {
     for (let i = 0; i < this.controls.length; i++) {
       try {
-        this.roundFillet(radius, i + 1);
-      } catch (e) { }
+        this.roundFillet(radius, i + 1, limitToShortestEdge);
+      } catch (e) {
+        if (e instanceof RoundFilletError)
+          continue
+        throw e;
+      }
     }
   }
 
@@ -210,9 +232,15 @@ export class Path {
 
     const length = norm(lastPoint, p);
     const lengthToCenterpoint = Math.sqrt((length / 2) ** 2 + sagitta ** 2);
-    const halfPerimeter = length / 2 + lengthToCenterpoint
-    const divider = (4 * Math.sqrt(halfPerimeter * (halfPerimeter - length) * (halfPerimeter - lengthToCenterpoint) ** 2));
-    const radius = length * lengthToCenterpoint ** 2 / divider;
+    const halfPerimeter = length / 2 + lengthToCenterpoint;
+    const divider =
+      4 *
+      Math.sqrt(
+        halfPerimeter *
+        (halfPerimeter - length) *
+        (halfPerimeter - lengthToCenterpoint) ** 2,
+      );
+    const radius = (length * lengthToCenterpoint ** 2) / divider;
 
     this.controls.push(["arc", p, radius, sweepFlag]);
   }
@@ -838,7 +866,7 @@ export class Path {
     const bbox = this.bbox();
     const [[xMin, yMin], [xMax, yMax]] = bbox.extrema();
     const [x, y] = bbox.center();
-    const result = [0, 0]
+    const result = [0, 0];
     if (!opts) return this.translate([-x, -y]);
     if (opts?.onlyX) return this.translate([-x, 0]);
     if (opts?.onlyY) return this.translate([0, -y]);
@@ -1448,6 +1476,8 @@ export class Path {
    * @param {Path} other
    *
    * Very limited functionnality for now, only merging paths with common lines
+   *
+   * @deprecated
    */
   booleanUnion(other) {
     if (!this.isClosed() || !other.isClosed())
@@ -1477,6 +1507,59 @@ export class Path {
     }
 
     throw new Error("did not find a common line");
+  }
+
+  pointCoordinate() {
+    for (const segment of this.iterateOverSegments()) {
+      const [i, p1, type, p2, r, sweep] = segment;
+      switch (type) {
+        case "arc":
+          bbox.combine(arcBBox(p1, p2, r, sweep));
+          break;
+        case "lineTo":
+          bbox.include(p1);
+          bbox.include(p2);
+          break;
+        default:
+          throw new TypeError(`line type {type} not implemented for bbox`);
+      }
+    }
+    return bbox;
+  }
+
+  /**
+   * Drag the path to some other place and save the resulting shape
+   * for now it only supports a simple verctor
+   * @param {types.Point} point
+   * @returns {Path}
+   */
+  drag(point) {
+    if (!this.isClosed())
+      throw new Error("drag for open paths is not implemented yet");
+
+    const angle = Math.atan2(point[1], point[0]);
+    const rotated = this.rotate(-angle);
+    const bbox = rotated.bbox();
+    const { top, bottom } = bbox;
+    const topCoords = bbox.metadata[top.toString()];
+    const bottomCoords = bbox.metadata[bottom.toString()];
+
+    const first = this.subpath(
+      bottomCoords.segment,
+      bottomCoords.x,
+      topCoords.segment,
+      topCoords.x,
+    );
+    const second = this.subpath(
+      topCoords.segment,
+      topCoords.x,
+      bottomCoords.segment,
+      bottomCoords.x,
+    );
+    first.merge(second.translate(point));
+    first.close();
+    first.simplify();
+    return first;
   }
 
   /**
@@ -1557,10 +1640,22 @@ export class Path {
   }
 
   bbox() {
-    // TODO this is not exacty correct
     const bbox = new BBox();
-    for (const p of this.getPointsWithHalfArcs()) {
-      bbox.include(p);
+    for (const segment of this.iterateOverSegments()) {
+      const [i, p1, type, p2, r, sweep] = segment;
+      switch (type) {
+        // biome-ignore lint/suspicious/noFallthroughSwitchClause: justified
+        case "arc":
+          for (const { point, x } of arcExtrema(p1, p2, r, sweep)) {
+            bbox.include(point, { segment: i, x });
+          }
+        case "lineTo":
+          bbox.include(p1, { segment: i, x: 0 });
+          bbox.include(p2, { segment: i, x: 1 });
+          break;
+        default:
+          throw new TypeError(`line type {type} not implemented for bbox`);
+      }
     }
     return bbox;
   }

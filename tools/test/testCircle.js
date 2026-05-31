@@ -2,6 +2,7 @@
 
 import { rotatePoint } from "../2d.js";
 import {
+  arcExtrema,
   arcTangentAt,
   evaluateArc,
   getCircleCenter,
@@ -119,13 +120,25 @@ bro.test("evaluate arc bug", () => {
   const eps = 1e-6;
   const point = [19.5, 46];
 
-  const x = pointCoordinateOnArc(point, [11.500000000000004, 50], [21.5, 40], 10, 0);
-  bro
-    .expect(x)
-    .toRoughlyEqual(0.5903344706017327, eps);
+  const x = pointCoordinateOnArc(
+    point,
+    [11.500000000000004, 50],
+    [21.5, 40],
+    10,
+    0,
+  );
+  bro.expect(x).toRoughlyEqual(0.5903344706017327, eps);
 
   bro
-    .expect(evaluateArc(0.5903344706017327, [11.500000000000004, 50], [21.5, 40], 10, 0))
+    .expect(
+      evaluateArc(
+        0.5903344706017327,
+        [11.500000000000004, 50],
+        [21.5, 40],
+        10,
+        0,
+      ),
+    )
     .toRoughlyEqual(point, eps);
 });
 
@@ -190,4 +203,24 @@ bro.test("intersect line and arc bug", () => {
     true,
   );
   bro.expect(res).toEqual([3, 17.803847577293368]);
+});
+
+bro.test("finds arc extrema", () => {
+  bro
+    .expect(arcExtrema([0, 0], [10, 0], 8, 1))
+    .toEqual([{ point: [5.000000000000001, -1.7550020016016017], x: 0.5 }]);
+
+  bro.expect(arcExtrema([0, 0], [10, 3], 8, 0)).toEqual([
+    {
+      point: [6.741953980369392, 3.6934867321020235],
+      x: 0.7049902266089871,
+    },
+  ]);
+
+  bro.expect(arcExtrema([0, -5], [-1, 5], 6, 0)).toEqual([
+    {
+      point: [-3.237552397901899, 0.32624476020981014],
+      x: 0.5502021577388957,
+    },
+  ]);
 });

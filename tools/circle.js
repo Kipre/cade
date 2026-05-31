@@ -15,6 +15,8 @@ import { modulo } from "./utils.js";
 const eps = 1e-5;
 
 /**
+ * Clamps an arbitrary angle to [-PI, PI]
+ *
  * @param {number} a
  * @returns {number}
  */
@@ -229,8 +231,6 @@ export function getArcAngularLength(start, end, radius, sweep) {
 }
 
 /**
- * TODO
- *
  * @param {number} x
  * @param {types.Point} start
  * @param {types.Point} end
@@ -249,6 +249,29 @@ export function evaluateArc(x, start, end, radius, sweep) {
   const opening = getArcAngularLength(start, end, radius, sweep);
 
   return rotatePoint(center, start, opening * x);
+}
+
+/**
+ * @param {types.Point} start
+ * @param {types.Point} end
+ * @param {number} radius
+ * @param {number} sweep
+ * @returns {{ point: types.Point, x: number}[]}
+ */
+export function arcExtrema(start, end, radius, sweep) {
+  const result = [];
+  const center = getCircleCenter(start, end, radius, sweep);
+
+  for (const dir of [-Math.PI / 2, 0, Math.PI / 2, Math.PI]) {
+    const point = rotatePoint(center, plus(center, [radius, 0]), dir);
+    // TODO: maybe improve efficiency
+    const x = pointCoordinateOnArc(point, start, end, radius, sweep);
+    if (0 <= x && x <= 1) {
+      result.push({ point, x });
+    }
+  }
+
+  return result;
 }
 
 /**
