@@ -79,6 +79,14 @@ fn addCSourceFilesRecursive(b: *std.Build, io: std.Io, exe: *std.Build.Step.Comp
 }
 
 pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    var threaded: std.Io.Threaded = .init_single_threaded;
+    defer threaded.deinit();
+
+    const io = threaded.io();
+
     // ideally we should read the values from version.cmake
     const standard_version_h = b.addConfigHeader(.{
         .style = .{ .cmake = b.path("OCCT/adm/templates/Standard_Version.hxx.in") },
@@ -104,22 +112,34 @@ pub fn build(b: *std.Build) void {
     ) orelse "";
     const buildOCCTLibs = std.mem.eql(u8, staticOCCT, "");
 
-    var threaded: std.Io.Threaded = .init_single_threaded;
-    defer threaded.deinit();
+    const occ = b.addTranslateC(.{
+        .root_source_file = b.path("src/occ.h"),
+        .target = target,
+        .optimize = optimize,
+    });
 
-    const io = threaded.io();
+    const flattening_tool = b.addExecutable(.{
+        .name = "header-flattening-tool",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/flatten_headers.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    const flatten_headers = b.addRunArtifact(flattening_tool);
 
-    const flatten_step = FlattenHeadersStep.create(b, io, "OCCT/src", skip_header_flattening);
+    const include_dir = b.path(".zig-cache/flattened-headers");
 
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
+    flatten_headers.addArg(include_dir.src_path.sub_path);
 
     var occt_libs: [19]*std.Build.Step.Compile = undefined;
 
     for (modules, 0..) |module, i| {
         var lib = addOCCTModule(b, io, target, optimize, module);
-        lib.step.dependOn(&flatten_step.step);
-        lib.root_module.addIncludePath(flatten_step.getOutput());
+        if (!skip_header_flattening)
+            lib.step.dependOn(&flatten_headers.step);
+
+        lib.root_module.addIncludePath(include_dir);
         lib.root_module.addIncludePath(standard_version_h.getOutputDir());
         if (buildOCCTLibs)
             b.installArtifact(lib);
@@ -130,6 +150,12 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{
+                .name = "occ",
+                .module = occ.createModule(),
+            },
+        },
     });
 
     // // specific test
@@ -148,7 +174,7 @@ pub fn build(b: *std.Build) void {
         .name = "cade",
         .root_module = mod,
     });
-    exe.root_module.addIncludePath(flatten_step.getOutput());
+    exe.root_module.addIncludePath(include_dir);
     exe.root_module.addIncludePath(standard_version_h.getOutputDir());
 
     if (target.result.os.tag == .windows) {
@@ -169,82 +195,3 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
 }
 
-const FlattenHeadersStep = struct {
-    step: std.Build.Step,
-    b: *std.Build,
-    io: std.Io,
-    src_dir: []const u8,
-    dst_dir: std.Build.GeneratedFile,
-    skip: bool,
-
-    pub fn create(b: *std.Build, io: std.Io, sub_path: []const u8, skip: bool) *FlattenHeadersStep {
-        const self = b.allocator.create(FlattenHeadersStep) catch unreachable;
-
-        self.* = .{
-            .step = std.Build.Step.init(.{
-                .id = .custom,
-                .name = "flatten-submodule-headers",
-                .owner = b,
-                .makeFn = make,
-            }),
-            .b = b,
-            .io = io,
-            .src_dir = sub_path,
-            .dst_dir = .{ .step = &self.step },
-            .skip = skip,
-        };
-
-        return self;
-    }
-
-    pub fn getOutput(self: *FlattenHeadersStep) std.Build.LazyPath {
-        return .{ .generated = .{ .file = &self.dst_dir } };
-    }
-
-    fn make(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
-        const self: *FlattenHeadersStep = @fieldParentPtr("step", step);
-
-        const b = self.b;
-        const io = self.io;
-        self.dst_dir.path = b.pathJoin(&.{ b.cache_root.path.?, "flattened-headers" });
-
-        if (self.skip) return;
-
-        // Create the output directory in the zig-cache
-        const output_dir_path = b.pathFromRoot(self.dst_dir.path.?);
-
-        const cwd = std.Io.Dir.cwd();
-
-        try cwd.createDirPath(io, output_dir_path);
-
-        const src_path = self.src_dir;
-        var dir = try cwd.openDir(io, src_path, .{ .iterate = true });
-        defer dir.close(io);
-
-        // Perform the recursive walk here
-        try walkAndCopy(b, io, src_path, output_dir_path);
-    }
-
-    fn walkAndCopy(b: *std.Build, io: std.Io, src: []const u8, dest: []const u8) !void {
-        const cwd = std.Io.Dir.cwd();
-        var dir = try cwd.openDir(io, src, .{ .iterate = true });
-        defer dir.close(io);
-
-        var it = dir.iterate();
-        while (try it.next(io)) |entry| {
-            const full_src = try std.fs.path.join(b.allocator, &.{ src, entry.name });
-            if (std.mem.indexOf(u8, full_src, "GTests") != null) continue;
-
-            if (entry.kind == .directory) {
-                try walkAndCopy(b, io, full_src, dest);
-                continue;
-            }
-            if (entry.kind != .file) continue;
-            if (std.mem.eql(u8, std.fs.path.extension(entry.name), ".hxx") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".h") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".lxx") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".pxx") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".gxx")) {
-                const full_dest = try std.fs.path.join(b.allocator, &.{ dest, entry.name });
-                // Only copy if the file is different/newer
-                try cwd.copyFile(full_src, cwd, full_dest, io, .{});
-            }
-        }
-    }
-};
