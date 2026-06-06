@@ -1,6 +1,4 @@
-const occ = @cImport({
-    @cInclude("occ.h");
-});
+const occ = @import("occ");
 
 pub const Shape = occ.Shape;
 pub const Compound = occ.Compound;
