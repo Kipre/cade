@@ -40,7 +40,7 @@ export function project3(point, vector) {
  * @returns {boolean}
  */
 export function collinear3(v1, v2) {
-  return norm3(project3(v1, v2), v2) < eps;
+  return norm3(project3(v1, v2), v1) < eps;
 }
 
 /**
