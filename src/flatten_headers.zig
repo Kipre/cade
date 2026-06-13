@@ -32,6 +32,7 @@ fn walkAndCopy(allocator: Allocator, io: std.Io, src: []const u8, dest: []const 
     var it = dir.iterate();
     while (try it.next(io)) |entry| {
         const full_src = try std.fs.path.join(allocator, &.{ src, entry.name });
+        defer allocator.free(full_src);
 
         // skip test directories
         if (std.mem.indexOf(u8, full_src, "GTests") != null) continue;
@@ -43,6 +44,7 @@ fn walkAndCopy(allocator: Allocator, io: std.Io, src: []const u8, dest: []const 
         if (entry.kind != .file) continue;
         if (std.mem.eql(u8, std.fs.path.extension(entry.name), ".hxx") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".h") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".lxx") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".pxx") or std.mem.eql(u8, std.fs.path.extension(entry.name), ".gxx")) {
             const full_dest = try std.fs.path.join(allocator, &.{ dest, entry.name });
+            defer allocator.free(full_dest);
             // Only copy if the file is different/newer
             try cwd.copyFile(full_src, cwd, full_dest, io, .{ .replace = true });
         }
