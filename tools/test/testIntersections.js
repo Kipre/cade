@@ -1,4 +1,5 @@
 // @ts-check
+import { y2, zero2 } from "../defaults.js";
 import { Path } from "../path.js";
 import { debugGeometry } from "../svg.js";
 import bro from "./brotest/brotest.js";
@@ -80,16 +81,19 @@ bro.test("difference 1", () => {
     );
 });
 
-
 bro.test("intersect two halved circle", () => {
   const rollerThickness = 40;
   const rollerWidth = 52;
   const ballScrewPlateDiameter = 48;
 
-  const rollerBbox = Path.makeRect(rollerWidth, rollerThickness).translate([-rollerWidth / 2, -rollerThickness / 2]);
+  const rollerBbox = Path.makeRect(rollerWidth, rollerThickness).translate([
+    -rollerWidth / 2,
+    -rollerThickness / 2,
+  ]);
 
-  const result = Path.makeCircle(ballScrewPlateDiameter / 2)
-    .booleanIntersection(rollerBbox);
+  const result = Path.makeCircle(
+    ballScrewPlateDiameter / 2,
+  ).booleanIntersection(rollerBbox);
 
   bro
     .expect(result.toString())
@@ -118,7 +122,6 @@ bro.test("cut on line", () => {
 });
 
 bro.test("difference on round", () => {
-
   const p = new Path();
   p.moveTo([0, 35]);
   p.lineTo([0, 130]);
@@ -142,7 +145,6 @@ bro.test("difference on round", () => {
   other.lineTo([21.5, 30]);
   other.arc([11.5, 20], 10, 0);
   other.close();
-
 
   bro
     .expect(p.booleanDifference(other).toString())
@@ -176,7 +178,6 @@ bro.test("double difference", () => {
   path.lineTo([200, 2.2737367544323206e-13]);
   path.close();
 
-
   const other = new Path();
   other.moveTo([2.465190328815662e-32, 52.43923078108367]);
   other.arc([0, 46.43923078108367], 3, 0);
@@ -189,7 +190,9 @@ bro.test("double difference", () => {
 
   bro
     .expect(path.booleanDifference(other).toString())
-    .toBe("M -15 46.43923078108367 A 3 3 0 0 1 -8.999999999999993 46.43923078108367 L 0 46.43923078108367 A 3 3 0 0 1 2.465190328815662e-32 52.43923078108367 L 2.2227668360177165e-32 61.40000000000001 L 90 61.4 A 10 10 0 0 1 100 71.4 L 100 118.6 A 10 10 0 0 1 90 128.6 L -3.552713678800501e-15 128.60000000000002 L 0 143.5607692189163 L -15 143.5607692189163 A 3 3 0 0 1 -15 137.5607692189163 L -15 128.60000000000002 L -25 128.60000000000002 L -25 170 L 155 170 L 155 125 L 200 124.99999999999997 L 200 2.2737367544323206e-13 L -25 0 L -25 61.40000000000001 L -15.000000000000004 61.40000000000002 Z");
+    .toBe(
+      "M -15 46.43923078108367 A 3 3 0 0 1 -8.999999999999993 46.43923078108367 L 0 46.43923078108367 A 3 3 0 0 1 2.465190328815662e-32 52.43923078108367 L 2.2227668360177165e-32 61.40000000000001 L 90 61.4 A 10 10 0 0 1 100 71.4 L 100 118.6 A 10 10 0 0 1 90 128.6 L -3.552713678800501e-15 128.60000000000002 L 0 143.5607692189163 L -15 143.5607692189163 A 3 3 0 0 1 -15 137.5607692189163 L -15 128.60000000000002 L -25 128.60000000000002 L -25 170 L 155 170 L 155 125 L 200 124.99999999999997 L 200 2.2737367544323206e-13 L -25 0 L -25 61.40000000000001 L -15.000000000000004 61.40000000000002 Z",
+    );
 });
 
 bro.test("difference with overlapping lines", () => {
@@ -213,7 +216,6 @@ bro.test("difference with overlapping lines", () => {
     );
 });
 
-
 bro.test("union with overlapping line", () => {
   const path = new Path();
   path.moveTo([115.99999999999997, -109.5]);
@@ -234,3 +236,28 @@ bro.test("union with overlapping line", () => {
     );
 });
 
+// bro.test("union with common line", () => {
+//   const squareBeamProfile = Path.makeRoundedRect(40, 40, 4).recenter();
+//   const topCapPath = squareBeamProfile.recenter({ x: "start", y: "center" });
+//   const smallerBeamProfile = Path.makeRoundedRect(30, 40, 4).recenter();
+//
+//   const result = topCapPath.realBooleanUnion(
+//     smallerBeamProfile.recenter({ x: "start" }).scale(1, 1.5),
+//   );
+//
+//   bro
+//     .expect(result.toString())
+//     .toBe(
+//       "M 0 -16 A 5 4 0 0 1 4 -20 L 30 -20 L 30 -24 A 4 4 0 0 0 26.000000000000004 -30.000000000000007 L 3.9999999999999982 -30.000000000000007 A 4 4 0 0 0 0 -24.000000000000007 Z",
+//     );
+// });
+
+bro.test("cut simple shape", () => {
+  const path = Path.makeRoundedRect(10, 10, 2).recenter().cutOnLine(zero2, y2);
+  debugGeometry(path);
+  bro
+    .expect(path.cutOnLine(zero2, y2).toString())
+    .toBe(
+      "M 0 -5 L -2.999999999999999 -5 A 2 2 0 0 0 -5 -3.0000000000000004 L -5 3 A 2 2 0 0 0 -2.9999999999999996 5 L 0 5 Z",
+    );
+});

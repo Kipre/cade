@@ -190,8 +190,7 @@ export class Path {
       try {
         this.roundFillet(radius, i + 1, limitToShortestEdge);
       } catch (e) {
-        if (e instanceof RoundFilletError)
-          continue
+        if (e instanceof RoundFilletError) continue;
         throw e;
       }
     }
@@ -847,8 +846,12 @@ export class Path {
     const center = bbox.center();
 
     const centerOnLine = pointToLine(center, l1, l2);
-    const p1 = placeAlong(centerOnLine, l1, { fromStart: 2 * size });
-    const p2 = placeAlong(centerOnLine, l1, { fromStart: -2 * size });
+    let point = l1;
+    if (norm(centerOnLine, l1) < eps) {
+      point = l2;
+    }
+    const p1 = placeAlong(centerOnLine, point, { fromStart: 2 * size });
+    const p2 = placeAlong(centerOnLine, point, { fromStart: -2 * size });
     const [p4, p3] = offsetPolyline([p1, p2], (other ? -2 : 2) * size);
 
     const toRemove = Path.fromPolyline([p1, p2, p3, p4]);
@@ -1115,6 +1118,7 @@ export class Path {
    * @param {number} width
    * @param {number} height
    * @param {number} radius
+   * @returns {Path}
    */
   static makeRoundedRect(width, height, radius) {
     const result = Path.makeRect(width, height);
@@ -1220,10 +1224,11 @@ export class Path {
 
   /**
    * @param {number} x
-   * @param {number} y
+   * @param {number | null} y
    * @returns {Path}
    */
-  scale(x, y) {
+  scale(x, y = null) {
+    if (y == null) y = x;
     const result = new Path();
     result.controls = this.controls.map((control) => {
       const result = [...control];
