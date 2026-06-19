@@ -91,7 +91,7 @@ const isoFastenerSizes = {
  * @param {"M3" | "M4" | "M5" | "M6" | "M8"} size
  * @param {number} length
  */
-function makeBolt(size, length) {
+export function makeBolt(size, length) {
   const { diameter, headSize, boltHeadThickness } = isoFastenerSizes[size];
   const headPath = Path.fromPolyline(
     Array.from({ length: 6 }, (_, i) =>
