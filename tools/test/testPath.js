@@ -479,7 +479,7 @@ bro.test("more complex rounded fillet with radius limiting", () => {
     .offset(5)
     .realBooleanUnion(Path.makeCircle(7.5).drag([30 / 2 + 7.5, 0]));
 
-  endCapPath.roundFilletAll(5, true);
+  endCapPath.roundFilletAll(5, {limitToShortestEdge: true} );
 
   bro
     .expect(endCapPath.toString())
@@ -848,3 +848,48 @@ bro.test("drag drags", () => {
     );
 });
 
+bro.test("center of arc can be controlled", () => {
+  const p = new Path();
+  p.moveTo([0, 0]);
+  p.lineTo([0, 1]);
+
+  const p1 = p.clone();
+  p1.arcTo([-1, 2], 0.1);
+  bro
+    .expect(p1.toString())
+    .toEqual(
+      "M 0 0 L 0 0.9585786437626904 A 0.1 0.1 0 0 1 -0.029289321881345205 1.0292893218813453 L -1 2",
+    );
+
+  const p2 = p.clone();
+  p2.arcTo([-1, 2], 0.1, { center: "start" });
+  bro
+    .expect(p2.toString())
+    .toEqual(
+      "M 0 0 L 0 0.9 A 0.1 0.1 0 0 1 -0.029289321881345212 0.9707106781186547 L -1 2",
+    );
+
+  const p3 = p.clone();
+  p3.arcTo([1, 2], 0.1, { center: "start" });
+  bro
+    .expect(p3.toString())
+    .toEqual(
+      "M 0 0 L 0 0.9 A 0.1 0.1 0 0 0 0.02928932188134523 0.9707106781186547 L 1 2",
+    );
+
+  const p4 = p.clone();
+  p4.arcTo([-1, 2], 0.1, { center: "end" });
+  bro
+    .expect(p4.toString())
+    .toEqual(
+      "M 0 0 L -0.04142135623730967 1 A 0.1 0.1 0 0 1 -0.07071067811865483 1.0707106781186548 L -1 2",
+    );
+
+  const p5 = p.clone();
+  p5.arcTo([1, 2], 0.1, { center: "end" });
+  bro
+    .expect(p5.toString())
+    .toEqual(
+      "M 0 0 L 0.04142135623730967 1 A 0.1 0.1 0 0 0 0.07071067811865483 1.0707106781186548 L 1 2",
+    );
+});

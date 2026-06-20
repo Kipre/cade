@@ -126,11 +126,15 @@ export class Path {
   }
 
   /**
+   * @typedef {{limitToShortestEdge?: boolean, center?: "start" | "end"}} RoundFilletOptions
+   */
+
+  /**
    * @param {number} radius
    * @param {number?} maybeIndex
-   * @param {boolean} limitToShortestEdge
+   * @param {RoundFilletOptions} options
    */
-  roundFillet(radius, maybeIndex = null, limitToShortestEdge = false) {
+  roundFillet(radius, maybeIndex = null, options = {}) {
     const length = this.controls.length;
     const index = maybeIndex ?? length - 1;
 
@@ -140,7 +144,8 @@ export class Path {
       throw new RoundFilletError("round fillets need lines to operate");
 
     // limit rounding on edges that aren't long enough
-    if (limitToShortestEdge) {
+    // TODO: does not take into account center placement
+    if (options.limitToShortestEdge) {
       const n1 = norm(p1, p2);
       const n2 = norm(p2, p3);
 
@@ -152,12 +157,31 @@ export class Path {
       if (n1 < requiredLength || n2 < requiredLength) radius = Math.min(n1, n2);
     }
 
-    let [oStart, center] = offsetPolyline([p1, p2, p3], radius);
-    if (norm(oStart, center) > norm(p1, p2))
-      [, center] = offsetPolyline([p1, p2, p3], -radius);
+    let center, oStart, start, end;
+    if (options.center == null) {
+      [oStart, center] = offsetPolyline([p1, p2, p3], radius);
+      if (norm(oStart, center) > norm(p1, p2))
+        [, center] = offsetPolyline([p1, p2, p3], -radius);
+      end = pointToLine(center, p2, p3);
+      start = pointToLine(center, p1, p2);
+    } else if (options.center === "start" || options.center === "end") {
+      let [x1, x2, x3] = [p1, p2, p3];
 
-    const start = pointToLine(center, p1, p2);
-    const end = pointToLine(center, p2, p3);
+      if (options.center === "end") {
+        [x1, x3] = [p3, p1];
+      }
+
+      start = placeAlong(x1, x2, { fromEnd: -radius });
+      center = rotatePoint(start, x2, Math.PI / 2);
+      const other = rotatePoint(start, x2, -Math.PI / 2);
+      if (norm(other, x3) < norm(center, x3)) center = other;
+      end = pointToLine(center, x2, x3);
+      end = placeAlong(center, end, { fromStart: radius });
+
+      if (options.center === "end") {
+        [start, end] = [end, start];
+      }
+    } else throw new TypeError();
 
     const angle1 = Math.atan2(...minus(start, center).toReversed());
     const angle2 = Math.atan2(...minus(end, center).toReversed());
@@ -183,12 +207,12 @@ export class Path {
 
   /**
    * @param {number} radius
-   * @param {boolean} limitToShortestEdge
+   * @param {RoundFilletOptions} options
    */
-  roundFilletAll(radius, limitToShortestEdge = false) {
+  roundFilletAll(radius, options = {}) {
     for (let i = 0; i < this.controls.length; i++) {
       try {
-        this.roundFillet(radius, i + 1, limitToShortestEdge);
+        this.roundFillet(radius, i + 1, options);
       } catch (e) {
         if (e instanceof RoundFilletError) continue;
         throw e;
@@ -199,12 +223,21 @@ export class Path {
   /**
    * Connects a tangent arc between two last and next points
    *
-   * @param {types.Point} p
+   * @param {types.Point | ((p: types.Point) => types.Point)} p
    * @param {number} radius
+   * @param {RoundFilletOptions} options
    */
-  arcTo(p, radius) {
-    this.lineTo(p);
-    this.roundFillet(radius);
+  arcTo(p, radius, options = {}) {
+    let point;
+    if (typeof p === "function") {
+      const [, lastPoint] = this.controls.at(-1);
+      point = p(lastPoint);
+    } else {
+      point = p
+    }
+
+    this.lineTo(point);
+    this.roundFillet(radius, null, options);
   }
 
   /**

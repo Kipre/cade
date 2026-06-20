@@ -8,9 +8,12 @@ import {
   norm,
   offsetPolyline,
   placeAlong,
+  placeRightAngle,
   rotatePoint,
 } from "../2d.js";
 import bro from "./brotest/brotest.js";
+import { Path } from "../path.js";
+import { debugGeometry } from "../svg.js";
 
 bro.test("offset polyline", () => {
   const points = [
@@ -181,14 +184,14 @@ bro.test("computes angle", () => {
   bro
     .expect(
       Math.abs(computeVectorAngle([0, -402.3543409078357]) - Math.PI * 1.5) %
-        (2 * Math.PI),
+      (2 * Math.PI),
     )
     .toBeLessThan(1e-10);
 
   bro
     .expect(
       Math.abs(computeVectorAngle([0, 402.3543409078357]) - Math.PI / 2) %
-        (2 * Math.PI),
+      (2 * Math.PI),
     )
     .toBeLessThan(1e-10);
 
@@ -242,4 +245,18 @@ bro.test("is to the left", () => {
     )
     .toBe(false);
   bro.expect(isToTheLeft([2500, 2000], [1638, 527], [1472, 638])).toBe(false);
+});
+
+bro.test("places the point on the right angle", () => {
+  bro
+    .expect(placeRightAngle([0, 0], [1, 0], { fraction: 0.5 }))
+    .toRoughlyEqual([0.5, 0.5], 1e-16);
+
+  bro
+    .expect(placeRightAngle([0, 0], [1, 0], { fraction: 0.5, other: true }))
+    .toRoughlyEqual([0.5, -0.5], 1e-16);
+
+  bro
+    .expect(placeRightAngle([0, 0], [1, 0], { fromStart: 0.2 }))
+    .toEqual([0.29999999999999993, 0.458257569495584]);
 });

@@ -250,25 +250,54 @@ export function pointToLine(p, l1, l2) {
 }
 
 /**
+ * @typedef {{fromStart?: number; fromEnd?: number; fraction?: number}} PlaceAlongParam
+ */
+
+/**
  * @param {types.Point} p1
  * @param {types.Point} p2
- * @param {{distance: number} | {fromStart: number} | {fromEnd: number} | {fraction: number}} param
+ * @param {PlaceAlongParam} param
  * @returns {types.Point}
  */
 export function placeAlong(p1, p2, param) {
-  let fraction = 0;
+  let x = 0;
   const total = norm(p1, p2);
-  if ("distance" in param && param.distance != null) {
-    if (param.distance < 0) fraction = (total + param.distance) / total;
-    else fraction = param.distance / total;
-  } else if ("fromStart" in param && param.fromStart != null) {
-    fraction = param.fromStart / total;
-  } else if ("fromEnd" in param && param.fromEnd != null) {
-    fraction = (total + param.fromEnd) / total;
-  } else if ("fraction" in param) fraction = param.fraction;
+  const { distance, fromStart, fromEnd, fraction } = param;
+  if (distance != null) {
+    if (distance < 0) x = (total + distance) / total;
+    else x = distance / total;
+  } else if (fromStart != null) {
+    x = fromStart / total;
+  } else if (fromEnd != null) {
+    x = (total + fromEnd) / total;
+  } else if (fraction != null) x = fraction;
   else throw new TypeError();
 
-  return plus(mult(p1, 1 - fraction), mult(p2, fraction));
+  return plus(mult(p1, 1 - x), mult(p2, x));
+}
+
+/**
+ * @param {types.Point} p1
+ * @param {types.Point} p2
+ * @param {PlaceAlongParam & {other?: boolean}} param
+ * @returns {types.Point}
+ */
+export function placeRightAngle(p1, p2, param) {
+  let x = 0;
+  const total = norm(p1, p2);
+  const { fromStart, fromEnd, fraction, other } = param;
+
+  if (fromStart != null) {
+    x = Math.acos(fromStart * 2 / total);
+  } else if (fromEnd != null) {
+    x = Math.PI - Math.acos(fromEnd * 2 / total);
+  } else if (fraction != null) x = Math.PI * fraction;
+  else throw new TypeError();
+
+  if (!other) x *= -1
+
+  const center = placeAlong(p1, p2, {fraction: 0.5});
+  return rotatePoint(center, p1, x);
 }
 
 /**
