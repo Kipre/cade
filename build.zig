@@ -158,18 +158,6 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    // // specific test
-    // const specific_test = b.addTest(.{
-    //     .name = "test",
-    //     .root_module = mod,
-    // });
-    //
-    // addDependencies(b, target, &occt_libs, specific_test);
-    //
-    // const specific_test_step = b.step("test", "Run tests");
-    // const run_specific = b.addRunArtifact(specific_test);
-    // specific_test_step.dependOn(&run_specific.step);
-
     const exe = b.addExecutable(.{
         .name = "cade",
         .root_module = mod,

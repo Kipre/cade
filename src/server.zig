@@ -93,7 +93,7 @@ fn accept(context: *Context, stream: std.Io.net.Stream) !void {
         // Handle the request
         _ = switch (method) {
             .GET => serveFileOrDirectory(&request, context.gpa, context.io, path),
-            .POST => handlePostRequest(&request, context.gpa, path),
+            .POST => handlePostRequest(&request, context.gpa, context.io, path),
             else => sendError(&request, .method_not_allowed, context.gpa, "Method not allowed"),
         } catch |err| {
             std.log.err("unable to accept connection: {s}", .{@errorName(err)});

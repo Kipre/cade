@@ -2,6 +2,7 @@ const std = @import("std");
 const http = std.http;
 const parse = @import("parse_path.zig");
 const api = @import("api.zig");
+const getFileFromQueryParams = @import("utils.zig").getFileFromQueryParams;
 
 const reqBodySize = 1024 * std.math.pow(i32, 2, 8);
 const meshBodySize = 1024 * std.math.pow(i32, 2, 10);
@@ -10,6 +11,7 @@ const ServerAction = enum {
     export_step,
     solidify,
     project,
+    save,
     unknown,
 };
 
@@ -17,7 +19,31 @@ const actions_map = std.StaticStringMap(ServerAction).initComptime(.{
     .{ "/occ/export", .export_step },
     .{ "/occ/solidify", .solidify },
     .{ "/occ/project", .project },
+    .{ "/occ/save", .save },
 });
+
+fn save(req: *http.Server.Request, allocator: std.mem.Allocator, io: std.Io) !void {
+    const path_buf = try allocator.alloc(u8, req.head.target.len);
+    defer allocator.free(path_buf);
+
+    const decoded_path = std.Uri.percentDecodeBackwards(path_buf, req.head.target);
+    const filename: []const u8 = try getFileFromQueryParams(decoded_path);
+
+    const body = readRequestBody(req, allocator, reqBodySize) catch |err| {
+        try sendJsonError(req, "Failed to read request body", 400);
+        return err;
+    };
+    defer allocator.free(body);
+
+    std.debug.print("Received body: {s}\n", .{body});
+
+    const file = try std.Io.Dir.cwd().createFile(io, filename, .{});
+    defer file.close(io);
+
+    try file.writePositionalAll(io, body, 0);
+
+    try req.respond("", .{});
+}
 
 fn solidify(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     const body = readRequestBody(req, allocator, reqBodySize) catch |err| {
@@ -79,25 +105,11 @@ fn export_step(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
 fn project(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     std.debug.print("target: {s}\n", .{req.head.target});
 
-    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
-    const decoded_path = std.Uri.percentDecodeBackwards(&path_buf, req.head.target);
-    const query = if (std.mem.indexOf(u8, decoded_path, "?")) |idx| decoded_path[idx..] else "";
+    const path_buf = try allocator.alloc(u8, req.head.target.len);
+    defer allocator.free(path_buf);
 
-    var it = std.mem.splitScalar(u8, query, '&');
-
-    var file: ?[]const u8 = null;
-
-    while (it.next()) |pair| {
-        var kv = std.mem.splitScalar(u8, pair, '=');
-
-        const key = kv.next() orelse continue;
-        const value = kv.next() orelse "";
-        if (std.mem.eql(u8, key, "file")) {
-            file = value[0..];
-        } else if (std.mem.eql(u8, key, "")) {
-            std.debug.print("hello", .{});
-        }
-    }
+    const decoded_path = std.Uri.percentDecodeBackwards(path_buf, req.head.target);
+    const filename: ?[]const u8 = getFileFromQueryParams(decoded_path) catch null;
 
     const body = readRequestBody(req, allocator, reqBodySize) catch |err| {
         try sendJsonError(req, "Failed to read request body", 400);
@@ -117,7 +129,7 @@ fn project(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     };
     defer input.deinit();
 
-    if (file) |f| {
+    if (filename) |f| {
         try api.projectSVG(allocator, &input.value, f);
 
         try req.respond("wrote successfully", .{ .extra_headers = &.{
@@ -140,13 +152,14 @@ fn project(req: *http.Server.Request, allocator: std.mem.Allocator) !void {
     try bodyWriter.end();
 }
 
-pub fn handlePostRequest(req: *http.Server.Request, allocator: std.mem.Allocator, path: []const u8) !void {
+pub fn handlePostRequest(req: *http.Server.Request, allocator: std.mem.Allocator, io: std.Io, path: []const u8) !void {
     const action = actions_map.get(path) orelse .unknown;
 
     switch (action) {
         .export_step => try export_step(req, allocator),
         .project => try project(req, allocator),
         .solidify => try solidify(req, allocator),
+        .save => try save(req, allocator, io),
         .unknown => {
             std.debug.print("Failed to understand request: {s}\n", .{path});
             try sendJsonError(req, "Action not found", 404);
