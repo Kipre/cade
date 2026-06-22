@@ -5,6 +5,7 @@ import {
   arcExtrema,
   arcTangentAt,
   evaluateArc,
+  getArcBulge,
   getCircleCenter,
   intersectLineAndArc,
   isInPieSlice,
@@ -223,4 +224,11 @@ bro.test("finds arc extrema", () => {
       x: 0.5502021577388957,
     },
   ]);
+});
+
+bro.test("computes arc bulges", () => {
+  bro.expect(getArcBulge([0, 0], [1, 0], 0.5, 1)).toRoughlyEqual(1, 1e-15);
+  bro.expect(getArcBulge([0, 0], [1, 0], 0.5, 0)).toRoughlyEqual(-1, 1e-15);
+  bro.expect(getArcBulge([0, 0], [1, 0], 1, 0)).toEqual(-0.26794919243112286);
+  bro.expect(getArcBulge([0, 0], [1, 0], 5, 0)).toEqual(-0.050125628933800424);
 });

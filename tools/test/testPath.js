@@ -479,7 +479,7 @@ bro.test("more complex rounded fillet with radius limiting", () => {
     .offset(5)
     .realBooleanUnion(Path.makeCircle(7.5).drag([30 / 2 + 7.5, 0]));
 
-  endCapPath.roundFilletAll(5, {limitToShortestEdge: true} );
+  endCapPath.roundFilletAll(5, { limitToShortestEdge: true });
 
   bro
     .expect(endCapPath.toString())
@@ -892,4 +892,44 @@ bro.test("center of arc can be controlled", () => {
     .toEqual(
       "M 0 0 L 0.04142135623730967 1 A 0.1 0.1 0 0 0 0.07071067811865483 1.0707106781186548 L 1 2",
     );
+});
+
+bro.test("bulge exporter", () => {
+  const path = Path.makeRoundedRect(10, 30, 2);
+  const vertices = path.toArcBulges();
+
+  bro.expect(vertices).toEqual([
+    {
+      point: [2.000000000000001, 0],
+      bulge: -0.41421356237309503,
+    },
+    {
+      point: [0, 1.9999999999999996],
+      bulge: 0,
+    },
+    {
+      point: [0, 28.000000000000004],
+      bulge: -0.414213562373094,
+    },
+    {
+      point: [2.0000000000000004, 29.999999999999996],
+      bulge: 0,
+    },
+    {
+      point: [7.999999999999999, 30],
+      bulge: -0.4142135623730953,
+    },
+    {
+      point: [10, 28],
+      bulge: 0,
+    },
+    {
+      point: [10, 1.999999999999996],
+      bulge: -0.4142135623730945,
+    },
+    {
+      point: [8, 0],
+      bulge: 0,
+    },
+  ]);
 });

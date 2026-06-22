@@ -10,6 +10,8 @@ import {
   pointInsideLineBbox,
   rotatePoint,
 } from "./2d.js";
+import { Path } from "./path.js";
+import { debugGeometry } from "./svg.js";
 import { modulo } from "./utils.js";
 
 const eps = 1e-5;
@@ -318,3 +320,18 @@ export function areOnSameCircle(from1, to1, r1, s1, from2, to2, r2, s2) {
 
   return norm(center1, center2) < eps;
 }
+
+/**
+ * Bulge here is in the sense of tan(arc_angular_length / 4)
+ *
+ *
+ * @param {types.Point} from
+ * @param {types.Point} to
+ * @param {number} radius
+ * @param {number} sweep
+ */
+export function getArcBulge(from, to, radius, sweep) {
+  const opening = getArcAngularLength(from, to, radius, sweep);
+  return Math.tan(opening / 4);
+}
+

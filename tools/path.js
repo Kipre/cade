@@ -26,6 +26,7 @@ import {
   areOnSameCircle,
   evaluateArc,
   getArcAngularLength,
+  getArcBulge,
   getCircleCenter,
   intersectLineAndArc,
   intersectLineAndCircle,
@@ -233,7 +234,7 @@ export class Path {
       const [, lastPoint] = this.controls.at(-1);
       point = p(lastPoint);
     } else {
-      point = p
+      point = p;
     }
 
     this.lineTo(point);
@@ -1666,6 +1667,32 @@ export class Path {
         default:
           throw new Error("failed");
       }
+    }
+    return result;
+  }
+
+  toArcBulges() {
+    const result = [];
+    let lastPoint = null;
+    let bulge = 0;
+    for (const [type, point, maybeRadius, maybeFlag] of this.controls) {
+      switch (type) {
+        case "moveTo":
+        case "lineTo":
+        case "close":
+          bulge = 0;
+          break;
+
+        case "arc": {
+          bulge = getArcBulge(lastPoint, point, maybeRadius, maybeFlag);
+          break;
+        }
+
+        default:
+          throw new Error("failed");
+      }
+      if (type !== "moveTo") result.push({ point: lastPoint, bulge });
+      lastPoint = point;
     }
     return result;
   }
