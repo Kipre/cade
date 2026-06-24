@@ -11,7 +11,7 @@ import { a2m } from "../tools/transform.js";
 
 const washerThickness = 1;
 
-const isoFastenerSizes = {
+export const isoFastenerSizes = {
   M3: {
     headSize: 5.5,
     pitch: 0.5,
@@ -24,6 +24,11 @@ const isoFastenerSizes = {
     hexSize: 2.5,
     hexHeadHeight: 3,
     lengths: [5, 6, 8, 10, 12, 16, 20, 25, 30, 35, 40, 50],
+    holeSizes: {
+      closeFit: 3.2,
+      mediumFit: 3.4,
+      looseFit: 3.6,
+    },
   },
   M4: {
     headSize: 7,
@@ -37,6 +42,11 @@ const isoFastenerSizes = {
     hexSize: 3,
     hexHeadHeight: 4,
     lengths: [6, 8, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50, 55, 60],
+    holeSizes: {
+      closeFit: 4.3,
+      mediumFit: 4.5,
+      looseFit: 4.8,
+    },
   },
   M5: {
     headSize: 8,
@@ -52,6 +62,11 @@ const isoFastenerSizes = {
     lengths: [
       6, 8, 10, 12, 14, 16, 18, 20, 22, 25, 30, 35, 40, 45, 50, 55, 60, 70, 100,
     ],
+    holeSizes: {
+      closeFit: 5.3,
+      mediumFit: 5.5,
+      looseFit: 5.8,
+    },
   },
   M6: {
     headSize: 10,
@@ -68,6 +83,11 @@ const isoFastenerSizes = {
       8, 10, 12, 14, 16, 18, 20, 22, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75,
       80, 90, 100, 110, 130, 150,
     ],
+    holeSizes: {
+      closeFit: 6.4,
+      mediumFit: 6.6,
+      looseFit: 7.0,
+    },
   },
   M8: {
     headSize: 13,
@@ -84,6 +104,11 @@ const isoFastenerSizes = {
       8, 10, 12, 14, 16, 18, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80,
       90, 100, 110, 120, 140, 150, 180,
     ],
+    holeSizes: {
+      closeFit: 8.4,
+      mediumFit: 9.0,
+      looseFit: 10.0,
+    },
   },
 };
 
@@ -108,7 +133,7 @@ export function makeBolt(size, length) {
 
   const bolt = new Part(`${size} bolt ${length}`, fuse(head, shank));
   bolt.material = metalMaterial;
-  bolt.addSymmetries(a2m(zero3, x3), a2m(zero3, y3))
+  bolt.addSymmetries(a2m(zero3, x3), a2m(zero3, y3));
   return bolt;
 }
 
@@ -136,7 +161,7 @@ function makeHexBolt(size, length) {
 
   const bolt = new Part(`${size} hex bolt ${length}`, fuse(head, shank));
   bolt.material = blackMetalMaterial;
-  bolt.addSymmetries(a2m(zero3, x3), a2m(zero3, y3))
+  bolt.addSymmetries(a2m(zero3, x3), a2m(zero3, y3));
   return bolt;
 }
 
@@ -160,7 +185,7 @@ function makeNut(size) {
 
   const nut = new Part(`${size} nut`, head);
   nut.material = metalMaterial;
-  nut.addSymmetries(a2m(zero3, x3), a2m(zero3, y3))
+  nut.addSymmetries(a2m(zero3, x3), a2m(zero3, y3));
   return nut;
 }
 
@@ -206,21 +231,29 @@ function makeWasher(size) {
 
   const washer = new Part(`${size} washer`, washerShape);
   washer.material = metalMaterial;
-  washer.addSymmetries(a2m(zero3, x3), a2m(zero3, y3))
+  washer.addSymmetries(a2m(zero3, x3), a2m(zero3, y3));
   return washer;
 }
 
 const tops = {};
 const bottoms = {};
+const holeSizeToM = {};
+for (const code in isoFastenerSizes) {
+  const data = isoFastenerSizes[code];
+  holeSizeToM[data.holeSizes.closeFit] = code;
+  holeSizeToM[data.holeSizes.mediumFit] = code;
+  holeSizeToM[data.holeSizes.looseFit] = code;
+}
 
 function getISOSize(size, length, addLengthForNut = true) {
-  let mSize = "M3";
-  if (size > 4) mSize = "M4";
-  if (size > 5) mSize = "M5";
-  if (size > 6) mSize = "M6";
-  if (size > 8) mSize = "M8";
-  if (size > 9 || size < 3)
-    throw new Error(`we don't have bolts this size yet: size: ${size}`);
+  const roundedSize = Math.round(size * 1e3) / 1e3;
+  const ssize = roundedSize.toString();
+  let mSize;
+  if (ssize in holeSizeToM) {
+    mSize = holeSizeToM[ssize];
+  } else {
+    throw new Error(`hole size ${size} does not match any known sizes`);
+  }
 
   const iso = isoFastenerSizes[mSize];
   let requiredLength = length;
@@ -245,7 +278,7 @@ export function getFastenerKit(size, length, addLengthForNut = true) {
     bottom = new Assembly(`iso bottom ${mSize}`);
     bottom.addChild(nut, a2m([0, 0, -washerThickness]));
     bottom.addChild(washer);
-    bottom.addSymmetries(a2m(zero3, x3), a2m(zero3, y3))
+    bottom.addSymmetries(a2m(zero3, x3), a2m(zero3, y3));
     bottoms[mSize] = bottom;
   }
 
@@ -256,7 +289,7 @@ export function getFastenerKit(size, length, addLengthForNut = true) {
     top = new Assembly(`iso top ${key}`);
     top.addChild(bolt, a2m([0, 0, -washerThickness]));
     top.addChild(washer);
-    top.addSymmetries(a2m(zero3, x3), a2m(zero3, y3))
+    top.addSymmetries(a2m(zero3, x3), a2m(zero3, y3));
     tops[key] = top;
   }
 
@@ -290,7 +323,12 @@ export function getBoltAndBarrelNut(...args) {
   return { top: getFastenerKit(...args).top, bottom: cylinderNut };
 }
 
-export const { top: m5Top } = getFastenerKit(5.3, 22);
+export const { top: m5Top } = getFastenerKit(
+  isoFastenerSizes.M5.holeSizes.mediumFit,
+  22,
+);
 
-export const { top: m6Top } = getFastenerKit(6.3, 26);
-
+export const { top: m6Top } = getFastenerKit(
+  isoFastenerSizes.M6.holeSizes.mediumFit,
+  26,
+);
