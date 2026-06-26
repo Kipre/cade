@@ -84,15 +84,21 @@ export class BBox {
     return this.bottom[1];
   }
 
+  width() {
+    return this.xMax - this.xMin;
+  }
+
+  height() {
+    return this.yMax - this.yMin;
+  }
+
   /** Returns the longest dimension in the cube */
   size() {
-    const xSize = this.xMax - this.xMin;
-    const ySize = this.yMax - this.yMin;
     const zSize = Object.is(Number.POSITIVE_INFINITY, this.zMin)
       ? 0
       : this.zMax - this.zMin;
 
-    return Math.max(xSize, ySize, zSize);
+    return Math.max(this.width(), this.height(), zSize);
   }
 
   /**
