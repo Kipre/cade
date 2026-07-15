@@ -152,7 +152,7 @@ fn serveFile(req: *http.Server.Request, allocator: std.mem.Allocator, io: std.Io
         io,
         file_path, 
         allocator, 
-        .limited(10 * 1024 * 1024),
+        .limited(15 * 1024 * 1024),
     );
     defer allocator.free(content);
 
