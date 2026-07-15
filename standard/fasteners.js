@@ -112,6 +112,8 @@ export const isoFastenerSizes = {
   },
 };
 
+export class Fastener extends Part {};
+
 /**
  * @param {"M3" | "M4" | "M5" | "M6" | "M8"} size
  * @param {number} length
@@ -131,7 +133,7 @@ export function makeBolt(size, length) {
   );
   const shank = extrusion(a2m(), length, Path.makeCircle(diameter / 2));
 
-  const bolt = new Part(`${size} bolt ${length}`, fuse(head, shank));
+  const bolt = new Fastener(`${size} bolt ${length}`, fuse(head, shank));
   bolt.material = metalMaterial;
   bolt.addSymmetries(a2m(zero3, x3), a2m(zero3, y3));
   return bolt;
@@ -159,7 +161,7 @@ function makeHexBolt(size, length) {
   );
   const shank = extrusion(a2m(), length, Path.makeCircle(diameter / 2));
 
-  const bolt = new Part(`${size} hex bolt ${length}`, fuse(head, shank));
+  const bolt = new Fastener(`${size} hex bolt ${length}`, fuse(head, shank));
   bolt.material = blackMetalMaterial;
   bolt.addSymmetries(a2m(zero3, x3), a2m(zero3, y3));
   return bolt;
@@ -183,7 +185,7 @@ function makeNut(size) {
     Path.makeCircle(diameter / 2),
   );
 
-  const nut = new Part(`${size} nut`, head);
+  const nut = new Fastener(`${size} nut`, head);
   nut.material = metalMaterial;
   nut.addSymmetries(a2m(zero3, x3), a2m(zero3, y3));
   return nut;
@@ -210,10 +212,10 @@ const m5hole = extrusion(
   Path.makeCircle(5 / 2),
 );
 
-export const cylinderNut = new Part("m6 cylinder nut", cut(cylinder, m6hole));
+export const cylinderNut = new Fastener("m6 cylinder nut", cut(cylinder, m6hole));
 cylinderNut.material = metalMaterial;
 
-export const m5CylinderNut = new Part("m5 cylinder nut", cut(cylinder, m5hole));
+export const m5CylinderNut = new Fastener("m5 cylinder nut", cut(cylinder, m5hole));
 m5CylinderNut.material = metalMaterial;
 
 /**
@@ -229,7 +231,7 @@ function makeWasher(size) {
     Path.makeCircle(washerInnerDiameter / 2),
   );
 
-  const washer = new Part(`${size} washer`, washerShape);
+  const washer = new Fastener(`${size} washer`, washerShape);
   washer.material = metalMaterial;
   washer.addSymmetries(a2m(zero3, x3), a2m(zero3, y3));
   return washer;
