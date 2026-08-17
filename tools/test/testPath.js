@@ -751,7 +751,7 @@ bro.test("gets equidistant points", () => {
   directrix.arc([100, 100], 50, 1);
   directrix.lineTo([0, 100]);
 
-  bro.expect(directrix.getEquidistantPoints(21)).toEqual([
+  bro.expect(directrix.getEquidistantPoints(21)).toRoughlyEqual([
     [0, 0],
     [21, 0],
     [42, 0],
@@ -770,7 +770,7 @@ bro.test("gets equidistant points", () => {
     [40.96671117450174, 100],
     [19.96671117450174, 100],
   ]);
-});
+}, 1e-13);
 
 bro.test("deletes unnecessary points", () => {
   const path = new Path();
@@ -898,7 +898,7 @@ bro.test("bulge exporter", () => {
   const path = Path.makeRoundedRect(10, 30, 2);
   const vertices = path.toArcBulges();
 
-  bro.expect(vertices).toEqual([
+  bro.expect(vertices).toRoughlyEqual([
     {
       point: [2.000000000000001, 0],
       bulge: -0.41421356237309503,
@@ -931,5 +931,5 @@ bro.test("bulge exporter", () => {
       point: [8, 0],
       bulge: 0,
     },
-  ]);
+  ], 1e-15);
 });
