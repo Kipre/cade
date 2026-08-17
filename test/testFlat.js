@@ -5,7 +5,6 @@ import { Assembly } from "../lib/lib.js";
 import { findConvexZones, ShelfMaker } from "../lib/shelf.js";
 import { convexHull } from "../tools/operations.js";
 import { Path } from "../tools/path.js";
-import { debugGeometry } from "../tools/svg.js";
 import bro from "../tools/test/brotest/brotest.js";
 import { a2m } from "../tools/transform.js";
 
@@ -222,7 +221,7 @@ bro.test("makes simple shelf", () => {
 
   const loc = getFaceOnLocatedFlatPart(assy.findChild(part1), x => x[0]);
 
-  const shelf = new ShelfMaker(loc, { woodThickness: 10 })
+  const shelf = new ShelfMaker(loc, { thickness: 10 })
     .addFlatPart(assy.findChild(part1))
     .addFlatPart(assy.findChild(part2));
 
@@ -230,7 +229,7 @@ bro.test("makes simple shelf", () => {
     .expect(shelf.make().toString())
     .toBe("M -100 0 L -100 110 L 0 110 L 0 0 Z");
 
-  const shelf2 = new ShelfMaker(loc.translate(0, 0, -20), { woodThickness: 10 })
+  const shelf2 = new ShelfMaker(loc.translate(0, 0, -20), { thickness: 10 })
     .addFlatPart(assy.findChild(part1))
     .addFlatPart(assy.findChild(part2));
 
@@ -239,30 +238,3 @@ bro.test("makes simple shelf", () => {
     .toBe("M -100 10 L -100 100 L -3.061616997868383e-16 100 L -3.061616997868383e-16 10 Z");
 });
 
-
-// bro.test("makes shelf", () => {
-//   const part1 = new FlatPart("one", 10, Path.makeRect(100));
-//   const part2 = new FlatPart("two", 10, Path.makeRect(100));
-//   const part3 = new FlatPart("three", 10, Path.makeRect(100));
-//   const part4 = new FlatPart("four", 10, Path.makeRect(100));
-//
-//   const assy = new Assembly("assy");
-//   assy.addChild(part1);
-//   assy.addChild(part2, a2m([0, 0, 100]));
-//   assy.addChild(part3, a2m([0, 0, 200]));
-//   assy.addChild(part4, a2m([0, 0, 300]));
-//
-//   const loc = getFaceOnLocatedFlatPart(assy.findChild(part1), x => x[0]);
-//
-//   const shelf = new ShelfMaker(loc, { woodThickness: 10 })
-//     .addFlatPart(assy.findChild(part1))
-//     .addFlatPart(assy.findChild(part2))
-//     .addFlatPart(assy.findChild(part3))
-//     .addFlatPart(assy.findChild(part4));
-//
-//   bro
-//     .expect(shelf.make().toString())
-//     .toBe(
-//       "M 0 0 L 7.171572875253809 -2.220446049250313e-16 A 2 2 0 0 1 10 2.8284271247461894 L 10 7.17157287525381 A 2 2 0 0 0 12.82842712474619 10 L 17.17157287525381 10 A 2 2 0 0 0 20 7.17157287525381 L 20 2.8284271247461894 A 2 2 0 0 1 22.82842712474619 -2.220446049250313e-16 L 28.46926627053964 -2.220446049250313e-16 A 2 2 0 0 1 31.082392200292396 1.0823922002923951 L 40 10",
-//     );
-// });
