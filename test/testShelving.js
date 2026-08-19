@@ -53,7 +53,7 @@ bro.test("makes simple inside shelf", () => {
   bro.expect(baseInside.toString()).toBe("M 0 5 L 30 50 L 130 50 L 130 5 Z");
 });
 
-const onlyBigger = (x) => x[1] > 70;
+const onlyBigger = (x) => x[0] > 70;
 
 bro.test("makes filtered inside shelf", () => {
   const halfInsideBigger = new ShelfMaker(a2m([5, 0, 0], nx3), { thickness })
@@ -77,7 +77,7 @@ bro.test("makes filtered butt shelf", () => {
     .toBe("M 80 -5 L 80 0 L 130 0 L 130 -55 L 110 -55 Z");
 });
 
-const onlyLower = (x) => x[1] < 70;
+const onlyLower = (x) => x[0] < 70;
 
 bro.test("makes another filtered inside shelf", () => {
   const halfInsideLower = new ShelfMaker(a2m([5, 0, 0], nx3), { thickness })
