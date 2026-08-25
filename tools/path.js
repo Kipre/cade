@@ -1622,22 +1622,26 @@ export class Path {
 
   /**
    * @param {number} offset
-   * @param {boolean} roundStart
-   * @param {boolean} roundEnd
+   * @param {any} options
    */
-  thickenAndClose(offset, roundStart = false, roundEnd = false) {
-    const result = this.clone();
+  thickenAndClose(offset, options = {}) {
+    let result = this.clone();
     let end = this.invert();
-    end = end.offset(offset);
+    if (options.centered) {
+      result = result.offset(offset / 2);
+      end = end.offset(offset / 2);
+    } else {
+      end = end.offset(offset);
+    }
 
     const sweep = offset > 0 ? 0 : 1;
     const diameter = Math.abs(offset) / 2;
-    if (roundEnd) result.arc(end.controls[0][1], diameter, sweep);
+    if (options.roundEnd) result.arc(end.controls[0][1], diameter, sweep);
     else result.lineTo(end.controls[0][1]);
 
     result.merge(end);
 
-    if (roundStart) result.arc(result.controls[0][1], diameter, sweep);
+    if (options.roundStart) result.arc(result.controls[0][1], diameter, sweep);
 
     result.close();
     result.simplify();

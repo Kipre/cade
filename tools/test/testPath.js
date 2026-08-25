@@ -348,6 +348,22 @@ bro.test("another simple line thicken", () => {
     );
 });
 
+bro.test("centered line thicknen", () => {
+  const path = Path.fromPolyline(
+    [
+      [53.210678118654755, 0],
+      [600, 0],
+    ],
+    false,
+  ).thickenAndClose(15, { centered: true });
+
+  bro
+    .expect(path.toString())
+    .toBe(
+      "M 53.210678118654755 7.5 L 600 7.5 L 600 -7.5 L 53.210678118654755 -7.5 Z",
+    );
+});
+
 bro.test("offset circle", () => {
   const path = Path.makeCircle(10);
 
@@ -360,8 +376,8 @@ bro.test("thicken with rounding", () => {
   const doorSpace = new Path();
   doorSpace.moveTo([0, 400]);
   doorSpace.lineTo([500, 400]);
-  const thicknened = doorSpace.thickenAndClose(100, true, true);
-  const thicknened2 = doorSpace.invert().thickenAndClose(-100, false, true);
+  const thicknened = doorSpace.thickenAndClose(100, { roundStart: true, roundEnd: true });
+  const thicknened2 = doorSpace.invert().thickenAndClose(-100, { roundStart: false, roundEnd: true });
   bro
     .expect(thicknened.toString())
     .toBe("M 500 400 A 50 50 0 0 0 500 300 L 0 300 A 50 50 0 0 0 0 400 Z");
@@ -377,7 +393,7 @@ bro.test("thicken with rounding & scale", () => {
   let wallOutline = new Path();
   wallOutline.moveTo([0, 0]);
   wallOutline.lineTo([0, 300]);
-  wallOutline = wallOutline.thickenAndClose(-50, false, true);
+  wallOutline = wallOutline.thickenAndClose(-50, { roundStart: false, roundEnd: true });
   wallOutline.scale(1, -1);
   bro
     .expect(wallOutline.toString())
