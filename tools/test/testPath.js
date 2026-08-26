@@ -376,8 +376,13 @@ bro.test("thicken with rounding", () => {
   const doorSpace = new Path();
   doorSpace.moveTo([0, 400]);
   doorSpace.lineTo([500, 400]);
-  const thicknened = doorSpace.thickenAndClose(100, { roundStart: true, roundEnd: true });
-  const thicknened2 = doorSpace.invert().thickenAndClose(-100, { roundStart: false, roundEnd: true });
+  const thicknened = doorSpace.thickenAndClose(100, {
+    roundStart: true,
+    roundEnd: true,
+  });
+  const thicknened2 = doorSpace
+    .invert()
+    .thickenAndClose(-100, { roundStart: false, roundEnd: true });
   bro
     .expect(thicknened.toString())
     .toBe("M 500 400 A 50 50 0 0 0 500 300 L 0 300 A 50 50 0 0 0 0 400 Z");
@@ -393,7 +398,10 @@ bro.test("thicken with rounding & scale", () => {
   let wallOutline = new Path();
   wallOutline.moveTo([0, 0]);
   wallOutline.lineTo([0, 300]);
-  wallOutline = wallOutline.thickenAndClose(-50, { roundStart: false, roundEnd: true });
+  wallOutline = wallOutline.thickenAndClose(-50, {
+    roundStart: false,
+    roundEnd: true,
+  });
   wallOutline.scale(1, -1);
   bro
     .expect(wallOutline.toString())
@@ -760,33 +768,37 @@ bro.test("inserts feature as expected", () => {
     );
 });
 
-bro.test("gets equidistant points", () => {
-  const directrix = new Path();
-  directrix.moveTo([0, 0]);
-  directrix.lineTo([100, 0]);
-  directrix.arc([100, 100], 50, 1);
-  directrix.lineTo([0, 100]);
+bro.test(
+  "gets equidistant points",
+  () => {
+    const directrix = new Path();
+    directrix.moveTo([0, 0]);
+    directrix.lineTo([100, 0]);
+    directrix.arc([100, 100], 50, 1);
+    directrix.lineTo([0, 100]);
 
-  bro.expect(directrix.getEquidistantPoints(21)).toRoughlyEqual([
-    [0, 0],
-    [21, 0],
-    [42, 0],
-    [63, 0],
-    [84, 0],
-    [104.9985061553517, 0.25047803028745896],
-    [124.9865120751614, 6.690945354143135],
-    [140.5668972649126, 20.771129917527947],
-    [148.9912817771333, 40.00728716346076],
-    [148.77360418386763, 61.00615895375924],
-    [139.95226281256777, 80.06354430461454],
-    [124.08334228113098, 93.8177204401358],
-    [103.96612017130268, 99.84245069001715],
-    [82.96671117450174, 100],
-    [61.96671117450174, 100],
-    [40.96671117450174, 100],
-    [19.96671117450174, 100],
-  ]);
-}, 1e-13);
+    bro.expect(directrix.getEquidistantPoints(21)).toRoughlyEqual([
+      [0, 0],
+      [21, 0],
+      [42, 0],
+      [63, 0],
+      [84, 0],
+      [104.9985061553517, 0.25047803028745896],
+      [124.9865120751614, 6.690945354143135],
+      [140.5668972649126, 20.771129917527947],
+      [148.9912817771333, 40.00728716346076],
+      [148.77360418386763, 61.00615895375924],
+      [139.95226281256777, 80.06354430461454],
+      [124.08334228113098, 93.8177204401358],
+      [103.96612017130268, 99.84245069001715],
+      [82.96671117450174, 100],
+      [61.96671117450174, 100],
+      [40.96671117450174, 100],
+      [19.96671117450174, 100],
+    ]);
+  },
+  1e-13,
+);
 
 bro.test("deletes unnecessary points", () => {
   const path = new Path();
@@ -914,38 +926,59 @@ bro.test("bulge exporter", () => {
   const path = Path.makeRoundedRect(10, 30, 2);
   const vertices = path.toArcBulges();
 
-  bro.expect(vertices).toRoughlyEqual([
-    {
-      point: [2.000000000000001, 0],
-      bulge: -0.41421356237309503,
-    },
-    {
-      point: [0, 1.9999999999999996],
-      bulge: 0,
-    },
-    {
-      point: [0, 28.000000000000004],
-      bulge: -0.414213562373094,
-    },
-    {
-      point: [2.0000000000000004, 29.999999999999996],
-      bulge: 0,
-    },
-    {
-      point: [7.999999999999999, 30],
-      bulge: -0.4142135623730953,
-    },
-    {
-      point: [10, 28],
-      bulge: 0,
-    },
-    {
-      point: [10, 1.999999999999996],
-      bulge: -0.4142135623730945,
-    },
-    {
-      point: [8, 0],
-      bulge: 0,
-    },
-  ], 1e-15);
+  bro.expect(vertices).toRoughlyEqual(
+    [
+      {
+        point: [2.000000000000001, 0],
+        bulge: -0.41421356237309503,
+      },
+      {
+        point: [0, 1.9999999999999996],
+        bulge: 0,
+      },
+      {
+        point: [0, 28.000000000000004],
+        bulge: -0.414213562373094,
+      },
+      {
+        point: [2.0000000000000004, 29.999999999999996],
+        bulge: 0,
+      },
+      {
+        point: [7.999999999999999, 30],
+        bulge: -0.4142135623730953,
+      },
+      {
+        point: [10, 28],
+        bulge: 0,
+      },
+      {
+        point: [10, 1.999999999999996],
+        bulge: -0.4142135623730945,
+      },
+      {
+        point: [8, 0],
+        bulge: 0,
+      },
+    ],
+    1e-15,
+  );
+});
+
+bro.test("path scaling", () => {
+  const p = new Path();
+  p.moveTo([12.902903378454596, 9.999999999999993]);
+  p.lineTo([12.9029033784546, -0.9805806756909057]);
+  p.arc([3.333974459322655, -8.825226113612988], 8, 0);
+  p.lineTo([-6.471832621533601, -6.864064697441735]);
+  p.arc([-12.9029033784546, 0.9805806756909197], 8, 0);
+  p.lineTo([-12.9029033784546, 9.999999999999979]);
+  p.close();
+
+
+  bro
+    .expect(p.scale(2).toString())
+    .toBe(
+      "M 25.805806756909192 19.999999999999986 L 25.8058067569092 -1.9611613513818114 A 16 16 0 0 0 6.66794891864531 -17.650452227225976 L -12.943665243067201 -13.72812939488347 A 16 16 0 0 0 -25.8058067569092 1.9611613513818393 L -25.8058067569092 19.999999999999957 Z",
+    );
 });

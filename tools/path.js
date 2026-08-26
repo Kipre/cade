@@ -1257,19 +1257,26 @@ export class Path {
   }
 
   /**
-   * @param {number} x
-   * @param {number | null} y
+   * @param {number} sx
+   * @param {number | null} sy
    * @returns {Path}
    */
-  scale(x, y = null) {
-    if (y == null) y = x;
+  scale(sx, sy = null) {
+    if (sy == null) sy = sx;
     const result = new Path();
     result.controls = this.controls.map((control) => {
-      const result = [...control];
-      if (!result[1]) return result;
-      result[1] = [result[1][0] * x, result[1][1] * y];
-      if (result[3] != null && x * y < 0) result[3] = result[3] === 0 ? 1 : 0;
-      return result;
+      let [type, point, maybeRadius, maybeFlag] = control;
+      if (type === "arc" && !(Math.abs(sx) === Math.abs(sy)))
+        throw new Error(
+          `scaling with x=${sx} and y=${sy} is not supported on a path with arcs`,
+        );
+
+      if (!point) return [type];
+
+      const newPoint = [point[0] * sx, point[1] * sy];
+      if (maybeFlag != null && sx * sy < 0) maybeFlag = maybeFlag === 0 ? 1 : 0;
+      if (maybeRadius != null) maybeRadius = Math.abs(maybeRadius * sx);
+      return [type, newPoint, maybeRadius, maybeFlag];
     });
     return result;
   }
