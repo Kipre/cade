@@ -1,8 +1,19 @@
 // @ts-check
 
-import { FlatPart, getFaceOnLocatedFlatPart, spindleCleared2LineTo, spindleClearedLineTo } from "../lib/flat.js";
+import { x3 } from "../lib/defaults.js";
+import {
+  FlatPart,
+  getFaceOnLocatedFlatPart,
+  makeSimpleTenon,
+  spindleCleared2LineTo,
+  spindleClearedLineTo,
+} from "../lib/flat.js";
 import { Assembly } from "../lib/lib.js";
-import { findConvexZones, ShelfMaker } from "../lib/shelf.js";
+import {
+  findConvexZones,
+  makeSimpleMortise,
+  ShelfMaker,
+} from "../lib/shelf.js";
 import { convexHull } from "../tools/operations.js";
 import { Path } from "../tools/path.js";
 import bro from "../tools/test/brotest/brotest.js";
@@ -10,8 +21,26 @@ import { a2m } from "../tools/transform.js";
 
 bro.test("make polygon from parallel lines", () => {
   const shelf = new ShelfMaker(a2m(), { woodThickness: 10 })
-    .addFeature(Path.fromPolyline([[53.210678118654755, 7.5], [600, 7.5]], false).thickenAndClose(7.5), a2m())
-    .addFeature(Path.fromPolyline([[53.210678118654755, -77.5], [600, -77.5]], false).thickenAndClose(10), a2m())
+    .addFeature(
+      Path.fromPolyline(
+        [
+          [53.210678118654755, 7.5],
+          [600, 7.5],
+        ],
+        false,
+      ).thickenAndClose(7.5),
+      a2m(),
+    )
+    .addFeature(
+      Path.fromPolyline(
+        [
+          [53.210678118654755, -77.5],
+          [600, -77.5],
+        ],
+        false,
+      ).thickenAndClose(10),
+      a2m(),
+    );
 
   bro
     .expect(shelf.make().toString())
@@ -96,29 +125,41 @@ bro.test("clears spindle in angles with minimal angle", () => {
 bro.test("find convex zones", () => {
   const lines = [
     {
-      "pts": [[1103, 7.5], [-85, 7.5]],
-      "type": "cutting",
-      "thickness": 15
+      pts: [
+        [1103, 7.5],
+        [-85, 7.5],
+      ],
+      type: "cutting",
+      thickness: 15,
     },
     {
-      "pts": [[-7.5, 15], [-7.5, 100]],
-      "type": "cutting",
-      "thickness": 15
+      pts: [
+        [-7.5, 15],
+        [-7.5, 100],
+      ],
+      type: "cutting",
+      thickness: 15,
     },
     {
-      "pts": [[1128, 107.5], [-170.62276185659434, 107.5]],
-      "type": "cutting",
-      "thickness": 15
+      pts: [
+        [1128, 107.5],
+        [-170.62276185659434, 107.5],
+      ],
+      type: "cutting",
+      thickness: 15,
     },
     {
-      "pts": [[1025.5, 15], [1025.5, 100]],
-      "type": "cutting",
-      "thickness": 15
-    }
-  ]
+      pts: [
+        [1025.5, 15],
+        [1025.5, 100],
+      ],
+      type: "cutting",
+      thickness: 15,
+    },
+  ];
 
   const zones = findConvexZones(lines);
-  const hulls = zones.map(z => convexHull(...z.map(l => l.pts)))
+  const hulls = zones.map((z) => convexHull(...z.map((l) => l.pts)));
   bro.expect(hulls).toHaveLength(3);
 
   bro
@@ -127,7 +168,9 @@ bro.test("find convex zones", () => {
 
   bro
     .expect(Path.fromPolyline(hulls[1]).toString())
-    .toBe("M 0 15.000000000000002 L 0 100 L 1018 100 L 1018 15 L 2.042810365310288e-14 15 Z");
+    .toBe(
+      "M 0 15.000000000000002 L 0 100 L 1018 100 L 1018 15 L 2.042810365310288e-14 15 Z",
+    );
 
   bro
     .expect(Path.fromPolyline(hulls[2]).toString())
@@ -137,81 +180,120 @@ bro.test("find convex zones", () => {
 bro.test("find convex zones 2", () => {
   const lines = [
     {
-      "pts": [[-67.5, -72.5], [82.50000000000003, -72.5]],
-      "type": "cutting",
-      "thickness": 15
+      pts: [
+        [-67.5, -72.5],
+        [82.50000000000003, -72.5],
+      ],
+      type: "cutting",
+      thickness: 15,
     },
     {
-      "pts": [[65, 27.5], [65, -72.5]],
-      "type": "cutting",
-      "thickness": 15
+      pts: [
+        [65, 27.5],
+        [65, -72.5],
+      ],
+      type: "cutting",
+      thickness: 15,
     },
     {
-      "pts": [[82.5, 27.5], [-67.50000000000001, 27.5]],
-      "type": "cutting",
-      "thickness": 15
+      pts: [
+        [82.5, 27.5],
+        [-67.50000000000001, 27.5],
+      ],
+      type: "cutting",
+      thickness: 15,
     },
     {
-      "pts": [[-50, 27.5], [-50, -72.5]],
-      "type": "cutting",
-      "thickness": 15
-    }
+      pts: [
+        [-50, 27.5],
+        [-50, -72.5],
+      ],
+      type: "cutting",
+      thickness: 15,
+    },
   ];
 
-  bro
-    .expect(findConvexZones(lines))
-    .toEqual([
-      [
-        {
-          "pts": [[72.5, -65], [82.50000000000003, -65]],
-          "type": "edge"
-        },
-        {
-          "pts": [[82.5, 20], [72.5, 20]],
-          "type": "edge"
-        },
-        {
-          "pts": [[72.5, 27.499999999999996], [72.5, -72.5]],
-          "type": "edge"
-        }
-      ],
-      [
-        {
-          "pts": [[-42.5, -65], [57.5, -65]],
-          "type": "edge"
-        },
-        {
-          "pts": [[57.5, 20.00000000000001], [-42.5, 20.00000000000001]],
-          "type": "edge"
-        },
-        {
-          "pts": [[57.5, 27.499999999999996], [57.5, -72.5]],
-          "type": "edge"
-        },
-        {
-          "pts": [[-42.5, 27.499999999999996], [-42.5, -72.5]],
-          "type": "edge"
-        }
-      ],
-      [
-        {
-          "pts": [[-67.5, -65], [-57.5, -65]],
-          "type": "edge"
-        },
-        {
-          "pts": [[-57.5, 20.00000000000001], [-67.50000000000001, 20.000000000000007]],
-          "type": "edge"
-        },
-        {
-          "pts": [[-57.5, 27.499999999999996], [-57.5, -72.5]],
-          "type": "edge"
-        }
-      ]
-    ]);
+  bro.expect(findConvexZones(lines)).toEqual([
+    [
+      {
+        pts: [
+          [72.5, -65],
+          [82.50000000000003, -65],
+        ],
+        type: "edge",
+      },
+      {
+        pts: [
+          [82.5, 20],
+          [72.5, 20],
+        ],
+        type: "edge",
+      },
+      {
+        pts: [
+          [72.5, 27.499999999999996],
+          [72.5, -72.5],
+        ],
+        type: "edge",
+      },
+    ],
+    [
+      {
+        pts: [
+          [-42.5, -65],
+          [57.5, -65],
+        ],
+        type: "edge",
+      },
+      {
+        pts: [
+          [57.5, 20.00000000000001],
+          [-42.5, 20.00000000000001],
+        ],
+        type: "edge",
+      },
+      {
+        pts: [
+          [57.5, 27.499999999999996],
+          [57.5, -72.5],
+        ],
+        type: "edge",
+      },
+      {
+        pts: [
+          [-42.5, 27.499999999999996],
+          [-42.5, -72.5],
+        ],
+        type: "edge",
+      },
+    ],
+    [
+      {
+        pts: [
+          [-67.5, -65],
+          [-57.5, -65],
+        ],
+        type: "edge",
+      },
+      {
+        pts: [
+          [-57.5, 20.00000000000001],
+          [-67.50000000000001, 20.000000000000007],
+        ],
+        type: "edge",
+      },
+      {
+        pts: [
+          [-57.5, 27.499999999999996],
+          [-57.5, -72.5],
+        ],
+        type: "edge",
+      },
+    ],
+  ]);
 });
 
 bro.test("makes simple shelf", () => {
-
   const part1 = new FlatPart("one", 10, Path.makeRect(100));
   const part2 = new FlatPart("two", 10, Path.makeRect(100));
 
@@ -219,7 +301,7 @@ bro.test("makes simple shelf", () => {
   assy.addChild(part1);
   assy.addChild(part2, a2m([0, 0, 100]));
 
-  const loc = getFaceOnLocatedFlatPart(assy.findChild(part1), x => x[0]);
+  const loc = getFaceOnLocatedFlatPart(assy.findChild(part1), (x) => x[0]);
 
   const shelf = new ShelfMaker(loc, { thickness: 10 })
     .addFlatPart(assy.findChild(part1))
@@ -235,6 +317,35 @@ bro.test("makes simple shelf", () => {
 
   bro
     .expect(shelf2.make().toString())
-    .toBe("M -100 10 L -100 100 L -3.061616997868383e-16 100 L -3.061616997868383e-16 10 Z");
+    .toBe(
+      "M -100 10 L -100 100 L -3.061616997868383e-16 100 L -3.061616997868383e-16 10 Z",
+    );
 });
 
+bro.test("makes simple tenon and mortise", () => {
+  const part1 = new FlatPart("one", 5, Path.makeRect(50));
+  const part2 = new FlatPart("two", 5, Path.makeRect(50));
+
+  const assy = new Assembly("assy");
+
+  assy.addChild(part1);
+  assy.addChild(part2, a2m([20, 0, 5], x3));
+  makeSimpleTenon(assy, part2, part1, (x) => x * 0.8);
+
+  assy.addChild(part2, a2m([30, 0, 5], x3));
+  makeSimpleMortise(assy, part2, part1);
+
+  bro
+    .expect(part2.outside.toString())
+    .toBe(
+      "M 50 0 L 50 50 L 0 50 L 0 0 L 4.999999999999999 0 L 5 -4.999999999999997 L 45 -5.000000000000003 L 45 -4.440892098500626e-16 Z",
+    );
+
+  bro
+    .expect(part1.insides[0].toString())
+    .toBe("M 20 4.999999999999999 L 20 45 L 25 45 L 25 4.999999999999999 Z");
+
+  bro
+    .expect(part1.insides[1].toString())
+    .toBe("M 30 4.999999999999999 L 30 45 L 35 45 L 35 4.999999999999999 Z");
+});
