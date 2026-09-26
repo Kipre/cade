@@ -265,7 +265,7 @@ bro.test("boolean intersection", () => {
   bro
     .expect(intersection.toString())
     .toEqual(
-      "M 1788.6751345948128 1000 L 1900 1000 L 1950 500 L 1600 500 A 100 100 0 0 1 1550 586.6025403784439 Z",
+      "M 1950 500 L 1900 1000 L 1788.675134594813 1000 L 1549.9999999999998 586.6025403784439 A 100 100 0 0 0 1600 500 Z",
     );
 });
 
@@ -1004,12 +1004,25 @@ bro.test("path transform bug", () => {
     );
 });
 
-bro.only("round fillet only some angles", () => {
+bro.test("overlapping bool operation", () => {
+  const p = Path.makeRect(30);
+  const other = new Path();
+  other.moveTo([0, 30]);
+  other.lineTo([5, 30]);
+  other.arc([0, 25], 5, 1);
+  other.close();
+
+  bro
+    .expect(p.booleanDifference(other).toString())
+    .toBe("M 0 25.000000089913275 A 5 5 0 0 0 5 30 L 30 30 L 30 0 L 0 0 Z");
+});
+
+bro.test("round fillet only some angles", () => {
   const p = Path.makeRect(30).roundFilletSome((x) => (x[0] === 0 ? 5 : 0));
 
   bro
     .expect(p.toString())
     .toBe(
-      "M 0 5 L 0 25 A 5 5 0 0 0 5.000000000000001 29.999999999999996 L 30 30 L 30 0 L 4.999999999999999 0 A 5 5 0 0 0 0 4.999999999999999 L 0 30",
+      "M 4.999999910086721 8.881784197001252e-16 A 5 5 0 0 0 8.881784197001252e-16 4.999999906559385 L 0 25.000000089913275 A 5 5 0 0 0 5 30 L 30 30 L 30 0 Z",
     );
 });

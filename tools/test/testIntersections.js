@@ -1,7 +1,6 @@
 // @ts-check
 import { y2, zero2 } from "../defaults.js";
 import { Path } from "../path.js";
-import { debugGeometry } from "../svg.js";
 import bro from "./brotest/brotest.js";
 
 const loop = Path.fromD(
@@ -77,7 +76,7 @@ bro.test("difference 1", () => {
   bro
     .expect(firstPath.booleanDifference(secondPath).toString())
     .toBe(
-      "M 85.00000000000003 0 L 53.210678118654755 0 L 53.210678118654755 -70 L 600 -70 L 600 0 L 100 0 L 100 -29 A 3 3 0 0 0 100 -35 L 85 -35 A 3 3 0 0 0 85 -29 Z",
+      "M 100 -29 A 3 3 0 0 0 100 -35 L 85 -35 A 3 3 0 0 0 85 -29 L 85 0 L 53.210678118654755 0 L 53.210678118654755 -70 L 600 -70 L 600 0 L 100 0 Z",
     );
 });
 
@@ -232,7 +231,7 @@ bro.test("union with overlapping line", () => {
   bro
     .expect(path.realBooleanUnion(chainSupport).toString())
     .toBe(
-      "M -55 -109.5 L 115.99999999999997 -109.5 L 115.99999999999994 0 L -9.999999999999883 0 L -9.999999999999883 1000 L 115.99999999999999 1000.0000000000001 L 115.99999999999991 1109.5 L -7.105427357601002e-15 1109.5 L 0 1220 L -55 1220 L -55 1099.9999999999998 Z",
+      "M -55 -109.5 L 115.99999999999997 -109.5 L 115.99999999999994 0 L -9.999999999999883 0 L -9.999999999999883 1000 L 115.99999999999999 1000.0000000000001 L 115.99999999999991 1109.5 L -7.105427357601002e-15 1109.5 L 0 1220 L -55 1220 Z",
     );
 });
 
@@ -254,9 +253,8 @@ bro.test("union with overlapping line", () => {
 
 bro.test("cut simple shape", () => {
   const path = Path.makeRoundedRect(10, 10, 2).recenter().cutOnLine(zero2, y2);
-  debugGeometry(path);
   bro
-    .expect(path.cutOnLine(zero2, y2).toString())
+    .expect(path.toString())
     .toBe(
       "M 0 -5 L -2.999999999999999 -5 A 2 2 0 0 0 -5 -3.0000000000000004 L -5 3 A 2 2 0 0 0 -2.9999999999999996 5 L 0 5 Z",
     );

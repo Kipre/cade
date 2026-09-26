@@ -37,7 +37,7 @@ import {
 } from "./circle.js";
 import { BBox, debugGeometry } from "./svg.js";
 import { applyTransformMatrix } from "./transform.js";
-import { modulo } from "./utils.js";
+import { keyToComparison, modulo } from "./utils.js";
 
 class RoundFilletError extends TypeError { }
 
@@ -244,13 +244,12 @@ export class Path {
       corner.close();
       corners.push(corner);
     }
-    debugGeometry(result, ...corners);
 
     for (const corner of corners) {
       result = result.booleanDifference(corner);
     }
 
-    return this;
+    return result;
   }
 
   /**
@@ -609,6 +608,7 @@ export class Path {
         case "arc": {
           const [radius, sweep] = rest;
           const center = getCircleCenter(lastPoint, p, radius, sweep);
+
           if (norm(center, pointToLine(center, p1, p2)) > radius) break;
 
           const roots = intersectLineAndCircle(p1, p2, center, radius);
@@ -617,10 +617,14 @@ export class Path {
             const x = pointCoordinateOnArc(point, lastPoint, p, radius, sweep);
 
             const pointOnLine = pointInsideLineBbox(point, p1, p2);
-            if (!(0 < x && x < 1 && pointOnLine)) continue;
+            if (!(0 <= x && x <= 1 && pointOnLine)) continue;
 
             const tangent = arcTangentAt(x, lastPoint, p, radius, sweep);
-            const crossesFromTheRight = isToTheLeft(p2, ...tangent);
+            const crossesFromTheRight =
+              x > 0.5
+                ? isToTheLeft(p2, ...tangent)
+                : !isToTheLeft(p1, ...tangent);
+
             result.push({ point, segment: i, x, crossesFromTheRight });
           }
           break;
@@ -721,26 +725,36 @@ export class Path {
 
     const rawIntersections = this.findPathIntersections(other);
 
-    const loops = [];
-
     function sortIntersections(left, right, forSide) {
       const n1 = 10 * left[forSide].segment + left[forSide].x;
       const n2 = 10 * right[forSide].segment + right[forSide].x;
       return n1 - n2;
     }
 
-    const length = rawIntersections.length;
+    const selfOrdered = rawIntersections.toSorted((i1, i2) =>
+      sortIntersections(i1, i2, "self"),
+    );
+
+    let [last, ...rest] = selfOrdered;
+    const filtered = [last];
+
+    for (const int of rest) {
+      if (last.self.crossesFromTheRight !== int.self.crossesFromTheRight) {
+        filtered.push(int);
+      }
+      // else console.warn("dropping", int, selfOrdered);
+
+      last = int;
+    }
+
+    const length = filtered.length;
 
     const intersections = [];
-
     for (let i = 0; i < length; i++) {
-      const int = rawIntersections[i];
+      const int = filtered[i];
       intersections.push({ ...int, index: i });
     }
 
-    const selfOrdered = intersections.toSorted((i1, i2) =>
-      sortIntersections(i1, i2, "self"),
-    );
     const otherOrdered = intersections.toSorted((i1, i2) =>
       sortIntersections(i1, i2, "other"),
     );
@@ -750,7 +764,7 @@ export class Path {
       const after = modulo(i + 1, length);
       for (const [info, ordered] of [
         [intersections[otherOrdered[i].index].other, otherOrdered],
-        [intersections[selfOrdered[i].index].self, selfOrdered],
+        [intersections[intersections[i].index].self, intersections],
       ]) {
         info.order = i;
         info.after = ordered[after].index;
@@ -758,6 +772,7 @@ export class Path {
       }
     }
 
+    const loops = [];
     if (!intersections.length) return { loops, intersections };
 
     const maxIterations = 10;
@@ -773,9 +788,14 @@ export class Path {
       do {
         const { segment, x, before, after } = intersections[i][side];
 
-        const [here, there] = side === "self" ? [this, other] : [other, this];
-        const point = here.evaluate(segment, x + 1e-2);
-        const lineEntersThere = there.isInside(point);
+        const [here, there, otherSide] =
+          side === "self" ? [this, other, "other"] : [other, this, "self"];
+        // used to do this instead of using crossesFromTheRight
+        // const point = here.evaluate(segment, x + 1e-2);
+        // const lineEntersThere = there.isInside(point);
+        const lineEntersThere =
+          intersections[i][otherSide].crossesFromTheRight !==
+          there.rotatesClockwise();
         const invert = lineEntersThere !== shouldEnterOtherShape;
 
         const path = {
