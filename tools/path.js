@@ -222,6 +222,38 @@ export class Path {
   }
 
   /**
+   * @param {(x: import('./types').Point) => number?} getRadius
+   * @param {RoundFilletOptions} options
+   */
+  roundFilletSome(getRadius, options = {}) {
+    let result = this.clone();
+
+    const corners = [];
+    for (const [one, two] of this.iterateOverJunctions()) {
+      const [i, p1, typeOne, p2, r, sweep] = one;
+      const [, , typeTwo, p3] = two;
+
+      if (typeOne !== "lineTo" || typeTwo !== "lineTo") continue;
+      const radius = getRadius(p2);
+      if (!radius) continue;
+      const corner = new Path();
+      const start = placeAlong(p1, p2, { fromEnd: -radius });
+      corner.moveTo(p2);
+      corner.lineTo(placeAlong(p2, p3, { fromStart: radius }));
+      corner.arc(start, radius, 1);
+      corner.close();
+      corners.push(corner);
+    }
+    debugGeometry(result, ...corners);
+
+    for (const corner of corners) {
+      result = result.booleanDifference(corner);
+    }
+
+    return this;
+  }
+
+  /**
    * Connects a tangent arc between two last and next points
    *
    * @param {types.Point | ((p: types.Point) => types.Point)} p
@@ -775,34 +807,40 @@ export class Path {
    * @param {Path} other
    */
   booleanDifference(other) {
-    const { loops, intersections } = this.#findIntersectionLoops(
-      other,
-      (entered) => !entered,
-    );
+    try {
+      const { loops, intersections } = this.#findIntersectionLoops(
+        other,
+        (entered) => !entered,
+      );
 
-    if (!intersections.length) {
-      debugGeometry(this, other);
-      throw new Error("difference is impossible because shapes don't overlap");
-    }
+      if (!intersections.length)
+        throw new Error(
+          "difference is impossible because shapes don't overlap",
+        );
 
-    let loop;
-    let found = false;
-    for (loop of loops) {
-      if (loop.some((step) => step.side === "other" && step.entersOtherShape)) {
-        found = true;
-        break;
+      let loop;
+      let found = false;
+      for (loop of loops) {
+        if (
+          loop.some((step) => step.side === "other" && step.entersOtherShape)
+        ) {
+          found = true;
+          break;
+        }
       }
-    }
 
-    if (!found) {
+      if (!found) {
+        throw new Error("did not find the difference loop");
+      }
+
+      const result = this.#fromIntersectionLoop(other, loop, intersections);
+      if (this.rotatesClockwise() !== result.rotatesClockwise())
+        return result.invert();
+      return result;
+    } catch (e) {
       debugGeometry(this, other);
-      throw new Error("did not find the difference loop");
+      throw e;
     }
-
-    const result = this.#fromIntersectionLoop(other, loop, intersections);
-    if (this.rotatesClockwise() !== result.rotatesClockwise())
-      return result.invert();
-    return result;
   }
 
   /**
@@ -841,7 +879,12 @@ export class Path {
       throw new Error();
     }
 
-    return this.#fromIntersectionLoop(other, loop, intersections);
+    try {
+      return this.#fromIntersectionLoop(other, loop, intersections);
+    } catch (e) {
+      debugGeometry(this, other);
+      throw e;
+    }
   }
 
   #fromIntersectionLoop(other, loop, intersections) {
@@ -867,6 +910,10 @@ export class Path {
     }
 
     path.simplify();
+
+    if (path.controls.length === 2)
+      throw Error("failed to do boolean operation");
+
     return path;
   }
 
@@ -1242,7 +1289,7 @@ export class Path {
     const zero = applyTransformMatrix(mat, [0, 0]);
     const one = applyTransformMatrix(mat, [1, 1]);
     const transformed = minus(one, zero);
-    const hasMirroring = transformed[0] * transformed[1];
+    const hasMirroring = transformed[0] * transformed[1] < 0;
 
     const result = new Path();
     result.controls = this.controls.map((control) => {
