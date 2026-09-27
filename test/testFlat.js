@@ -5,6 +5,7 @@ import {
   FlatPart,
   getFaceOnLocatedFlatPart,
   makeSimpleTenon,
+  simpleTenonGenerator,
   spindleCleared2LineTo,
   spindleClearedLineTo,
 } from "../lib/flat.js";
@@ -16,6 +17,7 @@ import {
 } from "../lib/shelf.js";
 import { convexHull } from "../tools/operations.js";
 import { Path } from "../tools/path.js";
+import { debugGeometry } from "../tools/svg.js";
 import bro from "../tools/test/brotest/brotest.js";
 import { a2m } from "../tools/transform.js";
 
@@ -330,7 +332,8 @@ bro.test("makes simple tenon and mortise", () => {
 
   assy.addChild(part1);
   assy.addChild(part2, a2m([20, 0, 5], x3));
-  makeSimpleTenon(assy, part2, part1, (x) => x * 0.8);
+
+  makeSimpleTenon(assy, part2, part1, simpleTenonGenerator(0.8));
 
   assy.addChild(part2, a2m([30, 0, 5], x3));
   makeSimpleMortise(assy, part2, part1);
@@ -338,7 +341,7 @@ bro.test("makes simple tenon and mortise", () => {
   bro
     .expect(part2.outside.toString())
     .toBe(
-      "M 50 0 L 50 50 L 0 50 L 0 0 L 4.999999999999999 0 L 5 -4.999999999999997 L 45 -5.000000000000003 L 45 -4.440892098500626e-16 Z",
+      "M 50 0 L 50 50 L 0 50 L 0 0 L 4.999999999999999 0 L 4.999999999999999 -5 L 45 -5 L 45 0 Z",
     );
 
   bro

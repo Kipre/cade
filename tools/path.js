@@ -571,7 +571,7 @@ export class Path {
    * @param {types.Point} p2
    * @returns {SimpleIntersection[]}
    */
-  intersectLine(p1, p2) {
+  intersectLine(p1, p2, strict = true) {
     const result = [];
     let firstPoint;
     let lastPoint;
@@ -596,7 +596,7 @@ export class Path {
           if (
             int == null ||
             !pointInsideLineBbox(int, lastPoint, p) ||
-            !pointInsideLineBbox(int, p1, p2)
+            (strict && !pointInsideLineBbox(int, p1, p2))
           )
             break;
 
@@ -617,7 +617,7 @@ export class Path {
             const x = pointCoordinateOnArc(point, lastPoint, p, radius, sweep);
 
             const pointOnLine = pointInsideLineBbox(point, p1, p2);
-            if (!(0 <= x && x <= 1 && pointOnLine)) continue;
+            if (!(0 <= x && x <= 1 && (!strict || pointOnLine))) continue;
 
             const tangent = arcTangentAt(x, lastPoint, p, radius, sweep);
             const crossesFromTheRight =
@@ -884,22 +884,19 @@ export class Path {
    * @param {Path} other
    */
   realBooleanUnion(other) {
-    const { loops, intersections } = this.#findIntersectionLoops(
-      other,
-      () => false,
-    );
-
-    let loop;
-    for (loop of loops) {
-      if (loop.every((c) => !c.entersOtherShape)) break;
-    }
-
-    if (loop == null) {
-      debugGeometry(this, other);
-      throw new Error();
-    }
-
     try {
+      const { loops, intersections } = this.#findIntersectionLoops(
+        other,
+        () => false,
+      );
+
+      let loop;
+      for (loop of loops) {
+        if (loop.every((c) => !c.entersOtherShape)) break;
+      }
+
+      if (loop == null) throw new Error("failed to find loop");
+
       return this.#fromIntersectionLoop(other, loop, intersections);
     } catch (e) {
       debugGeometry(this, other);
