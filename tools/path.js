@@ -9,7 +9,6 @@ import {
   isToTheLeft,
   minus,
   mirrorPoint,
-  mult,
   norm,
   offsetPolyline,
   placeAlong,
@@ -37,7 +36,7 @@ import {
 } from "./circle.js";
 import { BBox, debugGeometry } from "./svg.js";
 import { applyTransformMatrix } from "./transform.js";
-import { keyToComparison, modulo } from "./utils.js";
+import { modulo } from "./utils.js";
 
 class RoundFilletError extends TypeError { }
 
@@ -609,7 +608,7 @@ export class Path {
           const [radius, sweep] = rest;
           const center = getCircleCenter(lastPoint, p, radius, sweep);
 
-          if (norm(center, pointToLine(center, p1, p2)) > radius) break;
+          if (norm(center, pointToLine(center, p1, p2)) > radius + eps) break;
 
           const roots = intersectLineAndCircle(p1, p2, center, radius);
 
