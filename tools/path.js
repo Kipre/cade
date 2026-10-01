@@ -619,10 +619,15 @@ export class Path {
             if (!(0 <= x && x <= 1 && (!strict || pointOnLine))) continue;
 
             const tangent = arcTangentAt(x, lastPoint, p, radius, sweep);
-            const crossesFromTheRight =
+            let crossesFromTheRight =
               x > 0.5
                 ? isToTheLeft(p2, ...tangent)
                 : !isToTheLeft(p1, ...tangent);
+
+            // TODO: find something better to write
+            if (x + eps > 1) {
+              crossesFromTheRight = isToTheLeft(lastPoint, p1, p2);
+            }
 
             result.push({ point, segment: i, x, crossesFromTheRight });
           }
@@ -745,6 +750,9 @@ export class Path {
 
       last = int;
     }
+
+    if (last.self.crossesFromTheRight === filtered[0].self.crossesFromTheRight)
+      filtered.pop();
 
     const length = filtered.length;
 
