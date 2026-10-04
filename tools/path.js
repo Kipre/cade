@@ -34,6 +34,7 @@ import {
   normalizeAngle,
   pointCoordinateOnArc,
 } from "./circle.js";
+import { pairs } from "./iteration.js";
 import { BBox, debugGeometry } from "./svg.js";
 import { applyTransformMatrix } from "./transform.js";
 import { modulo } from "./utils.js";
@@ -412,6 +413,21 @@ export class Path {
         this.controls[0][0] = "moveTo";
       }
     }
+
+    // if last segment and close are on same line
+    if (
+      this.isClosed() &&
+      areOnSameLine(
+        this.controls.at(-2)[1],
+        this.controls.at(-3)[1],
+        this.controls[0][1],
+      ) &&
+      this.controls.at(-2)[0] === "lineTo"
+    ) {
+      this.controls.pop();
+      this.controls.pop();
+      this.close();
+    }
   }
 
   /**
@@ -591,7 +607,9 @@ export class Path {
           p = firstPoint;
         case "lineTo": {
           if (lastPoint == null) throw new Error();
+
           const int = intersectLines(lastPoint, p, p1, p2);
+
           if (
             int == null ||
             !pointInsideLineBbox(int, lastPoint, p) ||
@@ -599,8 +617,14 @@ export class Path {
           )
             break;
 
+          // the line were intersecting overlaps with another
+          if (areOnSameLine(p1, p2, lastPoint, p)) {
+            break;
+          }
+
           const crossesFromTheRight = isToTheLeft(p2, lastPoint, p);
           const x = pointCoordinateOnLine(int, lastPoint, p);
+
           result.push({ point: int, segment: i, x, crossesFromTheRight });
           break;
         }
@@ -608,7 +632,8 @@ export class Path {
           const [radius, sweep] = rest;
           const center = getCircleCenter(lastPoint, p, radius, sweep);
 
-          if (norm(center, pointToLine(center, p1, p2)) > radius + eps) break;
+          const projectedCenter = pointToLine(center, p1, p2);
+          if (norm(center, projectedCenter) > radius + eps) break;
 
           const roots = intersectLineAndCircle(p1, p2, center, radius);
 
@@ -616,20 +641,22 @@ export class Path {
             const x = pointCoordinateOnArc(point, lastPoint, p, radius, sweep);
 
             const pointOnLine = pointInsideLineBbox(point, p1, p2);
-            if (!(0 <= x && x <= 1 && (!strict || pointOnLine))) continue;
+            if (!(-eps < x && x < 1 + eps && (!strict || pointOnLine)))
+              continue;
 
-            const tangent = arcTangentAt(x, lastPoint, p, radius, sweep);
-            let crossesFromTheRight =
-              x > 0.5
-                ? isToTheLeft(p2, ...tangent)
-                : !isToTheLeft(p1, ...tangent);
-
-            // TODO: find something better to write
-            if (x + eps > 1) {
-              crossesFromTheRight = isToTheLeft(lastPoint, p1, p2);
+            let crossesFromTheRight;
+            if (norm(point, projectedCenter) < eps) {
+              crossesFromTheRight =
+                Math.abs(x) < eps !== isToTheLeft(center, p1, p2);
+            } else {
+              crossesFromTheRight =
+                !!sweep ===
+                pointCoordinateOnLine(point, p1, p2) <
+                pointCoordinateOnLine(projectedCenter, p1, p2);
             }
 
             result.push({ point, segment: i, x, crossesFromTheRight });
+            break;
           }
           break;
         }
@@ -722,6 +749,7 @@ export class Path {
 
   /**
    * @param {Path} other
+   * @param {(x: boolean) => boolean} strategy
    */
   #findIntersectionLoops(other, strategy) {
     if (!this.isClosed() || !other.isClosed())
@@ -729,30 +757,37 @@ export class Path {
 
     const rawIntersections = this.findPathIntersections(other);
 
-    function sortIntersections(left, right, forSide) {
-      const n1 = 10 * left[forSide].segment + left[forSide].x;
-      const n2 = 10 * right[forSide].segment + right[forSide].x;
-      return n1 - n2;
+    function intersectionSorter(forSide) {
+      return (left, right) => {
+        const n1 = 10 * left[forSide].segment + left[forSide].x;
+        const n2 = 10 * right[forSide].segment + right[forSide].x;
+        return n1 - n2;
+      };
     }
 
-    const selfOrdered = rawIntersections.toSorted((i1, i2) =>
-      sortIntersections(i1, i2, "self"),
-    );
+    const selfOrdered = rawIntersections.toSorted(intersectionSorter("self"));
 
-    let [last, ...rest] = selfOrdered;
-    const filtered = [last];
+    // filter-out the intersections that overlap completely
+    const filtered = [];
+    let skipNext = false;
 
-    for (const int of rest) {
-      if (last.self.crossesFromTheRight !== int.self.crossesFromTheRight) {
-        filtered.push(int);
+    for (const [one, two] of pairs(selfOrdered)) {
+      if (skipNext) {
+        skipNext = false;
+        continue;
       }
-      // else console.warn("dropping", int, selfOrdered);
-
-      last = int;
+      if (norm(one.point, two.point) < eps) {
+        const i1 = one.self.x > 0.5 ? one.self.segment : two.self.segment;
+        const i2 = one.self.x > 0.5 ? two.other.segment : one.other.segment;
+        if (
+          coincideInJunction(this.getJunctionAt(i1), other.getJunctionAt(i2))
+        ) {
+          skipNext = true;
+        }
+        continue;
+      }
+      filtered.push(one);
     }
-
-    if (last.self.crossesFromTheRight === filtered[0].self.crossesFromTheRight)
-      filtered.pop();
 
     const length = filtered.length;
 
@@ -762,9 +797,7 @@ export class Path {
       intersections.push({ ...int, index: i });
     }
 
-    const otherOrdered = intersections.toSorted((i1, i2) =>
-      sortIntersections(i1, i2, "other"),
-    );
+    const otherOrdered = intersections.toSorted(intersectionSorter("other"));
 
     for (let i = 0; i < length; i++) {
       const before = modulo(i - 1, length);
@@ -1806,4 +1839,34 @@ export class Path {
     }
     return bbox;
   }
+}
+
+// ----- internal utils -----
+function arePartOfTheSameGeometry(segment1, segment2) {
+  const [, lp1, t1, p1, r1, s1] = segment1;
+  const [, lp2, t2, p2, r2, s2] = segment2;
+
+  if (t1 !== t2) return false;
+  if (t1 === "lineTo") {
+    return areOnSameLine(lp1, p1, lp2, p2);
+  }
+
+  if (t1 === "arc") {
+    const c1 = getCircleCenter(lp1, p1, r1, s1);
+    const c2 = getCircleCenter(lp2, p2, r2, s2);
+    return norm(c1, c2) < eps;
+  }
+
+  return new Error(`${t1} not supported yet`);
+}
+
+function coincideInJunction(j1, j2) {
+  const [seg1, seg2] = j1;
+  const [seg3, seg4] = j2;
+  return (
+    (arePartOfTheSameGeometry(seg1, seg3) &&
+      arePartOfTheSameGeometry(seg2, seg4)) ||
+    (arePartOfTheSameGeometry(seg1, seg4) &&
+      arePartOfTheSameGeometry(seg2, seg3))
+  );
 }

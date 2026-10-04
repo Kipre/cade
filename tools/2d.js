@@ -42,10 +42,13 @@ export function dot(p1, p2) {
   return p1[0] * p2[0] + p1[1] * p2[1];
 }
 
-export function areOnSameLine(p1, p2, p3) {
+export function areOnSameLine(p1, p2, ...points) {
   const u = minus(p1, p2);
-  const v = minus(p1, p3);
-  return Math.abs(u[1] * v[0] - v[1] * u[0]) < 1e-3;
+  for (const p of points) {
+    const v = minus(p1, p);
+    if (Math.abs(u[1] * v[0] - v[1] * u[0]) > 1e-3) return false;
+  }
+  return true;
 }
 
 /**
@@ -288,15 +291,15 @@ export function placeRightAngle(p1, p2, param) {
   const { fromStart, fromEnd, fraction, other } = param;
 
   if (fromStart != null) {
-    x = Math.acos(fromStart * 2 / total);
+    x = Math.acos((fromStart * 2) / total);
   } else if (fromEnd != null) {
-    x = Math.PI - Math.acos(fromEnd * 2 / total);
+    x = Math.PI - Math.acos((fromEnd * 2) / total);
   } else if (fraction != null) x = Math.PI * fraction;
   else throw new TypeError();
 
-  if (!other) x *= -1
+  if (!other) x *= -1;
 
-  const center = placeAlong(p1, p2, {fraction: 0.5});
+  const center = placeAlong(p1, p2, { fraction: 0.5 });
   return rotatePoint(center, p1, x);
 }
 
