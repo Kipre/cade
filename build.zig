@@ -1,4 +1,5 @@
 const std = @import("std");
+const Translator = @import("translate_c").Translator;
 
 const modules = [_][]const u8{
     "OCCT/src/FoundationClasses/TKernel",
@@ -112,10 +113,12 @@ pub fn build(b: *std.Build) void {
     ) orelse "";
     const buildOCCTLibs = std.mem.eql(u8, staticOCCT, "");
 
-    const occ = b.addTranslateC(.{
-        .root_source_file = b.path("src/occ.h"),
+    const translate_c = b.dependency("translate_c", .{});
+    const occ: Translator = .init(translate_c, .{
+        .c_source_file = b.path("src/occ.h"),
         .target = target,
         .optimize = optimize,
+        .default_init = true,
     });
 
     const flattening_tool = b.addExecutable(.{
@@ -153,7 +156,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{
                 .name = "occ",
-                .module = occ.createModule(),
+                .module = occ.mod,
             },
         },
     });
@@ -182,4 +185,3 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 }
-

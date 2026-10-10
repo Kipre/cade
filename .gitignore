@@ -1,5 +1,4 @@
 zig-out
+zig-pkg
 .zig-cache
-*generated-build-config*
-inc
 
