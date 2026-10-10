@@ -227,26 +227,37 @@ export class Path {
    */
   roundFilletSome(getRadius, options = {}) {
     let result = this.clone();
+    const clockwise = this.rotatesClockwise();
 
     const corners = [];
     for (const [one, two] of this.iterateOverJunctions()) {
-      const [i, p1, typeOne, p2, r, sweep] = one;
+      const [, p1, typeOne, p2] = one;
       const [, , typeTwo, p3] = two;
 
       if (typeOne !== "lineTo" || typeTwo !== "lineTo") continue;
       const radius = getRadius(p2);
       if (!radius) continue;
+
+      const entry = Math.atan2(...minus(p2, p1).toReversed());
+      const exit = Math.atan2(...minus(p3, p2).toReversed());
+      const turnsRight = normalizeAngle(exit - entry) < 0;
+
       const corner = new Path();
       const start = placeAlong(p1, p2, { fromEnd: -radius });
       corner.moveTo(p2);
       corner.lineTo(placeAlong(p2, p3, { fromStart: radius }));
-      corner.arc(start, radius, 1);
+      const sweep = turnsRight ? 1 : 0;
+      corner.arc(start, radius, sweep);
       corner.close();
-      corners.push(corner);
+
+      const op = clockwise !== turnsRight ? "union" : "difference";
+      corners.push({ op, corner });
     }
 
-    for (const corner of corners) {
-      result = result.booleanDifference(corner);
+    for (const { op, corner } of corners) {
+      if (op === "union") result = result.realBooleanUnion(corner);
+      else if (op === "difference") result = result.booleanDifference(corner);
+      else throw new Error();
     }
 
     return result;
@@ -768,7 +779,7 @@ export class Path {
     const selfOrdered = rawIntersections.toSorted(intersectionSorter("self"));
 
     // filter-out the intersections that overlap completely
-    const filtered = [];
+    let filtered = [];
     let skipNext = false;
 
     for (const [one, two] of pairs(selfOrdered)) {
@@ -778,15 +789,46 @@ export class Path {
       }
       if (norm(one.point, two.point) < eps) {
         const i1 = one.self.x > 0.5 ? one.self.segment : two.self.segment;
-        const i2 = one.self.x > 0.5 ? two.other.segment : one.other.segment;
-        if (
-          coincideInJunction(this.getJunctionAt(i1), other.getJunctionAt(i2))
-        ) {
-          skipNext = true;
-        }
+        const i2 = one.other.x > 0.5 ? one.other.segment : two.other.segment;
+
+        const j1 = this.getJunctionAt(i1);
+        const j2 = other.getJunctionAt(i2);
+
+        // sanity check to make sure we are on the right junction
+        console.assert(
+          norm(j1[1][1], one.point) +
+          norm(j2[1][1], one.point) +
+          norm(j2[0][3], one.point) +
+          norm(j2[0][3], one.point) <
+          eps,
+          "junctions don't match",
+        );
+
+        if (coincideInJunction(j1, j2)) skipNext = true;
         continue;
       }
       filtered.push(one);
+    }
+
+    // consider an overlap as a single intersection for shapes where it is not
+    // the only overlap
+    if (filtered.length > 2) {
+      const prefiltered = [...filtered];
+      filtered = [];
+      // this might be flawed and fail on some new cases
+      for (const [one, two] of pairs(prefiltered)) {
+        const oneIsAnEdge =
+          one.self.x < eps ||
+          one.self.x > 1 - eps ||
+          one.other.x < eps ||
+          one.other.x > 1 - eps;
+        const twoIsAnEdge =
+          two.self.x < eps ||
+          two.self.x > 1 - eps ||
+          two.other.x < eps ||
+          two.other.x > 1 - eps;
+        if (!(oneIsAnEdge && twoIsAnEdge)) filtered.push(one);
+      }
     }
 
     const length = filtered.length;
