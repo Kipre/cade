@@ -55,8 +55,7 @@ console.log(located);
 frame.addChild(located.child, located.placement);
 
 bro.test("mirrors a simple assembly", async () => {
-  const r = await frame.project();
-  const svg = await r.text();
+  const svg = await frame.project();
 
   bro
     .expect(svg)
