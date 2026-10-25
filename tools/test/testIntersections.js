@@ -1,4 +1,3 @@
-// @ts-check
 import { y2, zero2 } from "../defaults.js";
 import { Path } from "../path.js";
 import bro from "./brotest/brotest.js";

@@ -1,4 +1,3 @@
-// @ts-check
 /** @import * as types from './types' */
 
 import {
@@ -334,4 +333,3 @@ export function getArcBulge(from, to, radius, sweep) {
   const opening = getArcAngularLength(from, to, radius, sweep);
   return Math.tan(opening / 4);
 }
-

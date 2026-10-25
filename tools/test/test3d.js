@@ -1,5 +1,3 @@
-// @ts-check
-
 import { collinear3, projectToPlane } from "../3d.js";
 import { nx3, x3 } from "../defaults.js";
 import bro from "./brotest/brotest.js";

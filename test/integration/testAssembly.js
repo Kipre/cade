@@ -1,13 +1,10 @@
-// @ts-check
-
+import { Assembly } from "../../lib/assembly.js";
 import { x3, y3, z3, zero3 } from "../../lib/defaults.js";
-import { Assembly } from "../../lib/lib.js";
 import { cut, extrusion, fuse } from "../../lib/operations.js";
 import { Part } from "../../lib/part.js";
 import { Path } from "../../tools/path.js";
 import bro from "../../tools/test/brotest/brotest.js";
 import { a2m, intersectPlanes } from "../../tools/transform.js";
-
 
 const length = 500;
 const height = 1000;
@@ -24,7 +21,11 @@ square.addChild(across, a2m([0, 0, height], y3));
 
 const bottomSupport = new Assembly("bottom support");
 const bottomRect = new Part("bottom rect", extrusion(a2m(), length, profile));
-bottomRect.newSymmetries = [a2m(zero3, x3), a2m(zero3, y3), a2m([0, 0, length / 2], z3)];
+bottomRect.newSymmetries = [
+  a2m(zero3, x3),
+  a2m(zero3, y3),
+  a2m([0, 0, length / 2], z3),
+];
 
 bottomSupport.addChild(bottomRect);
 
@@ -34,15 +35,21 @@ const holderExtrusion = extrusion(a2m(), holderLength, profile2);
 const railClearance = extrusion(
   a2m([0, -40, 50], y3),
   50 * 2,
-  profile.recenter({ x: "start" }).offset(4)
+  profile.recenter({ x: "start" }).offset(4),
 );
 
-const wheelHolder = new Part("wheel holder", cut(holderExtrusion, railClearance));
+const wheelHolder = new Part(
+  "wheel holder",
+  cut(holderExtrusion, railClearance),
+);
 wheelHolder.newSymmetries = [a2m(zero3, y3), a2m(zero3, z3)];
 
 bottomSupport.addChild(wheelHolder, a2m([0, 0, length]));
 
-square.addChild(bottomSupport, a2m([0, length, height], [0, -length, -height / 2]));
+square.addChild(
+  bottomSupport,
+  a2m([0, length, height], [0, -length, -height / 2]),
+);
 
 frame.addChild(square);
 
@@ -57,10 +64,8 @@ frame.addChild(located.child, located.placement);
 bro.test("mirrors a simple assembly", async () => {
   const svg = await frame.project();
 
-  bro
-    .expect(svg)
-    .toBe(
-      `<svg xmlns="http://www.w3.org/2000/svg" transform="scale(1, -1)" viewBox="-309.15714 465.49826 649.1384 531.9337" style="background: #3392e6">
+  bro.expect(svg).toBe(
+    `<svg xmlns="http://www.w3.org/2000/svg" transform="scale(1, -1)" viewBox="-309.15714 465.49826 649.1384 531.9337" style="background: #3392e6">
 <g fill="none" stroke-width="1px">
 <path d="M -12.288479 997.43195 L -299.01965 899.67004 L -299.01965 875.3925 "/>
 <path d="M 12.288479 944.7709 L -274.4427 847.009 "/>
@@ -117,6 +122,5 @@ bro.test("mirrors a simple assembly", async () => {
 <path d="M 245.1273 483.85834 L 253.4425 500.7744 "/>
 </g>
 </svg>`,
-    );
+  );
 });
-

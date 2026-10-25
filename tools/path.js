@@ -1,4 +1,3 @@
-// @ts-check
 /** @import * as types from './types' */
 
 import {
@@ -39,7 +38,7 @@ import { BBox, debugGeometry } from "./svg.js";
 import { applyTransformMatrix } from "./transform.js";
 import { modulo } from "./utils.js";
 
-class RoundFilletError extends TypeError { }
+class RoundFilletError extends TypeError {}
 
 const eps = 1e-5;
 
@@ -312,8 +311,8 @@ export class Path {
       4 *
       Math.sqrt(
         halfPerimeter *
-        (halfPerimeter - length) *
-        (halfPerimeter - lengthToCenterpoint) ** 2,
+          (halfPerimeter - length) *
+          (halfPerimeter - lengthToCenterpoint) ** 2,
       );
     const radius = (length * lengthToCenterpoint ** 2) / divider;
 
@@ -401,8 +400,8 @@ export class Path {
         type2 === "arc" &&
         areOnSameCircle(p0, p1, r1, s1, p1, p2, r2, s2) &&
         Math.abs(getArcAngularLength(p0, p1, r1, s1)) +
-        Math.abs(getArcAngularLength(p1, p2, r2, s2)) <
-        Math.PI
+          Math.abs(getArcAngularLength(p1, p2, r2, s2)) <
+          Math.PI
       ) {
         this.controls.splice(i, 1);
         nbControlsToCheck--;
@@ -663,7 +662,7 @@ export class Path {
               crossesFromTheRight =
                 !!sweep ===
                 pointCoordinateOnLine(point, p1, p2) <
-                pointCoordinateOnLine(projectedCenter, p1, p2);
+                  pointCoordinateOnLine(projectedCenter, p1, p2);
             }
 
             result.push({ point, segment: i, x, crossesFromTheRight });
@@ -797,10 +796,10 @@ export class Path {
         // sanity check to make sure we are on the right junction
         console.assert(
           norm(j1[1][1], one.point) +
-          norm(j2[1][1], one.point) +
-          norm(j2[0][3], one.point) +
-          norm(j2[0][3], one.point) <
-          eps,
+            norm(j2[1][1], one.point) +
+            norm(j2[0][3], one.point) +
+            norm(j2[0][3], one.point) <
+            eps,
           "junctions don't match",
         );
 

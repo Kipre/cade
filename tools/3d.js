@@ -1,7 +1,6 @@
-// @ts-check
 /** @import * as types from './types' */
 
-import { eps } from './2d.js';
+import { eps } from "./2d.js";
 
 /**
  * @param {types.Point3} v

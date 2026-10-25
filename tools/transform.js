@@ -1,8 +1,16 @@
-// @ts-check
 /** @import * as types from './types' */
 
 import { eps, norm, rotatePoint } from "./2d.js";
-import { collinear3, cross, dot3, minus3, mult3, norm3, normalize3, plus3 } from "./3d.js";
+import {
+  collinear3,
+  cross,
+  dot3,
+  minus3,
+  mult3,
+  norm3,
+  normalize3,
+  plus3,
+} from "./3d.js";
 import { x3, y3, z3, zero3 } from "./defaults.js";
 import { DOMMatrix, DOMPoint } from "./dom.js";
 import { w3svg } from "./svg.js";
@@ -80,8 +88,7 @@ export function a2m(maybeOrigin = null, maybeUp = null, maybeDir = null) {
   const origin = maybeOrigin ?? [0, 0, 0];
   let dir = maybeDir ?? [1, 0, 0];
   const up = maybeUp ?? [0, 0, 1];
-  if (norm3(cross(up, dir)) < eps)
-    dir = [0, 1, 0];
+  if (norm3(cross(up, dir)) < eps) dir = [0, 1, 0];
 
   const z = normalize3(up);
   const y = normalize3(cross(z, dir));
@@ -89,10 +96,22 @@ export function a2m(maybeOrigin = null, maybeUp = null, maybeDir = null) {
 
   // prettier-ignore
   const transform = new DOMMatrix([
-    x[0], x[1], x[2], 0,
-    y[0], y[1], y[2], 0,
-    z[0], z[1], z[2], 0,
-    origin[0], origin[1], origin[2], 1,
+    x[0],
+    x[1],
+    x[2],
+    0,
+    y[0],
+    y[1],
+    y[2],
+    0,
+    z[0],
+    z[1],
+    z[2],
+    0,
+    origin[0],
+    origin[1],
+    origin[2],
+    1,
   ]);
 
   return transform;
@@ -137,10 +156,7 @@ export function intersectPlanes(plane1, plane2) {
   // point = ((d1 * n2 - d2 * n1) × direction) / |direction|²
   const temp = minus3(mult3(n2, d1), mult3(n1, d2));
 
-  const point = mult3(
-    cross(temp, direction),
-    1 / (dirLength * dirLength)
-  );
+  const point = mult3(cross(temp, direction), 1 / (dirLength * dirLength));
 
   return a2m(point, dir);
 }
@@ -173,10 +189,13 @@ export function computeTransformFromPoints(sourcePts, targetPts) {
 export function linearizationMatrix(p1, p2) {
   return computeTransformFromPoints(
     [p1, p2, rotatePoint(p1, p2, Math.PI / 2)],
-    [[0, 0], [1, 0], [0, 1]],
+    [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+    ],
   );
 }
-
 
 /**
  * @param {{ from: DOMMatrix; to: DOMMatrix; }[]} constraints
@@ -197,8 +216,7 @@ export function locateWithConstraints(...constraints) {
     else if (norm(axis, y3) < eps) {
       zee = cross(atm3(to, x3, true), axisHere);
       eax = cross(axisHere, zee);
-    }
-    else throw new Error();
+    } else throw new Error();
 
     loc = plus3(mult3(axisHere, dot3(axisHere, og)), loc);
   }

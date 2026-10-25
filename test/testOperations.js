@@ -1,5 +1,3 @@
-// @ts-check
-
 import { nz3, y3 } from "../lib/defaults.js";
 import { cut, extrusion, fuse, retrieveOperations } from "../lib/operations.js";
 import { Part } from "../lib/part.js";

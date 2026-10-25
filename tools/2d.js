@@ -1,4 +1,3 @@
-// @ts-check
 /** @import * as types from './types' */
 
 export const eps = 1e-5;

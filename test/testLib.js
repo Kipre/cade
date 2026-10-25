@@ -1,8 +1,6 @@
-// @ts-check
-
+import { Assembly } from "../lib/assembly.js";
 import { nx3, ny3, nz3, x3, y3 } from "../lib/defaults.js";
 import { FlatPart } from "../lib/flat.js";
-import { Assembly } from "../lib/lib.js";
 import { extrusion } from "../lib/operations.js";
 import { Part } from "../lib/part.js";
 import { cut } from "../lib/shelf.js";
@@ -32,6 +30,6 @@ bro.test("assembly mirroring", () => {
       [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 52, 40, -36, 1],
       [0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, -16, 10, 12, 1],
       [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -20, 1],
-      [-1, 0, 0, 0, 0, 0, -1, 0, 0, -1, 0, 0, 100, 20, 50, 1]
+      [-1, 0, 0, 0, 0, 0, -1, 0, 0, -1, 0, 0, 100, 20, 50, 1],
     ]);
 });

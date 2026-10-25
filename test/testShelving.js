@@ -1,7 +1,5 @@
-// @ts-check
-
+import { Assembly } from "../lib/assembly.js";
 import { FlatPart } from "../lib/flat.js";
-import { Assembly } from "../lib/lib.js";
 import { ShelfMaker } from "../lib/shelf.js";
 import { nx3, x3 } from "../tools/defaults.js";
 import { Path } from "../tools/path.js";

@@ -1,5 +1,3 @@
-// @ts-check
-
 import { mat4, vec3 } from "wgpu-matrix";
 import { clamp } from "./utils.js";
 
@@ -31,9 +29,11 @@ class BaseCamera {
     this.canvas = document.querySelector("canvas");
     if (this.canvas == null) throw new Error();
 
-    this.canvas.addEventListener("pointerdown", (e) => this.handlePointerDown(e));
+    this.canvas.addEventListener("pointerdown", (e) =>
+      this.handlePointerDown(e),
+    );
     this.canvas.addEventListener("pointerup", this.handlePointerUp);
-    this.canvas.addEventListener("wheel", e => this.handleMouseWheel(e));
+    this.canvas.addEventListener("wheel", (e) => this.handleMouseWheel(e));
     this.pitch = pitch;
     this.yaw = yaw;
     this.size = size;
@@ -71,7 +71,7 @@ class BaseCamera {
     this.lastY = event.clientY;
     this.isMoving = true;
 
-    this.canvas.onpointermove = e => this.handleMouseMove(e);
+    this.canvas.onpointermove = (e) => this.handleMouseMove(e);
     this.canvas.setPointerCapture(event.pointerId);
   }
 
@@ -108,7 +108,7 @@ class BaseCamera {
       maxZoom * this.size,
     );
     this.saveToCache();
-  };
+  }
 
   /**
    * @param {number} mouseDeltaX
@@ -189,10 +189,13 @@ export class CADOrthoCamera extends OrthoCamera {
   }
 
   setNextTarget(target, center) {
-    const ndcClick = center != null ? [
-      (2 * center[0]) / this.canvas.width - 1,
-      (2 * center[1]) / this.canvas.height - 1
-    ] : null;
+    const ndcClick =
+      center != null
+        ? [
+            (2 * center[0]) / this.canvas.width - 1,
+            (2 * center[1]) / this.canvas.height - 1,
+          ]
+        : null;
     this.nextTarget = target;
     this.nextCenter = ndcClick;
   }
@@ -213,11 +216,11 @@ export class CADOrthoCamera extends OrthoCamera {
       this.target = vec3.create(...this.nextTarget);
       this.center = [
         (2 * event.clientX) / this.canvas.width - 1,
-        (2 * event.clientY) / this.canvas.height - 1
+        (2 * event.clientY) / this.canvas.height - 1,
       ];
     }
     super.handleMouseWheel(event);
-  };
+  }
 
   getMVP() {
     const view = this.getView();

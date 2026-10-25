@@ -1,4 +1,3 @@
-// @ts-check
 /** @import * as types from './types' */
 
 const zero3 = /** @type {types.Point3} */ ([0, 0, 0]);

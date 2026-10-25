@@ -1,6 +1,3 @@
-// @ts-check
-
-import { Assembly } from "../../lib/lib.js";
 import { LinearPart } from "../../lib/linear.js";
 import { Path } from "../../tools/path.js";
 import bro from "../../tools/test/brotest/brotest.js";

@@ -1,4 +1,3 @@
-// @ts-check
 /** @import * as types from './types' */
 
 /**

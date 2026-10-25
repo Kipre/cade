@@ -1,4 +1,3 @@
-// @ts-check
 import { plus, pointToLine, rotatePoint } from "../2d.js";
 import { Path } from "../path.js";
 import bro from "./brotest/brotest.js";

@@ -1,4 +1,3 @@
-// @ts-check
 /** @import * as types from './types' */
 
 /**
@@ -14,8 +13,8 @@ export function keyToComparison(func) {
   return (a, b) => func(a) - func(b);
 }
 
-export const keyToComparison2d = func => (a, b) => {
+export const keyToComparison2d = (func) => (a, b) => {
   const va = func(a);
   const vb = func(b);
-  return va[0] !== vb[0] ? va[0] - vb[0] : va[1] - vb[1]
-}
+  return va[0] !== vb[0] ? va[0] - vb[0] : va[1] - vb[1];
+};

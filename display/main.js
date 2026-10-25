@@ -1,5 +1,3 @@
-// @ts-check
-
 import { mat4, utils, vec3, vec4 } from "wgpu-matrix";
 import { zero3 } from "../lib/defaults.js";
 import { Material } from "../lib/materials.js";
@@ -42,11 +40,10 @@ let pickerTimeoutId;
 let hoveredGeometry = MAX_U16;
 let hoveredInstance = MAX_U16;
 
-
 window.addEventListener("keydown", (event) => {
   if (event.code === "KeyP") {
     console.log(camera.getPosition());
-  };
+  }
 
   if (hoveredGeometry === MAX_U16) return;
 
@@ -133,11 +130,13 @@ function makeOutlinePipeline(device, layout) {
   const vertex = {
     module: vertModule,
     entryPoint: "main",
-    buffers: [{
-      attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
-      arrayStride: 3 * 4,
-      stepMode: "vertex",
-    }],
+    buffers: [
+      {
+        attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
+        arrayStride: 3 * 4,
+        stepMode: "vertex",
+      },
+    ],
   };
 
   const fragModule = device.createShaderModule({ code: lineFragmentShader });
@@ -454,7 +453,6 @@ export async function displayScene(items) {
   });
 
   function writeBuffers(queue) {
-
     for (let i = 0; i < items.length; i++) {
       const instances = sortedItems[i].instances;
       for (let j = 0; j < instances.length; j++) {

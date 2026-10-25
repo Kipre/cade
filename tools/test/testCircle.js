@@ -1,5 +1,3 @@
-// @ts-check
-
 import { rotatePoint } from "../2d.js";
 import {
   arcExtrema,
@@ -229,6 +227,10 @@ bro.test("finds arc extrema", () => {
 bro.test("computes arc bulges", () => {
   bro.expect(getArcBulge([0, 0], [1, 0], 0.5, 1)).toRoughlyEqual(1, 1e-15);
   bro.expect(getArcBulge([0, 0], [1, 0], 0.5, 0)).toRoughlyEqual(-1, 1e-15);
-  bro.expect(getArcBulge([0, 0], [1, 0], 1, 0)).toRoughlyEqual(-0.26794919243112286, 1e-15);
-  bro.expect(getArcBulge([0, 0], [1, 0], 5, 0)).toRoughlyEqual(-0.050125628933800424, 1e-15);
+  bro
+    .expect(getArcBulge([0, 0], [1, 0], 1, 0))
+    .toRoughlyEqual(-0.26794919243112286, 1e-15);
+  bro
+    .expect(getArcBulge([0, 0], [1, 0], 5, 0))
+    .toRoughlyEqual(-0.050125628933800424, 1e-15);
 });

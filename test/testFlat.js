@@ -1,5 +1,4 @@
-// @ts-check
-
+import { Assembly } from "../lib/assembly.js";
 import { x3 } from "../lib/defaults.js";
 import {
   FlatPart,
@@ -9,7 +8,6 @@ import {
   spindleCleared2LineTo,
   spindleClearedLineTo,
 } from "../lib/flat.js";
-import { Assembly } from "../lib/lib.js";
 import {
   findConvexZones,
   makeSimpleMortise,

@@ -1,7 +1,5 @@
-// @ts-check
-
+import { Assembly } from "../lib/assembly.js";
 import { nz3, x3, y3, zero2, zero3 } from "../lib/defaults.js";
-import { Assembly } from "../lib/lib.js";
 import { blackMetalMaterial, metalMaterial } from "../lib/materials.js";
 import { cut, extrusion, fuse } from "../lib/operations.js";
 import { Part } from "../lib/part.js";
@@ -112,7 +110,7 @@ export const isoFastenerSizes = {
   },
 };
 
-export class Fastener extends Part {};
+export class Fastener extends Part {}
 
 /**
  * @param {"M3" | "M4" | "M5" | "M6" | "M8"} size
@@ -212,10 +210,16 @@ const m5hole = extrusion(
   Path.makeCircle(5 / 2),
 );
 
-export const cylinderNut = new Fastener("m6 cylinder nut", cut(cylinder, m6hole));
+export const cylinderNut = new Fastener(
+  "m6 cylinder nut",
+  cut(cylinder, m6hole),
+);
 cylinderNut.material = metalMaterial;
 
-export const m5CylinderNut = new Fastener("m5 cylinder nut", cut(cylinder, m5hole));
+export const m5CylinderNut = new Fastener(
+  "m5 cylinder nut",
+  cut(cylinder, m5hole),
+);
 m5CylinderNut.material = metalMaterial;
 
 /**
