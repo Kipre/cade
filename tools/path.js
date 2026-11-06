@@ -1,4 +1,4 @@
-/** @import * as types from './types' */
+/** @import { Point } from './types' */
 
 import {
   areOnSameLine,
@@ -38,14 +38,14 @@ import { BBox, debugGeometry } from "./svg.js";
 import { applyTransformMatrix } from "./transform.js";
 import { modulo } from "./utils.js";
 
-class RoundFilletError extends TypeError {}
+class RoundFilletError extends TypeError { }
 
 const eps = 1e-5;
 
 /**
  * @typedef {{segment: number; x: number; crossesFromTheRight: boolean}} IntersectionLocation
- * @typedef {{point: types.Point} & IntersectionLocation} SimpleIntersection
- * @typedef {{point: types.Point; self: IntersectionLocation, other: IntersectionLocation}} PathIntersection
+ * @typedef {{point: Point} & IntersectionLocation} SimpleIntersection
+ * @typedef {{point: Point; self: IntersectionLocation, other: IntersectionLocation}} PathIntersection
  */
 
 export class Path {
@@ -106,7 +106,7 @@ export class Path {
   }
 
   /**
-   * @param {types.Point} p
+   * @param {Point} p
    */
   moveTo(p) {
     if (this.controls.length)
@@ -115,7 +115,7 @@ export class Path {
   }
 
   /**
-   * @param {types.Point} p
+   * @param {Point} p
    */
   lineTo(p) {
     this.controls.push(["lineTo", p]);
@@ -265,7 +265,7 @@ export class Path {
   /**
    * Connects a tangent arc between two last and next points
    *
-   * @param {types.Point | ((p: types.Point) => types.Point)} p
+   * @param {Point | ((p: Point) => Point)} p
    * @param {number} radius
    * @param {RoundFilletOptions} options
    */
@@ -285,7 +285,7 @@ export class Path {
   /**
    * Classic SVG arc definition: start, end radius and sweep flag
    *
-   * @param {types.Point} p
+   * @param {Point} p
    * @param {number} radius
    * @param {number} sweepFlag
    */
@@ -297,7 +297,7 @@ export class Path {
    * Arc defined by start, end and distance off the straignt line
    *
    * TODO: ensure positive of remove sweep flag
-   * @param {types.Point} p
+   * @param {Point} p
    * @param {number} sagitta
    * @param {number} sweepFlag
    */
@@ -311,8 +311,8 @@ export class Path {
       4 *
       Math.sqrt(
         halfPerimeter *
-          (halfPerimeter - length) *
-          (halfPerimeter - lengthToCenterpoint) ** 2,
+        (halfPerimeter - length) *
+        (halfPerimeter - lengthToCenterpoint) ** 2,
       );
     const radius = (length * lengthToCenterpoint ** 2) / divider;
 
@@ -320,8 +320,8 @@ export class Path {
   }
 
   /**
-   * @param {types.Point} p1
-   * @param {types.Point} p2
+   * @param {Point} p1
+   * @param {Point} p2
    */
   intersectLineTo(p1, p2) {
     const [, lastPoint, type, point, radius, sweep] = this.getSegmentAt(-1);
@@ -400,8 +400,8 @@ export class Path {
         type2 === "arc" &&
         areOnSameCircle(p0, p1, r1, s1, p1, p2, r2, s2) &&
         Math.abs(getArcAngularLength(p0, p1, r1, s1)) +
-          Math.abs(getArcAngularLength(p1, p2, r2, s2)) <
-          Math.PI
+        Math.abs(getArcAngularLength(p1, p2, r2, s2)) <
+        Math.PI
       ) {
         this.controls.splice(i, 1);
         nbControlsToCheck--;
@@ -441,8 +441,8 @@ export class Path {
   }
 
   /**
-   * @param {types.Point?} l1
-   * @param {types.Point?} l2
+   * @param {Point?} l1
+   * @param {Point?} l2
    */
   mirror(l1 = null, l2 = null) {
     const [[first, firstPoint]] = this.controls;
@@ -503,8 +503,8 @@ export class Path {
   }
 
   /**
-   * @param {types.Point} start
-   * @param {types.Point} end
+   * @param {Point} start
+   * @param {Point} end
    * @param {number} radius
    * @param {number} sweep
    * @returns {SimpleIntersection[]}
@@ -526,9 +526,9 @@ export class Path {
   }
 
   /**
-   * @param {types.Point} center
+   * @param {Point} center
    * @param {number} radius
-   * @returns {(SimpleIntersection & {tangent: [types.Point, types.Point]})[]}
+   * @returns {(SimpleIntersection & {tangent: [Point, Point]})[]}
    */
   intersectCircle(center, radius) {
     const result = [];
@@ -592,13 +592,14 @@ export class Path {
   }
 
   /**
-   * @param {types.Point} p1
-   * @param {types.Point} p2
+   * @param {Point} p1
+   * @param {Point} p2
    * @returns {SimpleIntersection[]}
    */
   intersectLine(p1, p2, strict = true) {
     const result = [];
     let firstPoint;
+    /** @type {Point} */
     let lastPoint;
 
     if (norm(p1, p2) < eps)
@@ -627,12 +628,16 @@ export class Path {
           )
             break;
 
-          // the line were intersecting overlaps with another
+          // the line we're intersecting overlaps with another
           if (areOnSameLine(p1, p2, lastPoint, p)) {
             break;
           }
 
-          const crossesFromTheRight = isToTheLeft(p2, lastPoint, p);
+          const crossesFromTheRight =
+            norm(p1, int) > eps
+              ? !isToTheLeft(p1, lastPoint, p)
+              : isToTheLeft(p2, lastPoint, p);
+
           const x = pointCoordinateOnLine(int, lastPoint, p);
 
           result.push({ point: int, segment: i, x, crossesFromTheRight });
@@ -662,7 +667,7 @@ export class Path {
               crossesFromTheRight =
                 !!sweep ===
                 pointCoordinateOnLine(point, p1, p2) <
-                  pointCoordinateOnLine(projectedCenter, p1, p2);
+                pointCoordinateOnLine(projectedCenter, p1, p2);
             }
 
             result.push({ point, segment: i, x, crossesFromTheRight });
@@ -786,27 +791,57 @@ export class Path {
         skipNext = false;
         continue;
       }
-      if (norm(one.point, two.point) < eps) {
-        const i1 = one.self.x > 0.5 ? one.self.segment : two.self.segment;
-        const i2 = one.other.x > 0.5 ? one.other.segment : two.other.segment;
 
-        const j1 = this.getJunctionAt(i1);
-        const j2 = other.getJunctionAt(i2);
-
-        // sanity check to make sure we are on the right junction
-        console.assert(
-          norm(j1[1][1], one.point) +
-            norm(j2[1][1], one.point) +
-            norm(j2[0][3], one.point) +
-            norm(j2[0][3], one.point) <
-            eps,
-          "junctions don't match",
-        );
-
-        if (coincideInJunction(j1, j2)) skipNext = true;
+      if (norm(one.point, two.point) > eps) {
+        filtered.push(one);
         continue;
       }
-      filtered.push(one);
+
+      // case where one path cuts precisely through the vertex of another so it
+      // intersects with both edges of the angle
+      if (
+        (one.other.segment === two.other.segment &&
+          Math.abs(
+            modulo(one.self.segment, this.controls.length - 1) -
+            two.self.segment,
+          ) === 1) ||
+        (one.self.segment === two.self.segment &&
+          Math.abs(
+            modulo(one.other.segment, other.controls.length - 1) -
+            two.other.segment,
+          ) === 1)
+      ) {
+        filtered.push(one);
+        skipNext = true;
+        continue;
+      }
+
+      // case where both paths overlap in a vertex, say AOB and AO intersects
+      // OB' and A'O intersects OB.
+      const i1 = one.self.x > 0.5 ? one.self.segment : two.self.segment;
+      const i2 = one.other.x > 0.5 ? one.other.segment : two.other.segment;
+
+      const j1 = this.getJunctionAt(i1);
+      const j2 = other.getJunctionAt(i2);
+
+      // sanity check to make sure we are on the right junction
+      const junctionsAreCorrect =
+        norm(j1[0][3], one.point) +
+        norm(j1[1][1], one.point) +
+        norm(j2[0][3], one.point) +
+        norm(j2[1][1], one.point) <
+        eps;
+
+      if (!junctionsAreCorrect) {
+        // console.assert(junctionsAreCorrect, "junctions don't match");
+        console.log(one);
+        console.log(two);
+        console.log(j1);
+        console.log(j2);
+        throw new Error("expected junctions to meet");
+      }
+
+      if (coincideInJunction(j1, j2)) skipNext = true;
     }
 
     // consider an overlap as a single intersection for shapes where it is not
@@ -826,7 +861,14 @@ export class Path {
           two.self.x > 1 - eps ||
           two.other.x < eps ||
           two.other.x > 1 - eps;
-        if (!(oneIsAnEdge && twoIsAnEdge)) filtered.push(one);
+        if (
+          !(
+            oneIsAnEdge &&
+            twoIsAnEdge &&
+            one.self.crossesFromTheRight === two.self.crossesFromTheRight
+          )
+        )
+          filtered.push(one);
       }
     }
 
@@ -1016,8 +1058,9 @@ export class Path {
   }
 
   /**
-   * @param {types.Point} l1
-   * @param {types.Point} l2
+   * @param {Point} l1
+   * @param {Point} l2
+   * TODO: make it use an intersection loop and output two candidates
    */
   cutOnLine(l1, l2, other = false) {
     const bbox = this.bbox();
@@ -1062,15 +1105,16 @@ export class Path {
   }
 
   /**
-   * @returns {types.Point[]}
+   * @returns {Point[]}
    */
   getPointsWithHalfArcs() {
     const points = [];
     for (const segment of this.iterateOverSegments()) {
       const [, p1, type, p2, r, sweep] = segment;
-      if (type === "arc") {
-        points.push(evaluateArc(0.5, p1, p2, r, sweep));
-      }
+
+      if (points.length === 0 && !this.isClosed()) points.push(p1);
+      if (type === "arc") points.push(evaluateArc(0.5, p1, p2, r, sweep));
+
       points.push(p2);
     }
     return points;
@@ -1081,7 +1125,7 @@ export class Path {
    * TODO: optimize
    * Fails if one points falls on a control point
    * @param {number} distance
-   * @returns {types.Point[]}
+   * @returns {Point[]}
    */
   getEquidistantPoints(distance) {
     const points = [];
@@ -1306,7 +1350,7 @@ export class Path {
   }
 
   /**
-   * @param {types.Point[]} polyline
+   * @param {Point[]} polyline
    */
   static fromPolyline(polyline, close = true) {
     const result = new Path();
@@ -1365,7 +1409,7 @@ export class Path {
   }
 
   /**
-   * @param {types.Point} p
+   * @param {Point} p
    * @returns {Path}
    */
   translate(p) {
@@ -1428,7 +1472,7 @@ export class Path {
 
   /**
    * @param {number} angle
-   * @param {types.Point} center
+   * @param {Point} center
    * @returns {Path}
    */
   rotate(angle, center = [0, 0]) {
@@ -1587,8 +1631,8 @@ export class Path {
   }
 
   /**
-   * @param {types.Point} l1
-   * @param {types.Point} l2
+   * @param {Point} l1
+   * @param {Point} l2
    * @param {{ exact?: boolean; includedInSegment?: boolean; includedInLine?: boolean; } | undefined} [options]
    */
   findSegmentsOnLine(l1, l2, options) {
@@ -1721,7 +1765,7 @@ export class Path {
   /**
    * Drag the path to some other place and save the resulting shape
    * for now it only supports a simple verctor
-   * @param {types.Point} point
+   * @param {Point} point
    * @returns {Path}
    */
   drag(point) {
@@ -1754,7 +1798,7 @@ export class Path {
   }
 
   /**
-   * @param {(x: types.Point) => boolean} finder
+   * @param {(x: Point) => boolean} finder
    */
   deletePoints(finder) {
     const newControls = [];

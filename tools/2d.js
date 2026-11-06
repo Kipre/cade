@@ -204,20 +204,21 @@ export function intersectLines(p0, p1, l0, l1) {
  * @param {types.Point} p
  * @param {types.Point} l1
  * @param {types.Point} l2
+ * @param {number} tol -- error tolerance
  * @returns {boolean}
  */
-export function pointInsideLineBbox(p, l1, l2) {
-  const [minX1, maxX1, minY1, maxY1] = [
+export function pointInsideLineBbox(p, l1, l2, tol=eps) {
+  const [minX, maxX, minY, maxY] = [
     Math.min(l1[0], l2[0]),
     Math.max(l1[0], l2[0]),
     Math.min(l1[1], l2[1]),
     Math.max(l1[1], l2[1]),
   ];
   return (
-    minX1 <= p[0] + eps &&
-    p[0] - eps <= maxX1 &&
-    minY1 <= p[1] + eps &&
-    p[1] - eps <= maxY1
+    minX - tol <= p[0] &&
+    p[0] <= maxX + tol &&
+    minY - tol <= p[1] &&
+    p[1] <= maxY + tol
   );
 }
 

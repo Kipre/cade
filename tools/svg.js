@@ -1,4 +1,6 @@
-/** @import * as types from './types' */
+/**
+ * @import { Point, Point3 } from "./types"
+ */
 
 import { Path } from "./path.js";
 
@@ -20,7 +22,7 @@ export class BBox {
   }
 
   /**
-   * @param { types.Point | types.Point3 } point
+   * @param { Point | Point3 } point
    * @param { any } metadata
    */
   include(point, metadata = null) {
@@ -38,7 +40,7 @@ export class BBox {
   }
 
   /**
-   * @returns {types.Point | types.Point3}
+   * @returns {Point | Point3}
    */
   extrema() {
     if (Number.isFinite(this.zMin))
@@ -101,7 +103,7 @@ export class BBox {
   }
 
   /**
-   * @returns {types.Point3 | types.Point}
+   * @returns {Point3 | Point}
    */
   center() {
     const result = [(this.xMax + this.xMin) / 2, (this.yMax + this.yMin) / 2];
@@ -237,9 +239,11 @@ export function debugArc(start, end, radius, sweep) {
 }
 
 /**
- * @param {(types.Point[] | string | Path)[]} shapes
+ * @param {(Point[] | string | Path | Point)[]} shapes
  */
 export function debugGeometry(...shapes) {
+  const err = new Error();
+  console.log(err);
   if (typeof document === "undefined") return;
 
   const id = "debug-drawing";
@@ -257,42 +261,98 @@ export function debugGeometry(...shapes) {
     markerUnits="strokeWidth">
     <circle cx="5" cy="5" r="3" stroke-width="1" stroke="context-stroke" fill="context-fill" />
   </marker>
-    <marker
-      id="arrow"
-      viewBox="0 0 10 10"
-      refX="1"
-      refY="5"
-      markerUnits="strokeWidth"
-      markerWidth="5"
-      markerHeight="10"
-      orient="auto">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
-    </marker>
-    <marker
-      id="start-line"
-      viewBox="0 0 10 10"
-      refX="1"
-      refY="5"
-      markerUnits="strokeWidth"
-      markerWidth="5"
-      markerHeight="10"
-      orient="auto">
-      <path d="M 4 0 L 4 10 L 6 10 L 6 0 Z" fill="context-stroke" />
-    </marker>
+  <marker
+    id="arrow"
+    viewBox="0 0 10 10"
+    refX="1"
+    refY="5"
+    markerUnits="strokeWidth"
+    markerWidth="5"
+    markerHeight="10"
+    orient="auto">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
+  </marker>
+  <marker
+    id="start-line"
+    viewBox="0 0 10 10"
+    refX="1"
+    refY="5"
+    markerUnits="strokeWidth"
+    markerWidth="5"
+    markerHeight="10"
+    orient="auto">
+    <path d="M 4 0 L 4 10 L 6 10 L 6 0 Z" fill="context-stroke" />
+  </marker>
 </defs>`;
     svg.id = id;
     document.body.appendChild(svg);
   }
+
+  svg.addEventListener("wheel", (/** @type {WheelEvent} */ e) => {
+    e.preventDefault();
+    const vb = svg.viewBox.baseVal;
+    const k = Math.exp(e.deltaY * 0.001); // > 1 zooms out, < 1 zooms in
+    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(
+      svg.getScreenCTM().inverse(),
+    );
+    vb.x = p.x - (p.x - vb.x) * k;
+    vb.y = p.y - (p.y - vb.y) * k;
+    vb.width *= k;
+    vb.height *= k;
+    svg.style.fontSize = `${12 / svg.getScreenCTM().a}px`;
+  });
+
+  /** @type {PointerEvent?} */
+  let last = null;
+  svg.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    last = e;
+    svg.setPointerCapture(e.pointerId);
+  });
+  svg.addEventListener("pointermove", (e) => {
+    if (!last) return;
+    const vb = svg.viewBox.baseVal;
+    const d = new DOMPoint(
+      e.clientX - last.clientX,
+      e.clientY - last.clientY,
+      0,
+      0,
+    ).matrixTransform(svg.getScreenCTM().inverse());
+    vb.x -= d.x;
+    vb.y -= d.y;
+    last = e;
+  });
+  svg.addEventListener("pointerup", () => (last = null));
+
   const bbox = BBox.fromDataset(svg);
   const colors = ["red", "green", "blue", "purple", "brown"];
 
   for (let i = 0; i < shapes.length; i++) {
     let shape = shapes[i];
-    const color = colors[i % shapes.length];
+    const color = colors[i % colors.length];
+
+    // this is a point
+    if (Number.isFinite(shape[0])) {
+      const [x, y] = shape;
+      const point = document.createElementNS(w3svg, "circle");
+      point.setAttribute("stroke", "black");
+      point.setAttribute("fill", color);
+      point.setAttribute("style", "opacity: 0.8");
+      point.setAttribute("r", "1em");
+      point.setAttribute("cx", x);
+      point.setAttribute("cy", y);
+      bbox.include([x, y]);
+
+      const title = document.createElementNS(w3svg, "title");
+      title.textContent = `point n° ${i} ${x} ${y}`;
+      point.appendChild(title);
+      svg.appendChild(point);
+      continue;
+    }
 
     let marker = "url(#arrow)";
-    let path;
-    if (Array.isArray(shape)) {
+    const fromArray = Array.isArray(shape);
+    if (fromArray) {
       const [first, ...points] = shape;
       shape = new Path();
       shape.moveTo(first);
@@ -301,7 +361,7 @@ export function debugGeometry(...shapes) {
       marker = "url(#circle)";
     }
 
-    path = document.createElementNS(w3svg, "path");
+    const path = document.createElementNS(w3svg, "path");
     path.setAttribute("d", shape.toString());
     path.setAttribute("stroke", color);
     path.setAttribute("style", "opacity: 0.8");
@@ -315,6 +375,9 @@ export function debugGeometry(...shapes) {
       const p = path.getPointAtLength(totalLength * i);
       bbox.include([p.x, p.y]);
     }
+    const title = document.createElementNS(w3svg, "title");
+    title.textContent = `${fromArray ? "array" : "path"} ${i}`;
+    path.appendChild(title);
     svg.appendChild(path);
   }
 
@@ -326,17 +389,15 @@ export function debugGeometry(...shapes) {
 
   for (const el of svg.querySelectorAll(".axes")) el.remove();
   svg.innerHTML = `
-  <line class="axes" x1="${bbox.xMin - mgn / 2}" x2=${
-    bbox.xMax + mgn / 2
-  } stroke="black" marker-end="url(#arrow)"/>
-  <line class="axes" y1="${bbox.yMin - mgn / 2}" y2=${
-    bbox.yMax + mgn / 2
-  } stroke="black" marker-end="url(#arrow)"/>
+  <line class="axes" x1="${bbox.xMin - mgn / 2}" x2=${bbox.xMax + mgn / 2
+    } stroke="black" marker-end="url(#arrow)"/>
+  <line class="axes" y1="${bbox.yMin - mgn / 2}" y2=${bbox.yMax + mgn / 2
+    } stroke="black" marker-end="url(#arrow)"/>
    ${svg.innerHTML}`;
+
   svg.setAttribute(
     "style",
-    `font-size: ${
-      size / 100
-    }; stroke-width: 0.2em; transform: scale(1, -1); max-height: 100vh;`,
+    `font-size: ${size / 100
+    }; stroke-width: 0.2em; transform: scale(1, -1); max-height: 100vh; border: 1px solid #999999`,
   );
 }

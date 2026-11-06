@@ -1,5 +1,6 @@
 import { plus, pointToLine, rotatePoint } from "../2d.js";
 import { Path } from "../path.js";
+import { debugGeometry } from "../svg.js";
 import bro from "./brotest/brotest.js";
 
 bro.test("simple case", () => {
@@ -1072,7 +1073,7 @@ bro.test("another round fillet bug", () => {
     );
 });
 
-bro.test("union with overlapping line", () => {
+bro.test("union with overlapping line 2", () => {
   const hookPath = new Path();
   hookPath.moveTo([-8.149999999999997, -16.19583365118224]);
   hookPath.lineTo([-8.149999999999997, 27.000000000000004]);
@@ -1083,6 +1084,24 @@ bro.test("union with overlapping line", () => {
   const square = Path.makeRect(30)
     .recenter({ x: "center", y: "end" })
     .translate([-30 / 2, hookPath.bbox().yMax]);
+
+  bro.expect(hookPath.findPathIntersections(square)).toEqual([
+    {
+      point: [-8.149999999999997, 27.000000000000004],
+      other: { segment: 2, x: 0.7283333333333334, crossesFromTheRight: true },
+      self: { segment: 1, x: 1, crossesFromTheRight: false },
+    },
+    {
+      point: [-8.149999999999997, -2.9999999999999964],
+      other: { segment: 4, x: 0.27166666666666656, crossesFromTheRight: false },
+      self: { segment: 1, x: 0.3054885746098127, crossesFromTheRight: true },
+    },
+    {
+      point: [0, 27.000000000000004],
+      other: { segment: 3, x: 0, crossesFromTheRight: true },
+      self: { segment: 2, x: 0.8149999999999998, crossesFromTheRight: false },
+    },
+  ]);
 
   bro
     .expect(hookPath.realBooleanUnion(square).toString())

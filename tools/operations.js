@@ -4,6 +4,7 @@ import { minus } from "./2d.js";
 import { cross } from "./3d.js";
 import { keyToComparison2d } from "./utils.js";
 
+  // TODO: fix the signature
 export function convexHull(...geometries) {
   const points = [];
   for (const geom of geometries) {
