@@ -772,7 +772,14 @@ export class Path {
 
     const rawIntersections = this.findPathIntersections(other);
 
+    /**
+     * @param {"self" | "other"} forSide
+     */
     function intersectionSorter(forSide) {
+      /**
+       * @param {PathIntersection} left
+       * @param {PathIntersection} right
+       */
       return (left, right) => {
         const n1 = 10 * left[forSide].segment + left[forSide].x;
         const n2 = 10 * right[forSide].segment + right[forSide].x;
@@ -782,96 +789,82 @@ export class Path {
 
     const selfOrdered = rawIntersections.toSorted(intersectionSorter("self"));
 
-    // filter-out the intersections that overlap completely
-    let filtered = [];
-    let skipNext = false;
+    /**
+     * @param {PathIntersection} one
+     * @param {PathIntersection} two
+     */
+    const areInSameGroup = (one, two) => {
+      if (norm(one.point, two.point) < eps) return true;
+
+      const selfLink = this.areOnSameSegment(
+        one.self.segment,
+        one.self.x,
+        two.self.segment,
+        two.self.x,
+      );
+      const otherLink = other.areOnSameSegment(
+        one.other.segment,
+        one.other.x,
+        two.other.segment,
+        two.other.x,
+      );
+      if (
+        selfLink != null &&
+        otherLink != null &&
+        this.getSegmentAt(selfLink)[2] === other.getSegmentAt(otherLink)[2]
+      )
+        return true;
+
+      return false;
+    };
+
+    // group itersections that are directly linked (a bit like finding the
+    // subpath that overlaps in both operands)
+
+    /** @type {PathIntersection[][]} */
+    const groups = [];
+    /** @type {PathIntersection[]} */
+    let currentGroup = [];
 
     for (const [one, two] of pairs(selfOrdered)) {
-      if (skipNext) {
-        skipNext = false;
+      if (currentGroup.length === 0) {
+        currentGroup.push(two);
         continue;
       }
 
-      if (norm(one.point, two.point) > eps) {
-        filtered.push(one);
+      if (areInSameGroup(one, two)) {
+        currentGroup.push(two);
         continue;
       }
 
-      // case where one path cuts precisely through the vertex of another so it
-      // intersects with both edges of the angle
-      if (
-        (one.other.segment === two.other.segment &&
-          Math.abs(
-            modulo(one.self.segment, this.controls.length - 1) -
-            two.self.segment,
-          ) === 1) ||
-        (one.self.segment === two.self.segment &&
-          Math.abs(
-            modulo(one.other.segment, other.controls.length - 1) -
-            two.other.segment,
-          ) === 1)
-      ) {
-        filtered.push(one);
-        skipNext = true;
-        continue;
-      }
-
-      // case where both paths overlap in a vertex, say AOB and AO intersects
-      // OB' and A'O intersects OB.
-      const i1 = one.self.x > 0.5 ? one.self.segment : two.self.segment;
-      const i2 = one.other.x > 0.5 ? one.other.segment : two.other.segment;
-
-      const j1 = this.getJunctionAt(i1);
-      const j2 = other.getJunctionAt(i2);
-
-      // sanity check to make sure we are on the right junction
-      const junctionsAreCorrect =
-        norm(j1[0][3], one.point) +
-        norm(j1[1][1], one.point) +
-        norm(j2[0][3], one.point) +
-        norm(j2[1][1], one.point) <
-        eps;
-
-      if (!junctionsAreCorrect) {
-        // console.assert(junctionsAreCorrect, "junctions don't match");
-        console.log(one);
-        console.log(two);
-        console.log(j1);
-        console.log(j2);
-        throw new Error("expected junctions to meet");
-      }
-
-      if (coincideInJunction(j1, j2)) skipNext = true;
+      groups.push(currentGroup);
+      currentGroup = [two];
     }
 
-    // consider an overlap as a single intersection for shapes where it is not
-    // the only overlap
-    if (filtered.length > 2) {
-      const prefiltered = [...filtered];
-      filtered = [];
-      // this might be flawed and fail on some new cases
-      for (const [one, two] of pairs(prefiltered)) {
-        const oneIsAnEdge =
-          one.self.x < eps ||
-          one.self.x > 1 - eps ||
-          one.other.x < eps ||
-          one.other.x > 1 - eps;
-        const twoIsAnEdge =
-          two.self.x < eps ||
-          two.self.x > 1 - eps ||
-          two.other.x < eps ||
-          two.other.x > 1 - eps;
-        if (
-          !(
-            oneIsAnEdge &&
-            twoIsAnEdge &&
-            one.self.crossesFromTheRight === two.self.crossesFromTheRight
-          )
-        )
-          filtered.push(one);
-      }
+    if (currentGroup.length) groups.push(currentGroup);
+
+    // connect first and last if connected (wrap-around)
+    if (
+      groups.length > 1 &&
+      areInSameGroup(groups[0][0], groups.at(-1).at(-1))
+    ) {
+      const tail = groups.shift();
+      groups.at(-1).push(...tail);
     }
 
+    // depending on the type of overlap keep either just intersections or just
+    // the overlap
+    const filtered = [];
+    if (groups.length === 1) filtered.push(groups[0][0], groups[0].at(-1));
+    // ideally, in this second case we should only allow a even number of
+    // groups and in each group take an entering intersection and exiting in
+    // the next one
+    else
+      for (const group of groups) {
+        filtered.push(group[0]);
+      }
+
+    // sorting and cross-referencing for later use
     const length = filtered.length;
 
     const intersections = [];
@@ -895,6 +888,7 @@ export class Path {
       }
     }
 
+    // loop logic
     const loops = [];
     if (!intersections.length) return { loops, intersections };
 
@@ -1843,6 +1837,52 @@ export class Path {
     result.simplify();
 
     return result;
+  }
+
+  /**
+   * @param {number} s1
+   * @param {number} x1
+   * @param {number} s2
+   * @param {number} x2
+   * @returns {number | null}
+   */
+  areOnSameSegment(s1, x1, s2, x2) {
+    if (s1 === s2) return s1;
+
+    const nbSegments = this.controls.length - 1;
+    const lhs = [s1];
+    const rhs = [s2];
+
+    if (s1 === nbSegments) {
+      lhs.push(0);
+    }
+
+    if (s2 === nbSegments) {
+      rhs.push(0);
+    }
+
+    if (Math.abs(x1) < eps) {
+      lhs.push(...lhs.map((x) => modulo(x - 1, nbSegments)));
+    }
+
+    if (Math.abs(x2) < eps) {
+      rhs.push(...rhs.map((x) => modulo(x - 1, nbSegments)));
+    }
+
+    if (Math.abs(x1 - 1) < eps) {
+      lhs.push(...lhs.map((x) => modulo(x + 1, nbSegments)));
+    }
+
+    if (Math.abs(x2 - 1) < eps) {
+      rhs.push(...rhs.map((x) => modulo(x + 1, nbSegments)));
+    }
+
+    for (const left of lhs)
+      for (const right of rhs) {
+        if (left === right) return left;
+      }
+
+    return null;
   }
 
   repr() {
