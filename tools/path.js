@@ -46,6 +46,8 @@ const eps = 1e-5;
  * @typedef {{segment: number; x: number; crossesFromTheRight: boolean}} IntersectionLocation
  * @typedef {{point: Point} & IntersectionLocation} SimpleIntersection
  * @typedef {{point: Point; self: IntersectionLocation, other: IntersectionLocation}} PathIntersection
+ *
+ * @typedef {[number, Point, "lineTo" | "arcTo", Point, number?, number?]} Segment
  */
 
 export class Path {
@@ -789,80 +791,32 @@ export class Path {
 
     const selfOrdered = rawIntersections.toSorted(intersectionSorter("self"));
 
-    /**
-     * @param {PathIntersection} one
-     * @param {PathIntersection} two
-     */
-    const areInSameGroup = (one, two) => {
-      if (norm(one.point, two.point) < eps) return true;
+    // find segments that overlap completely to filter them out later
+    /** @type {{self: number, other: number}[]} */
+    const fullOverlaps = [];
+    for (const s1 of this.iterateOverSegments()) {
+      for (const s2 of other.iterateOverSegments()) {
+        if (segmentsAreEqual(s1, s2)) {
+          fullOverlaps.push({ self: s1[0], other: s2[0] });
+        }
+      }
+    }
 
-      const selfLink = this.areOnSameSegment(
-        one.self.segment,
-        one.self.x,
-        two.self.segment,
-        two.self.x,
-      );
-      const otherLink = other.areOnSameSegment(
-        one.other.segment,
-        one.other.x,
-        two.other.segment,
-        two.other.x,
-      );
-      if (
-        selfLink != null &&
-        otherLink != null &&
-        this.getSegmentAt(selfLink)[2] === other.getSegmentAt(otherLink)[2]
+    const filtered = selfOrdered
+      // filter-out the intersections that involve segments that are identical
+      // on both operands
+      .filter(
+        (int) =>
+          !fullOverlaps.some(
+            ({ self, other }) =>
+              int.self.segment === self || int.other.segment === other,
+          ),
       )
-        return true;
-
-      return false;
-    };
-
-    // group itersections that are directly linked (a bit like finding the
-    // subpath that overlaps in both operands)
-
-    /** @type {PathIntersection[][]} */
-    const groups = [];
-    /** @type {PathIntersection[]} */
-    let currentGroup = [];
-
-    for (const [one, two] of pairs(selfOrdered)) {
-      if (currentGroup.length === 0) {
-        currentGroup.push(two);
-        continue;
-      }
-
-      if (areInSameGroup(one, two)) {
-        currentGroup.push(two);
-        continue;
-      }
-
-      groups.push(currentGroup);
-      currentGroup = [two];
-    }
-
-    if (currentGroup.length) groups.push(currentGroup);
-
-    // connect first and last if connected (wrap-around)
-    if (
-      groups.length > 1 &&
-      areInSameGroup(groups[0][0], groups.at(-1).at(-1))
-    ) {
-      const tail = groups.shift();
-      groups.at(-1).push(...tail);
-    }
-
-    // depending on the type of overlap keep either just intersections or just
-    // the overlap
-    const filtered = [];
-    if (groups.length === 1) filtered.push(groups[0][0], groups[0].at(-1));
-    // ideally, in this second case we should only allow a even number of
-    // groups and in each group take an entering intersection and exiting in
-    // the next one
-    else
-      for (const group of groups) {
-        filtered.push(group[0]);
-      }
+      // remove several consecutive enters / exits
+      .filter((int, i, arr) => {
+        const last = arr.at(i - 1);
+        return last.self.crossesFromTheRight !== int.self.crossesFromTheRight;
+      });
 
     // sorting and cross-referencing for later use
     const length = filtered.length;
@@ -1659,6 +1613,7 @@ export class Path {
 
   /**
    * @param {number} rawIndex
+   * @returns {Segment}
    */
   getSegmentAt(rawIndex) {
     const isClosed = this.isClosed();
@@ -1676,6 +1631,9 @@ export class Path {
     return [prev + 1, lastPoint, type, ...rest];
   }
 
+  /**
+   * @returns {Generator<Segment>}
+   */
   *iterateOverSegments() {
     const length = this.controls.length - 1;
 
@@ -1839,52 +1797,6 @@ export class Path {
     return result;
   }
 
-  /**
-   * @param {number} s1
-   * @param {number} x1
-   * @param {number} s2
-   * @param {number} x2
-   * @returns {number | null}
-   */
-  areOnSameSegment(s1, x1, s2, x2) {
-    if (s1 === s2) return s1;
-
-    const nbSegments = this.controls.length - 1;
-    const lhs = [s1];
-    const rhs = [s2];
-
-    if (s1 === nbSegments) {
-      lhs.push(0);
-    }
-
-    if (s2 === nbSegments) {
-      rhs.push(0);
-    }
-
-    if (Math.abs(x1) < eps) {
-      lhs.push(...lhs.map((x) => modulo(x - 1, nbSegments)));
-    }
-
-    if (Math.abs(x2) < eps) {
-      rhs.push(...rhs.map((x) => modulo(x - 1, nbSegments)));
-    }
-
-    if (Math.abs(x1 - 1) < eps) {
-      lhs.push(...lhs.map((x) => modulo(x + 1, nbSegments)));
-    }
-
-    if (Math.abs(x2 - 1) < eps) {
-      rhs.push(...rhs.map((x) => modulo(x + 1, nbSegments)));
-    }
-
-    for (const left of lhs)
-      for (const right of rhs) {
-        if (left === right) return left;
-      }
-
-    return null;
-  }
-
   repr() {
     let result = "const pathToRename = new Path();\n";
     for (const [type, [x, y], maybeRadius, maybeFlag] of this.controls) {
@@ -1985,6 +1897,7 @@ function arePartOfTheSameGeometry(segment1, segment2) {
   return new Error(`${t1} not supported yet`);
 }
 
+// keeping this one for now just in case we need to do sub-segment matching
 function coincideInJunction(j1, j2) {
   const [seg1, seg2] = j1;
   const [seg3, seg4] = j2;
@@ -1994,4 +1907,22 @@ function coincideInJunction(j1, j2) {
     (arePartOfTheSameGeometry(seg1, seg4) &&
       arePartOfTheSameGeometry(seg2, seg3))
   );
+}
+
+/**
+ * @param {Segment} s1
+ * @param {Segment} s2
+ */
+function segmentsAreEqual(s1, s2) {
+  const [, lp1, type1, p1, r1, sweep1] = s1;
+  const [, lp2, type2, p2, r2, sweep2] = s2;
+
+  if (norm(lp1, lp2) > eps) return false;
+  if (type1 !== type2) return false;
+  if (norm(p1, p2) > eps) return false;
+
+  if (r1 == null && r2 == null) return true;
+
+  if (Math.abs(r1 - r2) > eps) return false;
+  return sweep1 === sweep2;
 }
