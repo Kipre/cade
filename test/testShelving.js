@@ -1,7 +1,7 @@
 import { Assembly } from "../lib/assembly.js";
 import { FlatPart } from "../lib/flat.js";
-import { ShelfMaker } from "../lib/shelf.js";
-import { nx3, x3 } from "../tools/defaults.js";
+import { ShelfMaker, trimFlatPartWithAnother2 } from "../lib/shelf.js";
+import { nx3, x3, y3, z3 } from "../tools/defaults.js";
 import { Path } from "../tools/path.js";
 import { debugGeometry } from "../tools/svg.js";
 import bro from "../tools/test/brotest/brotest.js";
@@ -97,4 +97,36 @@ bro.test("makes another filtered butt shelf", () => {
   bro
     .expect(halfButtLower.toString())
     .toBe("M 0 -5 L 0 0 L 20 0 L 50 -50 L 50 -55 L 30 -55 Z");
+});
+
+bro.test("trims tilted holders with top and bottom shelves", () => {
+  const thickness = 3;
+  const ratio = 2.4;
+  const interplate = 9;
+  const shelvesSpacing = 50 + thickness;
+
+  const claw = new Assembly("claw");
+
+  const shelfPath = Path.makeRect(70, 120).translate([-10, -60]);
+  const topShelfLoc = a2m([0, 0, 25], z3, nx3);
+  const topShelf = new FlatPart("top shelf", thickness, shelfPath);
+  claw.addChild(topShelf, topShelfLoc);
+
+  const bottomShelf = new FlatPart("bottom shelf", thickness, shelfPath);
+  claw.addChild(bottomShelf, topShelfLoc.translate(0, 0, -shelvesSpacing));
+
+  const holderLoc = a2m([-26, 0, 0], [0, ratio, 1], y3);
+  const outside = Path.makeRect(70, 16).recenter();
+  const holder = new FlatPart("holder", thickness, outside);
+  claw.addChild(holder, holderLoc.translate(0, 0, interplate / 2));
+
+  for (const shelf of [topShelf, bottomShelf]) {
+    trimFlatPartWithAnother2(claw, holder, shelf);
+  }
+
+  bro
+    .expect(holder.outside.toString())
+    .toBe(
+      "M 28.95833333333333 -8 L -23.958333333333336 -8 L -23.958333333333343 8 L 28.95833333333333 8 Z",
+    );
 });

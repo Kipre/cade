@@ -1,4 +1,6 @@
-/** @import * as types from './types' */
+/**
+ * @import { Point, Point3 } from "../tools/types"
+ */
 
 import { eps, norm, rotatePoint } from "./2d.js";
 import {
@@ -24,8 +26,8 @@ export function parseTransformFunction(transform) {
 
 /**
  * @param {DOMMatrix} m
- * @param {types.Point} p
- * @returns {types.Point}
+ * @param {Point} p
+ * @returns {Point}
  */
 export function applyTransformMatrix(m, p) {
   const domp = new DOMPoint(p[0], p[1]);
@@ -35,8 +37,8 @@ export function applyTransformMatrix(m, p) {
 
 /**
  * @param {DOMMatrix} m
- * @param {types.Point3} p
- * @returns {types.Point3}
+ * @param {Point3} p
+ * @returns {Point3}
  */
 export function transformPoint3(m, p, noTranslation = false) {
   const domp = new DOMPoint(p[0], p[1], p[2]);
@@ -79,9 +81,9 @@ export function transformOnlyOrigin(mat, transform) {
 
 /**
  * Stands for axes to matrix
- * @param {types.Point3?} maybeOrigin
- * @param {types.Point3?} maybeUp
- * @param {types.Point3?} maybeDir
+ * @param {Point3?} maybeOrigin
+ * @param {Point3?} maybeUp
+ * @param {Point3?} maybeDir
  * @returns {DOMMatrix}
  */
 export function a2m(maybeOrigin = null, maybeUp = null, maybeDir = null) {
@@ -118,8 +120,8 @@ export function a2m(maybeOrigin = null, maybeUp = null, maybeDir = null) {
 }
 
 /**
- * @param {types.Point3} v1
- * @param {types.Point3} v2
+ * @param {Point3} v1
+ * @param {Point3} v2
  */
 export function computeAngleBetweenVectors(v1, v2) {
   return Math.acos(dot3(v1, v2) / (norm3(v1) * norm3(v2)));
@@ -161,6 +163,10 @@ export function intersectPlanes(plane1, plane2) {
   return a2m(point, dir);
 }
 
+/**
+  * @param {[Point, Point, Point]} sourcePts
+  * @param {[Point, Point, Point]} targetPts
+  */
 export function computeTransformFromPoints(sourcePts, targetPts) {
   // First create a matrix from the source points
   const sourceMatrix = new DOMMatrix([
@@ -201,7 +207,7 @@ export function linearizationMatrix(p1, p2) {
  * @param {{ from: DOMMatrix; to: DOMMatrix; }[]} constraints
  */
 export function locateWithConstraints(...constraints) {
-  let loc = /** @type {types.Point3} */ ([0, 0, 0]);
+  let loc = /** @type {Point3} */ ([0, 0, 0]);
   let zee = null;
   let eax = null;
 

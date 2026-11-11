@@ -18,6 +18,7 @@ export const isoFastenerSizes = {
     nutThickness: 2.4,
     washerOuterDiameter: 7,
     washerInnerDiameter: 3.2,
+    washerThickness: 0.5,
     hexOuter: 5.5,
     hexSize: 2.5,
     hexHeadHeight: 3,
@@ -36,6 +37,7 @@ export const isoFastenerSizes = {
     nutThickness: 3.2,
     washerOuterDiameter: 9,
     washerInnerDiameter: 4.3,
+    washerThickness: 0.8,
     hexOuter: 7,
     hexSize: 3,
     hexHeadHeight: 4,
@@ -51,9 +53,10 @@ export const isoFastenerSizes = {
     pitch: 0.8,
     diameter: 5,
     boltHeadThickness: 3.5,
-    nutThickness: 4,
+    nutThickness: 4.7,
     washerOuterDiameter: 10,
     washerInnerDiameter: 5.3,
+    washerThickness: 1,
     hexOuter: 8.5,
     hexSize: 4,
     hexHeadHeight: 5,
@@ -71,9 +74,10 @@ export const isoFastenerSizes = {
     pitch: 1,
     diameter: 6,
     boltHeadThickness: 4,
-    nutThickness: 5,
+    nutThickness: 5.2,
     washerOuterDiameter: 12,
     washerInnerDiameter: 6.4,
+    washerThickness: 1.6,
     hexOuter: 10,
     hexSize: 5,
     hexHeadHeight: 6,
@@ -92,9 +96,10 @@ export const isoFastenerSizes = {
     pitch: 1.25,
     diameter: 8,
     boltHeadThickness: 5.3,
-    nutThickness: 6.5,
+    nutThickness: 6.8,
     washerOuterDiameter: 16,
     washerInnerDiameter: 8.4,
+    washerThickness: 1.6,
     hexOuter: 13,
     hexSize: 6,
     hexHeadHeight: 8,
@@ -108,19 +113,41 @@ export const isoFastenerSizes = {
       looseFit: 10.0,
     },
   },
+  M10: {
+    headSize: 16,
+    pitch: 1.5,
+    diameter: 10,
+    boltHeadThickness: 6.4,
+    nutThickness: 8.4,
+    washerOuterDiameter: 20,
+    washerInnerDiameter: 10.5,
+    washerThickness: 2,
+    hexOuter: 16,
+    hexSize: 8,
+    hexHeadHeight: 10,
+    lengths: [
+      12, 16, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 90, 100, 110,
+      120, 130, 140, 150, 160, 180, 200,
+    ],
+    holeSizes: {
+      closeFit: 10.5,
+      mediumFit: 11.0,
+      looseFit: 12.0,
+    },
+  },
 };
 
-export class Fastener extends Part {}
+export class Fastener extends Part { }
 
 /**
- * @param {"M3" | "M4" | "M5" | "M6" | "M8"} size
+ * @param {"M3" | "M4" | "M5" | "M6" | "M8" | "M10"} size
  * @param {number} length
  */
 export function makeBolt(size, length) {
   const { diameter, headSize, boltHeadThickness } = isoFastenerSizes[size];
   const headPath = Path.fromPolyline(
     Array.from({ length: 6 }, (_, i) =>
-      rotatePoint(zero2, [headSize / 2, 0], (i * 2 * Math.PI) / 6),
+      rotatePoint(zero2, [headSize / Math.sqrt(3), 0], (i * 2 * Math.PI) / 6),
     ),
   );
 
@@ -138,7 +165,7 @@ export function makeBolt(size, length) {
 }
 
 /**
- * @param {"M3" | "M4" | "M5" | "M6" | "M8"} size
+ * @param {"M3" | "M4" | "M5" | "M6" | "M8" | "M10"} size
  * @param {number} length
  */
 function makeHexBolt(size, length) {
@@ -166,13 +193,13 @@ function makeHexBolt(size, length) {
 }
 
 /**
- * @param {"M3" | "M4" | "M5" | "M6" | "M8"} size
+ * @param {"M3" | "M4" | "M5" | "M6" | "M8" | "M10"} size
  */
 function makeNut(size) {
   const { diameter, headSize, nutThickness } = isoFastenerSizes[size];
   const headPath = Path.fromPolyline(
     Array.from({ length: 6 }, (_, i) =>
-      rotatePoint(zero2, [headSize / 2, 0], (i * 2 * Math.PI) / 6),
+      rotatePoint(zero2, [headSize / Math.sqrt(3), 0], (i * 2 * Math.PI) / 6),
     ),
   );
 
@@ -223,10 +250,11 @@ export const m5CylinderNut = new Fastener(
 m5CylinderNut.material = metalMaterial;
 
 /**
- * @param {"M3" | "M4" | "M5" | "M6" | "M8"} size
+ * @param {"M3" | "M4" | "M5" | "M6" | "M8" | "M10"} size
  */
 function makeWasher(size) {
-  const { washerOuterDiameter, washerInnerDiameter } = isoFastenerSizes[size];
+  const { washerOuterDiameter, washerInnerDiameter, washerThickness } =
+    isoFastenerSizes[size];
 
   const washerShape = extrusion(
     a2m([0, 0, -washerThickness]),
