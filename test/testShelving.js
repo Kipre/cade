@@ -1,7 +1,13 @@
 import { Assembly } from "../lib/assembly.js";
 import { FlatPart } from "../lib/flat.js";
-import { ShelfMaker, trimFlatPartWithAnother2 } from "../lib/shelf.js";
-import { nx3, x3, y3, z3 } from "../tools/defaults.js";
+import {
+  doCut,
+  ShelfMaker,
+  ShelfMaker2,
+  trimFlatPartWithAnother2,
+  withTags,
+} from "../lib/shelf.js";
+import { nx3, x3, y3, z3, zero3 } from "../tools/defaults.js";
 import { Path } from "../tools/path.js";
 import { debugGeometry } from "../tools/svg.js";
 import bro from "../tools/test/brotest/brotest.js";
@@ -127,6 +133,20 @@ bro.test("trims tilted holders with top and bottom shelves", () => {
   bro
     .expect(holder.outside.toString())
     .toBe(
-      "M 28.95833333333333 -8 L -23.958333333333336 -8 L -23.958333333333343 8 L 28.95833333333333 8 Z",
+      "M 28.958333333333357 -8 L -23.958333333333336 -8 L -23.958333333333343 8 L 28.958333333333314 8 Z",
     );
+});
+
+bro.test("makes cut shelf on a single tilted shelf side", () => {
+  const claw = new Assembly("claw");
+  const shelfPath = Path.makeRect(70, 120).recenter();
+  const shelf = new FlatPart("shelf", thickness, shelfPath);
+  const locatedShelf = claw.addChild(shelf, a2m([0, 0, -50]));
+
+  const insidePath = new ShelfMaker2(a2m(zero3, x3, [0, 2, 1]), { thickness })
+    .addFlatPart(locatedShelf, withTags("shelfA"), doCut)
+    .addFeature(Path.makeCircle(15), a2m())
+    .make();
+
+  bro.expect(insidePath.toString()).toBe("M -73.79024325749307 -13.416407864998742 L -9.18485099360515e-16 15 L 15 0 L 33.54101966249685 -67.0820393249937 Z");
 });

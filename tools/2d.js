@@ -1,4 +1,4 @@
-/** @import * as types from './types' */
+/** @import { Point } from './types' */
 
 export const eps = 1e-5;
 
@@ -6,35 +6,35 @@ import { pairs } from "./iteration.js";
 import { debugGeometry } from "./svg.js";
 
 /**
- * @param {types.Point} p1
- * @param {types.Point} p2
- * @returns {types.Point}
+ * @param {Point} p1
+ * @param {Point} p2
+ * @returns {Point}
  */
 export function plus(p1, p2) {
   return [p1[0] + p2[0], p1[1] + p2[1]];
 }
 
 /**
- * @param {types.Point} p
+ * @param {Point} p
  * @param {number} scalar
- * @returns {types.Point}
+ * @returns {Point}
  */
 export function mult(p, scalar) {
   return [p[0] * scalar, p[1] * scalar];
 }
 
 /**
- * @param {types.Point} p1
- * @param {types.Point} p2
- * @returns {types.Point}
+ * @param {Point} p1
+ * @param {Point} p2
+ * @returns {Point}
  */
 export function minus(p1, p2) {
   return [p1[0] - p2[0], p1[1] - p2[1]];
 }
 
 /**
- * @param {types.Point} p1
- * @param {types.Point} p2
+ * @param {Point} p1
+ * @param {Point} p2
  * @returns {number}
  */
 export function dot(p1, p2) {
@@ -53,10 +53,10 @@ export function areOnSameLine(p1, p2, ...points) {
 /**
  * Rotates p2 around p1 by alpha radian
  *
- * @param {types.Point} p1
- * @param {types.Point} p2
+ * @param {Point} p1
+ * @param {Point} p2
  * @param {number} alpha
- * @returns {types.Point}
+ * @returns {Point}
  */
 export function rotatePoint([x0, y0], [x1, y1], alpha) {
   const [u, v] = [x1 - x0, y1 - y0];
@@ -127,17 +127,17 @@ export function normalizePolygon(poly) {
 }
 
 /**
- * @param {types.Point[]} pts
+ * @param {Point[]} pts
  * @param {number} p
- * @returns {types.Point}
+ * @returns {Point}
  */
 export function getInterpolation([[x0, y0], [x1, y1]], p) {
   return [x0 * (1 - p) + x1 * p, y0 * (1 - p) + y1 * p];
 }
 
 /**
- * @param {types.Point} v
- * @returns {types.Point}
+ * @param {Point} v
+ * @returns {Point}
  */
 export function normalize(v) {
   const length = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
@@ -145,8 +145,8 @@ export function normalize(v) {
 }
 
 /**
- * @param {types.Point} u
- * @param {types.Point} v
+ * @param {Point} u
+ * @param {Point} v
  * @returns {number}
  */
 export function computeAngleBetween(u, v) {
@@ -156,7 +156,7 @@ export function computeAngleBetween(u, v) {
 }
 
 /**
- * @param {types.Point} v
+ * @param {Point} v
  * @returns {number}
  */
 export function computeVectorAngle(v) {
@@ -169,11 +169,11 @@ export function computeVectorAngle(v) {
 }
 
 /**
- * @param {types.Point} p0
- * @param {types.Point} p1
- * @param {types.Point} l0
- * @param {types.Point} l1
- * @returns {types.Point | null}
+ * @param {Point} p0
+ * @param {Point} p1
+ * @param {Point} l0
+ * @param {Point} l1
+ * @returns {Point | null}
  */
 export function intersectLines(p0, p1, l0, l1) {
   let [u, v] = [p1[0] - p0[0], p1[1] - p0[1]];
@@ -201,13 +201,13 @@ export function intersectLines(p0, p1, l0, l1) {
  * Checks if a point is within a bbox defined by two points.
  * Useful for determining if an intersection is relevant.
  *
- * @param {types.Point} p
- * @param {types.Point} l1
- * @param {types.Point} l2
+ * @param {Point} p
+ * @param {Point} l1
+ * @param {Point} l2
  * @param {number} tol -- error tolerance
  * @returns {boolean}
  */
-export function pointInsideLineBbox(p, l1, l2, tol=eps) {
+export function pointInsideLineBbox(p, l1, l2, tol = eps) {
   const [minX, maxX, minY, maxY] = [
     Math.min(l1[0], l2[0]),
     Math.max(l1[0], l2[0]),
@@ -223,10 +223,10 @@ export function pointInsideLineBbox(p, l1, l2, tol=eps) {
 }
 
 /**
- * @param {types.Point[]} poly1
- * @param {types.Point[]} poly2
+ * @param {Point[]} poly1
+ * @param {Point[]} poly2
  * @param {boolean} wrap
- * @returns {types.Point?}
+ * @returns {Point?}
  */
 export function intersect(poly1, poly2, wrap = false) {
   for (const [a, b] of pairs(poly1, 0, wrap && poly1.length > 2)) {
@@ -245,6 +245,12 @@ export function moveLine(p, l1, l2) {
   return plus(p, minus(l2, l1));
 }
 
+/**
+ * Project a point on a line
+ * @param {Point} p
+ * @param {Point} l1
+ * @param {Point} l2
+ */
 export function pointToLine(p, l1, l2) {
   if (norm(p, l1) < eps || norm(p, l1) < eps) return p;
   const angle = computeAngleBetween(minus(l1, l2), minus(l1, p));
@@ -257,10 +263,10 @@ export function pointToLine(p, l1, l2) {
  */
 
 /**
- * @param {types.Point} p1
- * @param {types.Point} p2
+ * @param {Point} p1
+ * @param {Point} p2
  * @param {PlaceAlongParam} param
- * @returns {types.Point}
+ * @returns {Point}
  */
 export function placeAlong(p1, p2, param) {
   let x = 0;
@@ -280,10 +286,10 @@ export function placeAlong(p1, p2, param) {
 }
 
 /**
- * @param {types.Point} p1
- * @param {types.Point} p2
+ * @param {Point} p1
+ * @param {Point} p2
  * @param {PlaceAlongParam & {other?: boolean}} param
- * @returns {types.Point}
+ * @returns {Point}
  */
 export function placeRightAngle(p1, p2, param) {
   let x = 0;
@@ -304,10 +310,10 @@ export function placeRightAngle(p1, p2, param) {
 }
 
 /**
- * @param {types.Point} l1
- * @param {types.Point} l2
+ * @param {Point} l1
+ * @param {Point} l2
  * @param {number} x
- * @returns {[types.Point, types.Point]}
+ * @returns {[Point, Point]}
  */
 export function slideLine(l1, l2, x) {
   return [
@@ -317,10 +323,10 @@ export function slideLine(l1, l2, x) {
 }
 
 /**
- * @param {types.Point[]} polyline
+ * @param {Point[]} polyline
  * @param {number | number[]} offset
  * @param {boolean} wraps
- * @returns {types.Point[]}
+ * @returns {Point[]}
  */
 export function offsetPolyline(polyline, offset, wraps = false) {
   function offsetSegment(t0, t1, offset) {
@@ -376,7 +382,7 @@ export function offsetPolyline(polyline, offset, wraps = false) {
 }
 
 /**
- * @param {types.Point[]} poly
+ * @param {Point[]} poly
  * @param {number | number[]} offset
  */
 export function inflatePolyline(poly, offset) {
@@ -384,9 +390,9 @@ export function inflatePolyline(poly, offset) {
 }
 
 /**
- * @param {types.Point} p
- * @param {types.Point} l1
- * @param {types.Point} l2
+ * @param {Point} p
+ * @param {Point} l1
+ * @param {Point} l2
  * @returns {boolean}
  */
 export function isToTheLeft(p, l1, l2) {
@@ -396,9 +402,9 @@ export function isToTheLeft(p, l1, l2) {
 }
 
 /**
- * @param {types.Point} p
- * @param {types.Point} l1
- * @param {types.Point} l2
+ * @param {Point} p
+ * @param {Point} l1
+ * @param {Point} l2
  * @returns {number}
  */
 export function pointCoordinateOnLine(p, l1, l2) {
