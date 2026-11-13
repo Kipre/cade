@@ -2,6 +2,8 @@ import { Assembly } from "../lib/assembly.js";
 import { FlatPart } from "../lib/flat.js";
 import {
   doCut,
+  keepBothSides,
+  makeSimpleMortise,
   ShelfMaker,
   ShelfMaker2,
   trimFlatPartWithAnother2,
@@ -133,7 +135,7 @@ bro.test("trims tilted holders with top and bottom shelves", () => {
   bro
     .expect(holder.outside.toString())
     .toBe(
-      "M 28.958333333333357 -8 L -23.958333333333336 -8 L -23.958333333333343 8 L 28.958333333333314 8 Z",
+      "M 28.95833333333333 -8 L -23.958333333333336 -8 L -23.95833333333333 8 L 28.958333333333332 8 Z",
     );
 });
 
@@ -148,5 +150,87 @@ bro.test("makes cut shelf on a single tilted shelf side", () => {
     .addFeature(Path.makeCircle(15), a2m())
     .make();
 
-  bro.expect(insidePath.toString()).toBe("M -73.79024325749307 -13.416407864998742 L -9.18485099360515e-16 15 L 15 0 L 33.54101966249685 -67.0820393249937 Z");
+  bro
+    .expect(insidePath.toString())
+    .toBe(
+      "M -73.79024325749307 -13.416407864998742 L -9.18485099360515e-16 15 L 15 0 L 33.54101966249685 -67.0820393249937 Z",
+    );
+});
+
+bro.test("makes a mortise for a tilted tenon", () => {
+  const thickness = 3;
+  const ratio = 2.4;
+  const interplate = 9;
+  const shelvesSpacing = 50 + thickness;
+  const holderWidth = 16;
+
+  const claw = new Assembly("claw");
+
+  const shelfPath = Path.makeRect(70, 120).translate([-10, -60]);
+  const topShelfLoc = a2m([0, 0, 25], z3, nx3);
+  const topShelf = new FlatPart("top shelf", thickness, shelfPath);
+  claw.addChild(topShelf, topShelfLoc);
+
+  const bottomShelf = new FlatPart("bottom shelf", thickness, shelfPath);
+  const locatedBottom = claw.addChild(
+    bottomShelf,
+    topShelfLoc.translate(0, 0, -shelvesSpacing),
+  );
+
+  const holderLoc = a2m([-26, 0, 0], [0, ratio, 1], y3);
+  const outside = Path.makeRect(70, holderWidth).recenter();
+  const holder = new FlatPart("holder", thickness, outside);
+  const locatedHolder = claw.addChild(
+    holder,
+    holderLoc.translate(0, 0, interplate / 2),
+  );
+
+  for (const shelf of [topShelf, bottomShelf]) {
+    trimFlatPartWithAnother2(claw, holder, shelf);
+  }
+
+  // squash the shape to make tenons
+  const tenonWidth = 10;
+  const tenonHeight = 5;
+  holder.assignOutsidePath(
+    holder.outside.realBooleanUnion(
+      holder.outside.offset([
+        tenonWidth - holderWidth,
+        tenonHeight,
+        0,
+        tenonHeight,
+      ]),
+    ),
+  );
+
+  // body of makeSimpleMortise(claw, holder, bottomShelf)
+  const maker = new ShelfMaker2(locatedBottom.placement, { thickness });
+  maker.addFlatPart(locatedHolder, keepBothSides);
+
+  bro
+    .expect(
+      maker.features.map(({ path, tags }) => ({ path: path.toString(), tags })),
+    )
+    .toEqual([
+      {
+        path: "M 24.000000000000007 -16.541666666666664 L 34.00000000000001 -16.541666666666664 L 34.00000000000001 -19.791666666666664 L 24.000000000000007 -19.791666666666664 Z",
+        tags: ["shelfA"],
+      },
+      {
+        path: "M 18.000000000000007 -15.291666666666664 L 24.000000000000007 -15.291666666666664 L 24.000000000000007 -18.541666666666664 L 18.000000000000007 -18.541666666666664 Z",
+        tags: ["shelfB", "edge"],
+      },
+      {
+        path: "M 24.000000000000007 -15.291666666666664 L 34.00000000000001 -15.291666666666664 L 34.00000000000001 -18.541666666666664 L 24.000000000000007 -18.541666666666664 Z",
+        tags: ["shelfB"],
+      },
+    ]);
+
+  makeSimpleMortise(claw, holder, bottomShelf);
+  bro.expect(bottomShelf.insides.length).toBe(1);
+  bro
+    .expect(bottomShelf.insides[0].toString())
+    .toBe(
+      "M 34.00000000000001 -15.291666666666664 L 24.000000000000007 -15.291666666666664 L 24.000000000000007 -19.791666666666664 L 34.00000000000001 -19.791666666666664 Z",
+    );
 });

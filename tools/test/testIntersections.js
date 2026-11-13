@@ -240,7 +240,7 @@ bro.test("cut simple shape", () => {
   bro
     .expect(path.toString())
     .toBe(
-      "M 0 -5 L -2.999999999999999 -5 A 2 2 0 0 0 -5 -3.0000000000000004 L -5 3 A 2 2 0 0 0 -2.9999999999999996 5 L 0 5 Z",
+      "M 0 -5 L -3 -5 A 2 2 0 0 0 -5 -3 L -5 3 A 2 2 0 0 0 -3 5 L 0 5 Z",
     );
 });
 
@@ -343,4 +343,20 @@ bro.test("another difference bug, returns a zero surface path", () => {
     .toBe(
       "M 46.92307692307692 15.115384615384608 L 6.123233995736766e-16 -10 L -10 0 L -53.846153846153825 57.10256410256409 Z",
     );
+});
+
+// TODO
+bro.test("simplify does not quite simplify as expected after union", () => {
+  // const holderWidth = 16;
+  // const outside = Path.makeRect(70, holderWidth).recenter();
+  // const tWidth = 10;
+  // const tHeight = 10;
+  //
+  // const squashed = outside.offset([tHeight, 0, tHeight, tWidth - holderWidth]);
+  //
+  // bro
+  //   .expect(outside.realBooleanUnion(squashed).toString())
+  //   .toBe(
+  //     "M 36.792307692307695 -10.511538461538448 L 39.56153846153847 -9.35769230769229 L 33.622983346207484 -17 L -34.66666666666662 -17 L -16.561537757286658 25.757692601130568 L 16.02307692307693 39.3346153846154 Z",
+  //   );
 });

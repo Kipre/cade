@@ -4,6 +4,7 @@ import {
   areOnSameLine,
   computeAngleBetween,
   computeVectorAngle,
+  dot,
   intersectLines,
   isToTheLeft,
   minus,
@@ -36,7 +37,7 @@ import {
 import { pairs } from "./iteration.js";
 import { BBox, debugGeometry } from "./svg.js";
 import { applyTransformMatrix } from "./transform.js";
-import { modulo } from "./utils.js";
+import { keyToComparison, modulo } from "./utils.js";
 
 class RoundFilletError extends TypeError { }
 

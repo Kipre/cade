@@ -1,10 +1,10 @@
-/** @import * as types from './types' */
+/** @import { Point, Point3 } from './types' */
 
 import { eps } from "./2d.js";
 
 /**
- * @param {types.Point3} v
- * @returns {types.Point3}
+ * @param {Point3} v
+ * @returns {Point3}
  */
 export function normalize3(v) {
   const length = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
@@ -12,9 +12,9 @@ export function normalize3(v) {
 }
 
 /**
- * @param {types.Point3 | types.Point} a
- * @param {types.Point3 | types.Point} b
- * @returns {types.Point3}
+ * @param {Point3 | Point} a
+ * @param {Point3 | Point} b
+ * @returns {Point3}
  */
 export function cross(a, b) {
   return [
@@ -25,17 +25,17 @@ export function cross(a, b) {
 }
 
 /**
- * @param {types.Point3} point
- * @param {types.Point3} vector
- * @returns {types.Point3}
+ * @param {Point3} point
+ * @param {Point3} vector
+ * @returns {Point3}
  */
 export function project3(point, vector) {
   return mult3(vector, dot3(point, vector) * norm3(vector) ** 2);
 }
 
 /**
- * @param {types.Point3} v1
- * @param {types.Point3} v2
+ * @param {Point3} v1
+ * @param {Point3} v2
  * @returns {boolean}
  */
 export function collinear3(v1, v2) {
@@ -43,35 +43,35 @@ export function collinear3(v1, v2) {
 }
 
 /**
- * @param {types.Point3} p1
- * @param {types.Point3} p2
- * @returns {types.Point3}
+ * @param {Point3} p1
+ * @param {Point3} p2
+ * @returns {Point3}
  */
 export function minus3(p1, p2) {
   return [p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2]];
 }
 
 /**
- * @param {types.Point3} p1
- * @param {types.Point3} p2
- * @returns {types.Point3}
+ * @param {Point3} p1
+ * @param {Point3} p2
+ * @returns {Point3}
  */
 export function plus3(p1, p2) {
   return [p1[0] + p2[0], p1[1] + p2[1], p1[2] + p2[2]];
 }
 
 /**
- * @param {types.Point3} p
+ * @param {Point3} p
  * @param {number} x
- * @returns {types.Point3}
+ * @returns {Point3}
  */
 export function mult3(p, x) {
   return [p[0] * x, p[1] * x, p[2] * x];
 }
 
 /**
- * @param {types.Point3} p1
- * @param {types.Point3} p2
+ * @param {Point3} p1
+ * @param {Point3} p2
  * @returns {number}
  */
 export function dot3(p1, p2) {
@@ -79,8 +79,8 @@ export function dot3(p1, p2) {
 }
 
 /**
- * @param {types.Point3} p1
- * @param {types.Point3?} p2
+ * @param {Point3} p1
+ * @param {Point3?} p2
  * @returns {number}
  */
 export function norm3(p1, p2 = null) {
@@ -90,17 +90,17 @@ export function norm3(p1, p2 = null) {
 }
 
 /**
- * @param {types.Point3} p
- * @returns {types.Point}
+ * @param {Point3} p
+ * @returns {Point}
  */
 export function proj2d(p) {
   return [p[0], p[1]];
 }
 
 /**
- * @param {types.Point3} p1
- * @param {types.Point3} p2
- * @returns {types.Point3}
+ * @param {Point3} p1
+ * @param {Point3} p2
+ * @returns {Point3}
  */
 export function placeAlong3(p1, p2, param) {
   let fraction = 0;
@@ -119,10 +119,10 @@ export function placeAlong3(p1, p2, param) {
 }
 
 /**
- * @param {types.Point3} p
- * @param {types.Point3} origin
- * @param {types.Point3} anyNormal
- * @returns {types.Point3}
+ * @param {Point3} p
+ * @param {Point3} origin
+ * @param {Point3} anyNormal
+ * @returns {Point3}
  */
 export function projectToPlane(p, origin, anyNormal) {
   const normal = normalize3(anyNormal);
@@ -130,4 +130,21 @@ export function projectToPlane(p, origin, anyNormal) {
   const toOrigin = minus3(origin, p);
   const distanceFromPlane = dot3(normal, toOrigin);
   return plus3(p, mult3(normal, distanceFromPlane));
+}
+
+/**
+ * Project a point on a line
+ * @param {Point3} p
+ * @param {Point3} l1
+ * @param {Point3} l2
+ * @returns {Point3}
+ */
+export function pointToLine3(p, l1, l2) {
+  if (norm3(l1, l2) < eps)
+    throw new Error("cannot project on zero length line");
+
+  const v = minus3(l2, l1);
+  const u = minus3(p, l1);
+  const toProj = dot3(u, v);
+  return plus3(l1, mult3(v, toProj / norm3(v) ** 2));
 }

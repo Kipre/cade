@@ -9,8 +9,13 @@ export function modulo(a, m) {
   return ((a % m) + m) % m;
 }
 
+/**
+ * @template T
+ * @param {(x: T) => number} func
+ * returns {(a: T, b: T) => number} func
+ */
 export function keyToComparison(func) {
-  return (a, b) => func(a) - func(b);
+  return (/** @type {T} */ a, /** @type {T} */ b) => func(a) - func(b);
 }
 
 export const keyToComparison2d = (func) => (a, b) => {

@@ -250,12 +250,15 @@ export function moveLine(p, l1, l2) {
  * @param {Point} p
  * @param {Point} l1
  * @param {Point} l2
+ * @returns {Point}
  */
 export function pointToLine(p, l1, l2) {
-  if (norm(p, l1) < eps || norm(p, l1) < eps) return p;
-  const angle = computeAngleBetween(minus(l1, l2), minus(l1, p));
-  const fraction = (norm(l1, p) * Math.cos(angle)) / norm(l1, l2);
-  return placeAlong(l1, l2, { fraction });
+  if (norm(l1, l2) < eps)
+    throw new Error("cannot project on zero length line");
+
+  const v = minus(l2, l1);
+  const u = minus(p, l1);
+  return plus(l1, mult(v, dot(u, v) / dot(v, v)));
 }
 
 /**
