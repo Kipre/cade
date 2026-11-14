@@ -48,7 +48,7 @@ const eps = 1e-5;
  * @typedef {{point: Point} & IntersectionLocation} SimpleIntersection
  * @typedef {{point: Point; self: IntersectionLocation, other: IntersectionLocation}} PathIntersection
  *
- * @typedef {[number, Point, "lineTo" | "arcTo", Point, number?, number?]} Segment
+ * @typedef {[number, Point, "lineTo" | "arc", Point, number?, number?]} Segment
  */
 
 export class Path {
@@ -1911,19 +1911,46 @@ function coincideInJunction(j1, j2) {
 }
 
 /**
+ * Compares segments regardless of their direction
+ *
  * @param {Segment} s1
  * @param {Segment} s2
  */
 function segmentsAreEqual(s1, s2) {
-  const [, lp1, type1, p1, r1, sweep1] = s1;
-  const [, lp2, type2, p2, r2, sweep2] = s2;
+  const [, , type1] = s1;
+  const [, , type2] = s2;
 
-  if (norm(lp1, lp2) > eps) return false;
   if (type1 !== type2) return false;
-  if (norm(p1, p2) > eps) return false;
+  if (type1 === "lineTo") return linesAreEqual(s1, s2);
+  if (type1 === "arc") return arcsAreEqual(s1, s2);
 
-  if (r1 == null && r2 == null) return true;
+  throw new Error(`${type1} not supported yet`);
+}
 
+/**
+ * Symmetric comparison
+ * @param {Segment} s1
+ * @param {Segment} s2
+ */
+function linesAreEqual([, lp1, , p1], [, lp2, , p2]) {
+  return (
+    (norm(lp1, lp2) < eps && norm(p1, p2) < eps) ||
+    (norm(lp1, p2) < eps && norm(p1, lp2) < eps)
+  );
+}
+
+/**
+ * Symmetric comparison
+ * @param {Segment} s1
+ * @param {Segment} s2
+ */
+function arcsAreEqual([, lp1, , p1, r1, sweep1], [, lp2, , p2, r2, sweep2]) {
+  if (r1 == null || r2 == null) throw new Error("arc without radius");
   if (Math.abs(r1 - r2) > eps) return false;
-  return sweep1 === sweep2;
+
+  const sameWay = norm(lp1, lp2) < eps && norm(p1, p2) < eps;
+  if (sameWay) return sweep1 === sweep2;
+
+  const backwards = norm(lp1, p2) < eps && norm(p1, lp2) < eps;
+  return backwards && sweep1 !== sweep2;
 }

@@ -210,7 +210,7 @@ function makeNut(size) {
     Path.makeCircle(diameter / 2),
   );
 
-  const nut = new Fastener(`${size} nut`, head);
+  const nut = new Fastener(`${size} ${headSize}mm nut`, head);
   nut.material = metalMaterial;
   nut.addSymmetries(a2m(zero3, x3), a2m(zero3, y3));
   return nut;
@@ -304,6 +304,7 @@ export function getFastenerKit(size, length, addLengthForNut = true) {
     length,
     addLengthForNut,
   );
+  const { washerThickness } = isoFastenerSizes[mSize];
 
   let bottom = bottoms[mSize];
   if (bottom == null) {
