@@ -2,8 +2,6 @@
  * @import { Point, Point3 } from "./types"
  */
 
-import { Path } from "./path.js";
-
 export const w3svg = "http://www.w3.org/2000/svg";
 const defaultMarginPercents = 5;
 
@@ -141,16 +139,14 @@ export class BBox {
 
   static fromDataset(element) {
     const self = new BBox();
-    self.left = [
-      Number.parseFloat(element.dataset.xMin) || Number.POSITIVE_INFINITY,
-      0,
-    ];
-    self.bottom = [
-      Number.parseFloat(element.dataset.yMin) || Number.POSITIVE_INFINITY,
-      0,
-    ];
-    self.right = [Number.parseFloat(element.dataset.xMax) || 0, 0];
-    self.top = [0, Number.parseFloat(element.dataset.yMax) || 0];
+    const { xMin, yMin, xMax, yMax } = element.dataset;
+    // a missing value means an empty box
+    if ([xMin, yMin, xMax, yMax].includes(undefined)) return self;
+
+    self.left = [Number.parseFloat(xMin), 0];
+    self.bottom = [0, Number.parseFloat(yMin)];
+    self.right = [Number.parseFloat(xMax), 0];
+    self.top = [0, Number.parseFloat(yMax)];
     return self;
   }
 
@@ -188,216 +184,5 @@ export async function importDocument(path) {
   return parser.parseFromString(doc, mime);
 }
 
-export function logOnSVG(x, y, msg) {
-  const text = document.createElementNS(w3svg, "text");
-  text.setAttribute("x", x);
-  text.setAttribute("y", y);
-  text.innerHTML = msg;
-  return text;
-}
-
-export function logVector(x0, y0, x1, y1, color) {
-  const line = document.createElementNS(w3svg, "line");
-  if (color) line.style.stroke = color;
-  line.setAttribute("x1", x0);
-  line.setAttribute("y1", y0);
-  line.setAttribute("x2", x1);
-  line.setAttribute("y2", y1);
-  svg.appendChild(line);
-}
-
-export function debugPolyline(poly, color = "red", strokeWidth = null) {
-  const g = document.createElementNS(w3svg, "g");
-  const p = document.createElementNS(w3svg, "path");
-  const d = new Path();
-  const [p0, ...rest] = poly;
-  d.moveTo(p0);
-
-  for (const pn of rest) {
-    d.lineTo(pn);
-    const point = document.createElementNS(w3svg, "circle");
-    point.setAttribute("cx", pn[0]);
-    point.setAttribute("cy", pn[1]);
-    point.setAttribute("r", "1em");
-    g.appendChild(point);
-  }
-
-  p.setAttribute("d", d.toString());
-  p.setAttribute("stroke", color);
-  if (strokeWidth) p.setAttribute("stroke-width", strokeWidth);
-  p.setAttribute("fill", "none");
-
-  g.insertBefore(p, [...g.children][0]);
-  return g;
-}
-
-export function debugArc(start, end, radius, sweep) {
-  const d = new Path();
-  d.moveTo(start);
-  d.arc(end, radius, sweep);
-  return d;
-}
-
-/**
- * @param {(Point[] | string | Path | Point)[]} shapes
- */
-export function debugGeometry(...shapes) {
-  const err = new Error();
-  console.log(err);
-  if (typeof document === "undefined") return;
-
-  const id = "debug-drawing";
-  let svg = document.querySelector(`#${id}`);
-  if (!svg) {
-    svg = document.createElementNS(w3svg, "svg");
-    svg.innerHTML = `
-<defs>
-  <marker
-    id="circle"
-    markerWidth="10"
-    markerHeight="10"
-    refX="5"
-    refY="5"
-    markerUnits="strokeWidth">
-    <circle cx="5" cy="5" r="3" stroke-width="1" stroke="context-stroke" fill="context-fill" />
-  </marker>
-  <marker
-    id="arrow"
-    viewBox="0 0 10 10"
-    refX="1"
-    refY="5"
-    markerUnits="strokeWidth"
-    markerWidth="5"
-    markerHeight="10"
-    orient="auto">
-    <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
-  </marker>
-  <marker
-    id="start-line"
-    viewBox="0 0 10 10"
-    refX="1"
-    refY="5"
-    markerUnits="strokeWidth"
-    markerWidth="5"
-    markerHeight="10"
-    orient="auto">
-    <path d="M 4 0 L 4 10 L 6 10 L 6 0 Z" fill="context-stroke" />
-  </marker>
-</defs>`;
-    svg.id = id;
-    document.body.appendChild(svg);
-  }
-
-  svg.addEventListener("wheel", (/** @type {WheelEvent} */ e) => {
-    e.preventDefault();
-    const vb = svg.viewBox.baseVal;
-    const k = Math.exp(e.deltaY * 0.001); // > 1 zooms out, < 1 zooms in
-    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(
-      svg.getScreenCTM().inverse(),
-    );
-    vb.x = p.x - (p.x - vb.x) * k;
-    vb.y = p.y - (p.y - vb.y) * k;
-    vb.width *= k;
-    vb.height *= k;
-    svg.style.fontSize = `${12 / svg.getScreenCTM().a}px`;
-  });
-
-  /** @type {PointerEvent?} */
-  let last = null;
-  svg.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0) return;
-    last = e;
-    svg.setPointerCapture(e.pointerId);
-  });
-  svg.addEventListener("pointermove", (e) => {
-    if (!last) return;
-    const vb = svg.viewBox.baseVal;
-    const d = new DOMPoint(
-      e.clientX - last.clientX,
-      e.clientY - last.clientY,
-      0,
-      0,
-    ).matrixTransform(svg.getScreenCTM().inverse());
-    vb.x -= d.x;
-    vb.y -= d.y;
-    last = e;
-  });
-  svg.addEventListener("pointerup", () => (last = null));
-
-  const bbox = BBox.fromDataset(svg);
-  const colors = ["red", "green", "blue", "purple", "brown"];
-
-  for (let i = 0; i < shapes.length; i++) {
-    let shape = shapes[i];
-    const color = colors[i % colors.length];
-
-    // this is a point
-    if (Number.isFinite(shape[0])) {
-      const [x, y] = shape;
-      const point = document.createElementNS(w3svg, "circle");
-      point.setAttribute("stroke", "black");
-      point.setAttribute("fill", color);
-      point.setAttribute("style", "opacity: 0.8");
-      point.setAttribute("r", "1em");
-      point.setAttribute("cx", x);
-      point.setAttribute("cy", y);
-      bbox.include([x, y]);
-
-      const title = document.createElementNS(w3svg, "title");
-      title.textContent = `point n° ${i} ${x} ${y}`;
-      point.appendChild(title);
-      svg.appendChild(point);
-      continue;
-    }
-
-    let marker = "url(#arrow)";
-    const fromArray = Array.isArray(shape);
-    if (fromArray) {
-      const [first, ...points] = shape;
-      shape = new Path();
-      shape.moveTo(first);
-      for (const point of points) shape.lineTo(point);
-      shape.close();
-      marker = "url(#circle)";
-    }
-
-    const path = document.createElementNS(w3svg, "path");
-    path.setAttribute("d", shape.toString());
-    path.setAttribute("stroke", color);
-    path.setAttribute("style", "opacity: 0.8");
-    path.setAttribute("fill", "none");
-    path.setAttribute("marker-start", "url(#start-line)");
-    path.setAttribute("marker-mid", marker);
-    // path.setAttribute("marker-end", "url(#arrow)");
-
-    const totalLength = path.getTotalLength();
-    for (let i = 0; i < 1; i += 0.01) {
-      const p = path.getPointAtLength(totalLength * i);
-      bbox.include([p.x, p.y]);
-    }
-    const title = document.createElementNS(w3svg, "title");
-    title.textContent = `${fromArray ? "array" : "path"} ${i}`;
-    path.appendChild(title);
-    svg.appendChild(path);
-  }
-
-  bbox.toDataset(svg);
-  svg.setAttribute("viewBox", bbox.toViewBox());
-  const size = bbox.size();
-
-  const mgn = size / 20;
-
-  for (const el of svg.querySelectorAll(".axes")) el.remove();
-  svg.innerHTML = `
-  <line class="axes" x1="${bbox.xMin - mgn / 2}" x2=${bbox.xMax + mgn / 2
-    } stroke="black" marker-end="url(#arrow)"/>
-  <line class="axes" y1="${bbox.yMin - mgn / 2}" y2=${bbox.yMax + mgn / 2
-    } stroke="black" marker-end="url(#arrow)"/>
-   ${svg.innerHTML}`;
-
-  svg.setAttribute(
-    "style",
-    `font-size: ${size / 100
-    }; stroke-width: 0.2em; transform: scale(1, -1); max-height: 100vh; border: 1px solid #999999`,
-  );
-}
+/** @deprecated */
+export function debugGeometry() { }
