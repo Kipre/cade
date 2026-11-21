@@ -2,12 +2,23 @@
 
 /**
  * @import { Segment } from './path'
+ * @import { Point } from './types'
  */
 
 import { dot, eps, minus, norm, plus, rotatePoint } from "./2d.js";
-import { getCircleCenter, isInPieSlice } from "./circle.js";
+import { getCircleCenter, isInPieSlice, normalizeAngle } from "./circle.js";
+import { debugGeometry } from "./debug.js";
 import { x2, zero2 } from "./defaults.js";
+import { Panorama } from "./panorama.js";
 import { Path } from "./path.js";
+import { keyToComparison, modulo } from "./utils.js";
+
+/**
+ * @typedef {object} Piece
+ * @property {Point} point
+ * @property {number} radius
+ * @property {Panorama} pano
+ */
 
 // TODO: remove when old shelf-maker is removed
 /**
@@ -28,100 +39,109 @@ export function convexHullOld(...geometries) {
  * @returns {Path}
  */
 export function convexHull(...paths) {
-  let lastSegment = null;
-  let lastPoint = null;
+  /** @type {Piece[]} */
+  let pieces = [];
+  for (const path of paths) {
+    for (const segment of path.iterateOverSegments()) {
+      const [i, p1, type, p2, r, swp] = segment;
+
+      // prefill the pieces with at least one point
+      if (i === 0) pieces.push({ point: p1, pano: new Panorama(), radius: 0 });
+      // single line paths need this
+      else pieces = _stitch(pieces, p1);
+
+      if (type === "arc") {
+        if (r == null || swp == null) throw TypeError();
+        const center = getCircleCenter(p1, p2, r, swp);
+        const startAngle = normalizeAngle(
+          Math.atan2(...minus(p1, center).toReversed()),
+        );
+        const endAngle = normalizeAngle(
+          Math.atan2(...minus(p2, center).toReversed()),
+        );
+
+        const [S, E] = swp ? [startAngle, endAngle] : [endAngle, startAngle];
+        const pano = Panorama.fromPair(S, E);
+        pieces = _stitch(pieces, center, r, pano);
+      } else if (type !== "lineTo") throw new Error();
+
+      pieces = _stitch(pieces, p2);
+    }
+  }
+
+  pieces.sort(keyToComparison((x) => x.pano.start));
+
   const result = new Path();
+  const { point, pano, radius } = pieces[0];
+  result.moveTo(rotatePoint(point, plus(point, [radius, 0]), pano.start));
 
-  const allSegments = [];
-  for (const p of paths) {
-    for (const segment of p.iterateOverSegments()) {
-      allSegments.push(segment);
+  for (const { point, pano, radius } of pieces) {
+    result.lineTo(rotatePoint(point, plus(point, [radius, 0]), pano.start));
+    if (radius > eps) {
+      result.arc(
+        rotatePoint(point, plus(point, [radius, 0]), pano.start + pano.span),
+        radius,
+        1,
+      );
     }
   }
-
-  const fractions = 100;
-
-  for (const theta of Array.from(
-    { length: fractions },
-    (_, i) => (i * (2 * Math.PI)) / fractions,
-  )) {
-    const dir = rotatePoint(zero2, x2, theta);
-    let best = null;
-    let bestAt = -Infinity;
-    let bestPoint = null;
-    for (const segment of allSegments) {
-      const p = support(segment, theta);
-      const peak = dot(dir, p);
-      if (peak > bestAt) {
-        best = segment;
-        bestAt = peak;
-        bestPoint = p;
-      }
-    }
-    const [, p1, type, p2, r, sweep] = best;
-
-    if (result.controls.length === 0) {
-      result.moveTo(bestPoint);
-      lastPoint = bestPoint;
-      lastSegment = best;
-      continue;
-    }
-
-    if (type === "lineTo") {
-      if (norm(lastPoint, bestPoint) < eps) {
-        continue;
-      }
-      result.lineTo(bestPoint);
-      lastPoint = bestPoint;
-      lastSegment = best;
-      continue;
-    }
-
-    if (type === "arc" && best === lastSegment) {
-      if (result.controls.at(-1)[0] === "arc") {
-        result.controls.pop();
-      }
-      const s =
-        dot(minus(lastPoint, bestPoint), minus(p1, p2)) > 0 ? sweep : 1 - sweep;
-      result.arc(bestPoint, r, s);
-      lastPoint = bestPoint;
-      continue;
-    }
-
-    if (type === "arc") {
-      result.lineTo(bestPoint);
-      lastPoint = bestPoint;
-      lastSegment = best;
-      continue;
-    }
-    throw new Error("segment not supported");
-  }
-
   result.close();
   result.simplify();
+
   return result;
 }
 
 /**
- * @param {Segment} segment
- * @param {number} theta
+ * @param {Piece[]} pieces
+ * @param {Point} p2
+ * @param {number | null} [maybeRadius]
+ * @param {Panorama} [limits]
  */
-function support(segment, theta) {
-  const [, p1, type, p2, r, sweep] = segment;
+function _stitch(pieces, p2, maybeRadius = null, limits = new Panorama()) {
+  const newPieces = [];
 
-  if (type === "arc") {
-    const center = getCircleCenter(p1, p2, r, sweep);
-    const p = rotatePoint(center, plus(center, [r, 0]), theta);
-    if (isInPieSlice(p, p1, p2, r, sweep)) {
-      return p;
-    }
+  const rad = maybeRadius ?? 0;
+
+  // skip a point that coincides with another
+  if (pieces.some(({ point }) => norm(point, p2) + rad < eps)) {
+    return pieces;
   }
 
-  if (type !== "lineTo" && type !== "arc")
-    throw new Error("unknown segment type");
+  const newPano = new Panorama();
 
-  const dir = rotatePoint(zero2, x2, theta);
+  for (const piece of pieces) {
+    const { point, radius, pano } = piece;
+    const alpha = normalizeAngle(Math.atan2(...minus(p2, point).toReversed()));
 
-  if (dot(p1, dir) > dot(p2, dir)) return p1;
-  return p2;
+    const d = norm(point, p2);
+    let outside;
+
+    if (d < eps) {
+      outside = pano.clone();
+    } else {
+      const rDelta = Math.asin((rad - radius) / norm(point, p2));
+      outside = new Panorama(alpha + Math.PI, 0);
+      outside.growSelf(Math.PI / 2 - rDelta);
+    }
+
+    const currentPano = new Panorama(alpha);
+    currentPano.subtractSelf(outside);
+    currentPano.intersectSelf(limits);
+    currentPano.intersectSelf(newPano);
+
+    newPano.intersectSelf(currentPano);
+    pano.subtractSelf(currentPano);
+
+    // skip a point that is no longer necessary
+    if (pano.empty()) {
+      continue;
+    }
+
+    newPieces.push({ point, pano, radius });
+  }
+
+  if (!newPano.empty())
+    newPieces.push({ point: p2, pano: newPano, radius: rad });
+
+  return newPieces;
 }

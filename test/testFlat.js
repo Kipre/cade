@@ -12,6 +12,7 @@ import {
   findConvexZones,
   makeSimpleMortise,
   ShelfMaker,
+  ShelfMaker2,
 } from "../lib/shelf.js";
 import { convexHull, convexHullOld } from "../tools/operations.js";
 import { Path } from "../tools/path.js";
@@ -20,7 +21,7 @@ import bro from "../tools/test/brotest/brotest.js";
 import { a2m } from "../tools/transform.js";
 
 bro.test("make polygon from parallel lines", () => {
-  const shelf = new ShelfMaker(a2m(), { woodThickness: 10 })
+  const shelf = new ShelfMaker2(a2m(), { thickness: 10 })
     .addFeature(
       Path.fromPolyline(
         [
@@ -45,7 +46,7 @@ bro.test("make polygon from parallel lines", () => {
   bro
     .expect(shelf.make().toString())
     .toBe(
-      "M 53.210678118654755 7.5 L 53.210678118654755 -87.5 L 600 -87.5 L 600 7.5 Z",
+      "M 53.210678118654755 -87.5 L 600 -87.5 L 600 7.5 L 53.210678118654755 7.5 Z",
     );
 });
 
@@ -166,17 +167,17 @@ bro.test("find convex zones", () => {
 
   bro
     .expect(Path.fromPolyline(hulls[0]).toString())
-    .toBe("M -170.62276185659434 100 L -85 15 L -15 15 L -15.000000000000002 100 Z");
+    .toBe("M -15 15 L -15.000000000000002 100 L -170.62276185659434 100 L -85 15 Z");
 
   bro
     .expect(Path.fromPolyline(hulls[1]).toString())
     .toBe(
-      "M 9.769962616701378e-15 100 L 0 15.000000000000002 L 1018 15 L 1018 100 Z",
+      "M 1018 15 L 1018 100 L 9.769962616701378e-15 100 L 2.042810365310288e-14 15 Z",
     );
 
   bro
     .expect(Path.fromPolyline(hulls[2]).toString())
-    .toBe("M 1033 15 L 1103 15 L 1128 100 L 1033 100 Z");
+    .toBe("M 1103 15 L 1128 100 L 1033 100 L 1033 15 Z");
 });
 
 bro.test("find convex zones 2", () => {
@@ -311,7 +312,7 @@ bro.test("makes simple shelf", () => {
 
   bro
     .expect(shelf.make().toString())
-    .toBe("M -100 110 L -100 0 L 0 0 L 0 110 Z");
+    .toBe("M 0 0 L 0 110 L -100 110 L -100 0 Z");
 
   const shelf2 = new ShelfMaker(loc.translate(0, 0, -20), { thickness: 10 })
     .addFlatPart(assy.findChild(part1))
@@ -320,7 +321,7 @@ bro.test("makes simple shelf", () => {
   bro
     .expect(shelf2.make().toString())
     .toBe(
-      "M -100 100 L -100 10 L -3.061616997868383e-16 10 L -3.061616997868383e-16 100 Z",
+      "M -3.061616997868383e-16 10 L -3.061616997868383e-16 100 L -100 100 L -100 10 Z",
     );
 });
 

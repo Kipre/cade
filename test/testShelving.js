@@ -48,7 +48,7 @@ bro.test("makes simple butt shelf", () => {
 
   bro
     .expect(baseButt.toString())
-    .toBe("M 30 55 L 0 5 L 0 0 L 130 0 L 130 55 Z");
+    .toBe("M 130 0 L 130 55 L 30 55 L 0 5 L 0 0 Z");
 });
 
 bro.test("makes simple inside shelf", () => {
@@ -56,7 +56,7 @@ bro.test("makes simple inside shelf", () => {
     .addFlatPart(locatedTop)
     .addFlatPart(locatedBottom)
     .make();
-  bro.expect(baseInside.toString()).toBe("M 30 50 L 0 5 L 130 5 L 130 50 Z");
+  bro.expect(baseInside.toString()).toBe("M 130 50 L 30 50 L 0 5 L 130 5 Z");
 });
 
 const onlyBigger = (x) => x[0] > 70;
@@ -69,7 +69,7 @@ bro.test("makes filtered inside shelf", () => {
 
   bro
     .expect(halfInsideBigger.toString())
-    .toBe("M 80 -5 L 110 -50 L 130 -50 L 130 -5 Z");
+    .toBe("M 130 -50 L 130 -5 L 80 -5 L 110 -50 Z");
 });
 
 bro.test("makes filtered butt shelf", () => {
@@ -80,7 +80,7 @@ bro.test("makes filtered butt shelf", () => {
 
   bro
     .expect(halfButtBigger.toString())
-    .toBe("M 80 0 L 80 -5 L 110 -55 L 130 -55 L 130 0 Z");
+    .toBe("M 110 -55 L 130 -55 L 130 0 L 80 0 L 80 -5 Z");
 });
 
 const onlyLower = (x) => x[0] < 70;
@@ -93,7 +93,7 @@ bro.test("makes another filtered inside shelf", () => {
 
   bro
     .expect(halfInsideLower.toString())
-    .toBe("M 1.5308084989341916e-16 -5 L 30 -50 L 50 -50 L 20 -5 Z");
+    .toBe("M 50 -50 L 20 -5 L 1.5308084989341916e-16 -5 L 30 -50 Z");
 });
 
 bro.test("makes another filtered butt shelf", () => {
@@ -104,7 +104,7 @@ bro.test("makes another filtered butt shelf", () => {
 
   bro
     .expect(halfButtLower.toString())
-    .toBe("M 20 0 L 0 0 L 0 -5 L 30 -55 L 50 -55 L 50 -50 Z");
+    .toBe("M 30 -55 L 50 -55 L 50 -50 L 20 0 L 0 0 L 0 -5 Z");
 });
 
 bro.test("trims tilted holders with top and bottom shelves", () => {
@@ -148,12 +148,12 @@ bro.test("makes cut shelf on a single tilted shelf side", () => {
   const insidePath = new ShelfMaker2(a2m(zero3, x3, [0, 2, 1]), { thickness })
     .addFlatPart(locatedShelf, withTags("shelfA"), doCut)
     .addFeature(Path.makeCircle(15), a2m())
-    .make();
+    .make(true);
 
   bro
     .expect(insidePath.toString())
     .toBe(
-      "M 33.541019662496836 -67.08203932499369 L 14.265847744427303 4.635254915624211 A 15 15 0 0 1 -5.521868290270167 13.946647288323772 L -73.79024325749306 -13.416407864998735 Z",
+      "M 33.54101966249684 -67.08203932499369 L 14.486982166623857 3.889389117062258 A 15 15 0 0 1 -5.580678006324524 13.923219203536433 L -73.79024325749306 -13.41640786499875 Z",
     );
 });
 
