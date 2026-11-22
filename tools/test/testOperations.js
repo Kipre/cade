@@ -72,3 +72,19 @@ bro.test("convex hull from a few paths", () => {
       "M -15 10 A 5 5 0 0 1 -12.169780164824171 5.495329752763739 L 20 -10 L 40 -10 L 40 38 A 2 2 0 0 1 38 40 L 22 40 A 2 2 0 0 1 20.792467518379297 39.59432283613795 L -13.018831204051757 13.985807090344867 A 5 5 0 0 1 -15 9.999999999999996 Z",
     );
 });
+
+bro.test("convex hull of two offset rounded rects", () => {
+  const topJunctionOffset = 34.16666666666667;
+  const smallerBeamProfile = Path.makeRoundedRect(30, 50, 4);
+  const topRailProfile = Path.makeRoundedRect(30, 65, 4);
+  bro
+    .expect(
+      convexHull(
+        smallerBeamProfile.recenter({ x: "start", y: "start" }),
+        topRailProfile
+          .recenter({ x: "start", y: "start" })
+          .translate([0, topJunctionOffset]),
+      ).toString(),
+    )
+    .toBe("M 1.7763568394002505e-15 3.9999999999999956 A 4 4 0 0 1 4.000000000000001 4.440892098500626e-16 L 26 0 A 4 4 0 0 1 30 4 L 30 95.16666666666667 A 4 4 0 0 1 26 99.16666666666667 L 3.9999999999999933 99.16666666666667 A 4 4 0 0 1 0 95.16666666666667 Z");
+});

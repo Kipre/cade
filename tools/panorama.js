@@ -121,7 +121,10 @@ export class Panorama {
     const L = other.span;
     const o = modulo(other.start - this.start, TAU);
 
-    if (o > eps && o + L < S - eps)
+    // other strictly inside this would leave [0, o] and [o + L, S]; the
+    // second piece is dropped if it's only a sliver
+    const dropped = S - (o + L);
+    if (o > eps && dropped > 1e-3)
       throw new Error("panorama subtraction results in two");
 
     // what survives is [head, tail]
@@ -158,8 +161,13 @@ export class Panorama {
   }
 
   toString() {
-    if (this.empty()) return `EmptyPano(start=${this.start.toFixed(3)})`;
-    if (this.full()) return `FullPano(start=${this.start.toFixed(3)})`;
-    return `Panorama(start=${this.start.toFixed(3)}, span=${this.span.toFixed(3)})`;
+    const fmt = new Intl.NumberFormat("en", { maximumFractionDigits: 3 });
+    const pi = (/** @type {number} */ a) => `${fmt.format(a / Math.PI)}π`;
+    const s = pi(this.start);
+    const e = pi(this.start + this.span);
+    const span = pi(this.span);
+    if (this.empty()) return `EmptyPano(${s})`;
+    if (this.full()) return `FullPano(${s})`;
+    return `Panorama(${s} to ${e}, [${span}])`;
   }
 }

@@ -119,7 +119,8 @@ function _stitch(pieces, p2, maybeRadius = null, limits = new Panorama()) {
     if (d < eps) {
       outside = pano.clone();
     } else {
-      const rDelta = Math.asin((rad - radius) / norm(point, p2));
+      const ratio = (rad - radius) / norm(point, p2);
+      const rDelta = Math.asin(Math.max(-1, Math.min(1, ratio)));
       outside = new Panorama(alpha + Math.PI, 0);
       outside.growSelf(Math.PI / 2 - rDelta);
     }
