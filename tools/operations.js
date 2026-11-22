@@ -1,14 +1,12 @@
 //@ts-check
 
 /**
- * @import { Segment } from './path'
  * @import { Point } from './types'
  */
 
 import { dot, eps, minus, norm, plus, rotatePoint } from "./2d.js";
 import { getCircleCenter, isInPieSlice, normalizeAngle } from "./circle.js";
 import { debugGeometry } from "./debug.js";
-import { x2, zero2 } from "./defaults.js";
 import { Panorama } from "./panorama.js";
 import { Path } from "./path.js";
 import { keyToComparison, modulo } from "./utils.js";
@@ -69,13 +67,23 @@ export function convexHull(...paths) {
     }
   }
 
-  pieces.sort(keyToComparison((x) => x.pano.start));
+  return _assemblePieces(pieces);
+}
 
+/**
+ * @param {Piece[]} pieces
+ */
+function _assemblePieces(pieces, debug = false) {
+  const debugPaths = [];
+
+  const sorted = pieces.toSorted(keyToComparison((x) => x.pano.start));
   const result = new Path();
-  const { point, pano, radius } = pieces[0];
+  const { point, pano, radius } = sorted[0];
   result.moveTo(rotatePoint(point, plus(point, [radius, 0]), pano.start));
 
-  for (const { point, pano, radius } of pieces) {
+  for (const { point, pano, radius } of sorted) {
+    if (debug) debugPaths.push(pano.toPath());
+
     result.lineTo(rotatePoint(point, plus(point, [radius, 0]), pano.start));
     if (radius > eps) {
       result.arc(
@@ -87,6 +95,18 @@ export function convexHull(...paths) {
   }
   result.close();
   result.simplify();
+
+  if (debug) {
+    console.log(
+      pieces.map((x) => ({
+        ...x,
+        point: x.point.join(", "),
+        pano: x.pano.toString(),
+      })),
+    );
+    debugGeometry(result, ...debugPaths);
+    throw new Error();
+  }
 
   return result;
 }
@@ -107,42 +127,55 @@ function _stitch(pieces, p2, maybeRadius = null, limits = new Panorama()) {
     return pieces;
   }
 
-  const newPano = new Panorama();
+  let newPano = [limits];
 
   for (const piece of pieces) {
-    const { point, radius, pano } = piece;
+    const { point, radius } = piece;
     const alpha = normalizeAngle(Math.atan2(...minus(p2, point).toReversed()));
 
     const d = norm(point, p2);
-    let outside;
+    let outsides;
 
     if (d < eps) {
-      outside = pano.clone();
+      outsides = [piece.pano];
     } else {
       const ratio = (rad - radius) / norm(point, p2);
       const rDelta = Math.asin(Math.max(-1, Math.min(1, ratio)));
-      outside = new Panorama(alpha + Math.PI, 0);
-      outside.growSelf(Math.PI / 2 - rDelta);
+      outsides = new Panorama(alpha + Math.PI, 0)
+        .grow(Math.PI / 2 - rDelta)
+        .intersect(piece.pano);
     }
 
-    const currentPano = new Panorama(alpha);
-    currentPano.subtractSelf(outside);
-    currentPano.intersectSelf(limits);
-    currentPano.intersectSelf(newPano);
+    let applicable = [new Panorama(alpha)];
+    for (const out of outsides) {
+      applicable = applicable.flatMap((p) => p.subtract(out));
+    }
 
-    newPano.intersectSelf(currentPano);
-    pano.subtractSelf(currentPano);
-
-    // skip a point that is no longer necessary
-    if (pano.empty()) {
+    if (!applicable.length) {
+      newPieces.push(piece);
       continue;
     }
 
-    newPieces.push({ point, pano, radius });
+    const valid = [];
+    for (const previous of newPano) {
+      for (const current of applicable) {
+        valid.push(...current.intersect(previous));
+      }
+    }
+
+    newPano = valid;
+
+    if (valid.length) {
+      let reduced = [piece.pano];
+      for (const current of valid) {
+        reduced = reduced.flatMap((p) => p.subtract(current));
+      }
+      for (const pano of reduced) newPieces.push({ point, pano, radius });
+    } else newPieces.push({ point, pano: piece.pano, radius });
   }
 
-  if (!newPano.empty())
-    newPieces.push({ point: p2, pano: newPano, radius: rad });
+  for (const pano of newPano) newPieces.push({ point: p2, pano, radius: rad });
 
+  // if (newPieces.length > 2) _assemblePieces(newPieces, true);
   return newPieces;
 }

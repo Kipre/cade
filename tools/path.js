@@ -224,12 +224,13 @@ export class Path {
   }
 
   /**
-   * @param {(x: import('./types').Point) => number?} getRadius
+   * @param {(x: Point, bbox: BBox) => number?} getRadius
    * @param {RoundFilletOptions} options
    */
   roundFilletSome(getRadius, options = {}) {
     let result = this.clone();
     const clockwise = this.rotatesClockwise();
+    const bbox = this.bbox();
 
     const corners = [];
     for (const [one, two] of this.iterateOverJunctions()) {
@@ -237,7 +238,7 @@ export class Path {
       const [, , typeTwo, p3] = two;
 
       if (typeOne !== "lineTo" || typeTwo !== "lineTo") continue;
-      const radius = getRadius(p2);
+      const radius = getRadius(p2, bbox);
       if (!radius) continue;
 
       const entry = Math.atan2(...minus(p2, p1).toReversed());

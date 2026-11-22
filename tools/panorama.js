@@ -2,23 +2,32 @@
 
 import { eps, rotatePoint } from "./2d.js";
 import { normalizeAngle } from "./circle.js";
-import { debugGeometry } from "./debug.js";
 import { zero2 } from "./defaults.js";
 import { Path } from "./path.js";
 import { modulo } from "./utils.js";
 
+const TAU = 2 * Math.PI;
+
+/**
+ * @typedef {[] | [Panorama] | [Panorama, Panorama]} PanoOpResult
+ */
+
 /**
  * A helper to do arc-range operations: `start` and then rotate for
- * `span`, with span in [0, 2π] (0 is empty, 2π is full).
+ * `span`, with span in [0, 2π] (0 is empty, 2π is full). Immutable: every
+ * operation returns a new panorama (or one of its inputs, as is).
  */
 export class Panorama {
   /**
    * @param {number} [start]
    * @param {number} [span]
    */
-  constructor(start = 0, span = 2 * Math.PI) {
-    this.start = start;
+  constructor(start = 0, span = TAU) {
+    /** @readonly */
+    this.start = normalizeAngle(start);
+    /** @readonly */
     this.span = span;
+    Object.freeze(this);
   }
 
   /**
@@ -26,10 +35,7 @@ export class Panorama {
    * @param {number} end
    */
   static fromPair(start, end) {
-    return new Panorama(
-      normalizeAngle(start),
-      modulo(end - start, 2 * Math.PI),
-    );
+    return new Panorama(start, modulo(end - start, TAU));
   }
 
   /**
@@ -59,61 +65,53 @@ export class Panorama {
   }
 
   full() {
-    return this.span >= 2 * Math.PI - eps;
+    return this.span >= TAU - eps;
   }
 
   /** @param {number} angle */
   contains(angle) {
-    return modulo(angle - this.start, 2 * Math.PI) <= this.span;
+    return modulo(angle - this.start, TAU) <= this.span;
   }
 
   /**
-   * Throws if the result would be two arcs.
    * @param {Panorama} other
+   * @returns {PanoOpResult}
    */
-  intersectSelf(other) {
-    if (other.full()) return;
-    if (this.full()) {
-      this.start = other.start;
-      this.span = other.span;
-      return;
+  intersect(other) {
+    if (this.empty() || other.empty()) return [];
+    if (other.full()) return [this];
+    if (this.full()) return [other];
+
+    const S = this.span;
+    const L = other.span;
+    const o = modulo(other.start - this.start, TAU);
+
+    if (o < S - eps && o + L - TAU > eps) {
+      return [
+        new Panorama(this.start, o + L - TAU),
+        new Panorama(other.start, S - o),
+      ];
     }
 
-    const offset = modulo(other.start - this.start, 2 * Math.PI);
-
-    if (offset < this.span - eps && offset + other.span - 2 * Math.PI > eps) {
-      // console.log("intersect", this.toString(), "with", other.toString());
-      // debugGeometry(this.toPath(10), other.toPath(12));
-      throw new Error("panorama intersection results in two");
+    // other starts after this ends: only its wrap over [0, ...] can overlap
+    if (o > S - eps) {
+      const span = Math.min(S, o + L - TAU);
+      return span > eps ? [new Panorama(this.start, span)] : [];
     }
 
-    if (offset > this.span - eps) {
-      this.span = Math.max(
-        0,
-        Math.min(this.span, offset + other.span - 2 * Math.PI),
-      );
-      return;
-    }
-
-    this.start = other.start;
-    this.span = Math.min(this.span - offset, other.span);
+    return [new Panorama(other.start, Math.min(S - o, L))];
   }
 
   /**
-   * Throws if the result would be two arcs.
    * @param {Panorama} other
+   * @returns {PanoOpResult}
    */
-  subtractSelf(other) {
-    const TAU = 2 * Math.PI;
-    if (this.empty() || other.empty()) return;
-    if (other.full()) {
-      this.span = 0;
-      return;
-    }
+  subtract(other) {
+    if (this.empty()) return [];
+    if (other.empty()) return [this];
+    if (other.full()) return [];
     if (this.full()) {
-      this.start = normalizeAngle(other.start + other.span);
-      this.span = TAU - other.span;
-      return;
+      return [new Panorama(other.start + other.span, TAU - other.span)];
     }
 
     // work relative to this.start: this = [0, S], other = [o, o + L]
@@ -121,43 +119,46 @@ export class Panorama {
     const L = other.span;
     const o = modulo(other.start - this.start, TAU);
 
-    // other strictly inside this would leave [0, o] and [o + L, S]; the
-    // second piece is dropped if it's only a sliver
-    const dropped = S - (o + L);
-    if (o > eps && dropped > 1e-3)
-      throw new Error("panorama subtraction results in two");
+    // other strictly inside this would leave [0, o] and [o + L, S];
+    const residue = S - (o + L);
+    if (o > eps && residue > eps) {
+      return [
+        new Panorama(this.start, o),
+        new Panorama(this.start + o + L, residue),
+      ];
+    }
 
     // what survives is [head, tail]
     const startsAtZero = o <= eps;
     const head = startsAtZero ? L : Math.max(0, o + L - TAU);
     const tail = startsAtZero ? S : Math.min(S, o);
 
-    this.start = normalizeAngle(this.start + head);
-    this.span = Math.max(0, tail - head);
+    if (tail - head < eps) return [];
+
+    return [new Panorama(this.start + head, tail - head)];
   }
 
   /**
    * Widens both sides by `angle` (negative shrinks).
    * @param {number} angle
+   * @returns {Panorama}
    */
-  growSelf(angle) {
+  grow(angle) {
     if (this.full() && angle < 0) throw new Error("why shrink a full pano");
 
     // if (this.empty() && angle > 0) throw new Error("why grow an empty pano");
 
-    this.start = normalizeAngle(this.start - angle);
-    this.span = Math.max(0, Math.min(2 * Math.PI, this.span + 2 * angle));
+    return new Panorama(
+      this.start - angle,
+      Math.max(0, Math.min(TAU, this.span + 2 * angle)),
+    );
   }
 
   /** @param {Panorama} other */
   includes(other) {
     if (this.full()) return true;
-    const offset = modulo(other.start - this.start, 2 * Math.PI);
+    const offset = modulo(other.start - this.start, TAU);
     return this.span - offset >= other.span - eps;
-  }
-
-  clone() {
-    return new Panorama(this.start, this.span);
   }
 
   toString() {
