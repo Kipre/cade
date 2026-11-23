@@ -34,8 +34,9 @@ import {
   normalizeAngle,
   pointCoordinateOnArc,
 } from "./circle.js";
+import { debugGeometry } from "./debug.js";
 import { pairs } from "./iteration.js";
-import { BBox, debugGeometry } from "./svg.js";
+import { BBox } from "./svg.js";
 import { applyTransformMatrix } from "./transform.js";
 import { keyToComparison, modulo } from "./utils.js";
 
