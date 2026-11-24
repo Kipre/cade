@@ -1,4 +1,6 @@
-import { convexHull, convexHullOld } from "../operations.js";
+import { debugGeometry } from "../debug.js";
+import { y2, zero2 } from "../defaults.js";
+import { convexHull, convexHullOld, minBBox } from "../operations.js";
 import { Path } from "../path.js";
 import bro from "./brotest/brotest.js";
 
@@ -101,5 +103,20 @@ bro.test("hull of vertically aligned point and circle", () => {
     )
     .toBe(
       "M -10 -1.2246467991473533e-15 A 10 10 0 0 1 -9.682458365518539 -2.500000000000011 L 0 -40 L 5 -40 L 9.920307293423576 -1.2599615883220452 A 10 10 0 0 1 10 -4.440892098500626e-15 A 10 10 0 0 1 -10 1.2246467991473533e-15 Z",
+    );
+});
+
+bro.test("simple minimal bbox", () => {
+  const p = Path.makeRect(30, 10)
+    .recenter()
+    .rotate(Math.PI / 5)
+    .cutOnLine(zero2, y2);
+
+  debugGeometry(p);
+
+  bro
+    .expect(minBBox(p).toString())
+    .toBe(
+      "M -15.074181177086581 -4.7716938125123605 L -1.7763568394002505e-15 6.180339887498949 L 5.87785252292473 -1.909830056250526 L -9.19632865416185 -12.861863756261835 Z",
     );
 });

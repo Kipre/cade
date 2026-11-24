@@ -27,6 +27,16 @@ export function normalizeAngle(a) {
 
 /**
  * @param {types.Point} p1
+ * @param {types.Point} [p2]
+ * @return {number}
+ */
+export function vecAngle(p1, p2) {
+  const [x, y] = p2 == null ? p1 : minus(p2, p1);
+  return normalizeAngle(Math.atan2(y, x));
+}
+
+/**
+ * @param {types.Point} p1
  * @param {types.Point} p2
  * @param {number} radius
  * @param {number} sweep
@@ -208,10 +218,11 @@ export function isInPieSlice(p, start, end, radius, sweep) {
 export function pointCoordinateOnArc(p, start, end, radius, sweep) {
   const center = getCircleCenter(start, end, radius, sweep);
 
-  const startAngle = Math.atan2(...minus(start, center));
+  const startAngle = vecAngle(center, start);
 
-  let angle = normalizeAngle(Math.atan2(...minus(p, center)) - startAngle);
-  let endAngle = normalizeAngle(Math.atan2(...minus(end, center)) - startAngle);
+  // measured clockwise
+  let angle = normalizeAngle(startAngle - vecAngle(center, p));
+  let endAngle = normalizeAngle(startAngle - vecAngle(center, end));
 
   // will need some adjustment when long arcs will be possible
   if (Math.abs(endAngle + Math.PI) < eps && sweep === 0) endAngle = Math.PI;
@@ -226,8 +237,8 @@ export function pointCoordinateOnArc(p, start, end, radius, sweep) {
 
 export function getArcAngularLength(start, end, radius, sweep) {
   const center = getCircleCenter(start, end, radius, sweep);
-  const startAngle = Math.atan2(...minus(start, center).toReversed());
-  const endAngle = Math.atan2(...minus(end, center).toReversed());
+  const startAngle = vecAngle(center, start);
+  const endAngle = vecAngle(center, end);
   return (sweep ? 1 : -1) * Math.abs(normalizeAngle(endAngle - startAngle));
 }
 

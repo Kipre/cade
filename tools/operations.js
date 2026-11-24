@@ -4,8 +4,8 @@
  * @import { Point } from './types'
  */
 
-import { dot, eps, minus, norm, plus, rotatePoint } from "./2d.js";
-import { getCircleCenter, isInPieSlice, normalizeAngle } from "./circle.js";
+import { dot, eps, norm, plus, rotatePoint } from "./2d.js";
+import { getCircleCenter, isInPieSlice, vecAngle } from "./circle.js";
 import { debugGeometry } from "./debug.js";
 import { Panorama } from "./panorama.js";
 import { Path } from "./path.js";
@@ -51,12 +51,8 @@ export function convexHull(...paths) {
       if (type === "arc") {
         if (r == null || swp == null) throw TypeError();
         const center = getCircleCenter(p1, p2, r, swp);
-        const startAngle = normalizeAngle(
-          Math.atan2(...minus(p1, center).toReversed()),
-        );
-        const endAngle = normalizeAngle(
-          Math.atan2(...minus(p2, center).toReversed()),
-        );
+        const startAngle = vecAngle(center, p1);
+        const endAngle = vecAngle(center, p2);
 
         const [S, E] = swp ? [startAngle, endAngle] : [endAngle, startAngle];
         const pano = Panorama.fromPair(S, E);
@@ -131,7 +127,7 @@ function _stitch(pieces, p2, maybeRadius = null, limits = new Panorama()) {
 
   for (const piece of pieces) {
     const { point, radius } = piece;
-    const alpha = normalizeAngle(Math.atan2(...minus(p2, point).toReversed()));
+    const alpha = vecAngle(point, p2);
 
     const d = norm(point, p2);
     let outsides;
@@ -178,4 +174,33 @@ function _stitch(pieces, p2, maybeRadius = null, limits = new Panorama()) {
 
   // if (newPieces.length > 2) _assemblePieces(newPieces, true);
   return newPieces;
+}
+
+/**
+ * @param {Path} path
+ * @returns {Path}
+ */
+export function minBBox(path) {
+  const hull = convexHull(path);
+
+  let bestBbox = null;
+  let bestAngle = null;
+  let best = Number.POSITIVE_INFINITY;
+
+  for (const segment of hull.iterateOverSegments()) {
+    const [, p1, type, p2] = segment;
+    if (type !== "lineTo") continue;
+    const angle = vecAngle(p1, p2);
+    const bbox = hull.rotate(-angle).bbox();
+    const area = bbox.width() * bbox.height();
+    if (area > best) continue;
+
+    best = area;
+    bestBbox = bbox;
+    bestAngle = angle;
+  }
+
+  if (bestBbox == null || bestAngle == null) throw new Error();
+
+  return Path.fromBBox(bestBbox).rotate(bestAngle);
 }

@@ -3,7 +3,6 @@
 import {
   areOnSameLine,
   computeAngleBetween,
-  computeVectorAngle,
   dot,
   intersectLines,
   isToTheLeft,
@@ -33,6 +32,7 @@ import {
   intersectTwoCircles,
   normalizeAngle,
   pointCoordinateOnArc,
+  vecAngle,
 } from "./circle.js";
 import { debugGeometry } from "./debug.js";
 import { pairs } from "./iteration.js";
@@ -153,8 +153,8 @@ export class Path {
       const n1 = norm(p1, p2);
       const n2 = norm(p2, p3);
 
-      const angle1 = Math.atan2(...minus(p2, p1).toReversed());
-      const angle2 = Math.atan2(...minus(p3, p2).toReversed());
+      const angle1 = vecAngle(p1, p2);
+      const angle2 = vecAngle(p2, p3);
 
       const angle = normalizeAngle(angle2 - angle1);
       const requiredLength = Math.abs(radius * Math.tan(angle / 2));
@@ -187,8 +187,8 @@ export class Path {
       }
     } else throw new TypeError();
 
-    const angle1 = Math.atan2(...minus(start, center).toReversed());
-    const angle2 = Math.atan2(...minus(end, center).toReversed());
+    const angle1 = vecAngle(center, start);
+    const angle2 = vecAngle(center, end);
     const angle = normalizeAngle(angle2 - angle1);
 
     const sweepFlag = angle > 0 ? 1 : 0;
@@ -242,8 +242,8 @@ export class Path {
       const radius = getRadius(p2, bbox);
       if (!radius) continue;
 
-      const entry = Math.atan2(...minus(p2, p1).toReversed());
-      const exit = Math.atan2(...minus(p3, p2).toReversed());
+      const entry = vecAngle(p1, p2);
+      const exit = vecAngle(p2, p3);
       const turnsRight = normalizeAngle(exit - entry) < 0;
 
       const corner = new Path();
@@ -1158,7 +1158,7 @@ export class Path {
       throw new Error("cannot insert feature if segment is not a line");
 
     const location = placeAlong(p1, p2, placeAlongOpts);
-    const rotation = computeVectorAngle(minus(p2, p1));
+    const rotation = vecAngle(p1, p2);
     this.insert(index, feature.rotate(rotation).translate(location));
   }
 
@@ -1310,6 +1310,16 @@ export class Path {
     for (const p of rest) result.lineTo(p);
     if (close) result.close();
     return result;
+  }
+
+  /**
+   * @param {BBox} bbox
+   */
+  static fromBBox(bbox) {
+    return Path.makeRect(bbox.width(), bbox.height()).translate([
+      bbox.xMin,
+      bbox.yMin,
+    ]);
   }
 
   /**
@@ -1727,7 +1737,7 @@ export class Path {
     if (!this.isClosed())
       throw new Error("drag for open paths is not implemented yet");
 
-    const angle = Math.atan2(point[1], point[0]);
+    const angle = vecAngle(point);
     const rotated = this.rotate(-angle);
     const bbox = rotated.bbox();
     const { top, bottom } = bbox;
